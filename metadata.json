@@ -1,0 +1,6 @@
+{
+  "name": "حصتي - Hassty",
+  "description": "المنصة الأولى في مصر لربط المدرسين الخصوصيين بالطلاب وأولياء الأمور بنظام حضور ذكي بكود QR",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

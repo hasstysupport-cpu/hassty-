@@ -1,0 +1,201 @@
+import React from 'react';
+import {
+  LayoutDashboard,
+  QrCode,
+  Users,
+  Calendar,
+  Receipt,
+  ClipboardCheck,
+  BellRing,
+  Layers,
+  ScanLine,
+  UserCog,
+  Star,
+  ShieldCheck,
+  LogOut,
+  ChevronLeft,
+  Home,
+  Sparkles
+} from 'lucide-react';
+import { AccountRole } from '../../types';
+
+interface SidebarLinkItem {
+  name: string;
+  path: string;
+  icon: React.ComponentType<{ className?: string }>;
+  badge?: string;
+  highlight?: boolean;
+}
+
+interface DashboardSidebarProps {
+  currentRole: AccountRole;
+  currentPath: string;
+  onNavigate: (path: string) => void;
+  onLogout?: () => void;
+}
+
+export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
+  currentRole,
+  currentPath,
+  onNavigate,
+  onLogout,
+}) => {
+  // Navigation lists per role
+  const studentLinks: SidebarLinkItem[] = [
+    { name: 'الرئيسية', path: '/student/dashboard', icon: LayoutDashboard },
+    { name: 'كارنيه الـ QR', path: '/student/qr-card', icon: QrCode, badge: 'رقمي' },
+    { name: 'مدرسيني', path: '/student/tutors', icon: Users },
+    { name: 'حجز حصة', path: '/student/book', icon: Calendar },
+    { name: 'المدفوعات', path: '/student/payments', icon: Receipt },
+  ];
+
+  const parentLinks: SidebarLinkItem[] = [
+    { name: 'الرئيسية', path: '/parent/dashboard', icon: LayoutDashboard },
+    { name: 'سجل الحضور', path: '/parent/attendance', icon: ClipboardCheck },
+    { name: 'المدفوعات', path: '/parent/payments', icon: Receipt },
+    { name: 'إعدادات الإشعارات', path: '/parent/settings', icon: BellRing },
+  ];
+
+  const teacherLinks: SidebarLinkItem[] = [
+    { name: 'الرئيسية', path: '/teacher/dashboard', icon: LayoutDashboard },
+    { name: 'الطلاب', path: '/teacher/students', icon: Users },
+    { name: 'المجموعات', path: '/teacher/groups', icon: Layers },
+    { name: 'ماسح الحضور (QR)', path: '/teacher/scan', icon: ScanLine, highlight: true },
+    { name: 'المدفوعات والعمولة', path: '/teacher/payments', icon: Receipt },
+    { name: 'المواعيد المتاحة', path: '/teacher/availability', icon: Calendar },
+    { name: 'تعديل البروفايل العام', path: '/teacher/profile', icon: UserCog },
+    { name: 'التقييمات', path: '/teacher/reviews', icon: Star },
+  ];
+
+  const currentLinks =
+    currentRole === 'student' ? studentLinks : currentRole === 'parent' ? parentLinks : teacherLinks;
+
+  return (
+    <>
+      {/* Desktop Sidebar */}
+      <aside className="hidden lg:flex flex-col w-64 xl:w-72 bg-white border border-[#E5E7EB] rounded-3xl p-5 shrink-0 sticky top-24 h-[calc(100vh-8rem)] overflow-y-auto justify-between shadow-xs">
+        
+        {/* Navigation list */}
+        <div className="space-y-6">
+          
+          {/* Role Header Banner */}
+          <div className="p-3.5 bg-[#F8FAFF] border border-[#E5E7EB] rounded-2xl flex items-center gap-3">
+            <div
+              className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 ${
+                currentRole === 'student'
+                  ? 'bg-[#2563EB]'
+                  : currentRole === 'parent'
+                  ? 'bg-[#1E3A8A]'
+                  : 'bg-emerald-600'
+              }`}
+            >
+              {currentRole === 'student' ? (
+                <QrCode className="w-5 h-5" />
+              ) : currentRole === 'parent' ? (
+                <ShieldCheck className="w-5 h-5" />
+              ) : (
+                <Users className="w-5 h-5" />
+              )}
+            </div>
+            <div>
+              <span className="text-[11px] font-bold text-[#6B7280] block">
+                {currentRole === 'student'
+                  ? 'حساب طالب'
+                  : currentRole === 'parent'
+                  ? 'حساب ولي أمر'
+                  : 'حساب معلم معتمد'}
+              </span>
+              <h3 className="text-xs font-black text-[#1E3A8A]">
+                {currentRole === 'student'
+                  ? 'زياد أحمد (3 ثانوي)'
+                  : currentRole === 'parent'
+                  ? 'أحمد عبد الله'
+                  : 'أ. حسام إبراهيم'}
+              </h3>
+            </div>
+          </div>
+
+          {/* Links */}
+          <nav className="space-y-1.5">
+            <div className="text-[11px] font-bold text-[#6B7280] px-3 mb-2">القائمة الرئيسية</div>
+            {currentLinks.map((item) => {
+              const Icon = item.icon;
+              const isActive = currentPath === item.path;
+              return (
+                <button
+                  key={item.path}
+                  onClick={() => onNavigate(item.path)}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    isActive
+                      ? 'bg-[#2563EB] text-white shadow-xs'
+                      : item.highlight
+                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
+                      : 'text-[#1F2937] hover:bg-[#EFF6FF] hover:text-[#2563EB]'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Icon className={`w-4 h-4 ${isActive ? 'text-white' : item.highlight ? 'text-emerald-700' : 'text-gray-400'}`} />
+                    <span>{item.name}</span>
+                  </div>
+
+                  {item.badge && (
+                    <span
+                      className={`text-[10px] px-2 py-0.5 rounded-md font-bold ${
+                        isActive ? 'bg-white/20 text-white' : 'bg-[#EFF6FF] text-[#2563EB] border border-blue-200'
+                      }`}
+                    >
+                      {item.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+
+        </div>
+
+        {/* Bottom Public Return & Logout */}
+        <div className="pt-4 border-t border-gray-100 space-y-2">
+          <button
+            onClick={() => onNavigate('/')}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-[#4B5563] hover:text-[#2563EB] hover:bg-[#EFF6FF] rounded-xl transition-colors cursor-pointer"
+          >
+            <Home className="w-4 h-4" />
+            <span>العودة للرئيسية العامة</span>
+          </button>
+
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-[#EF4444] hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>تسجيل الخروج</span>
+            </button>
+          )}
+        </div>
+
+      </aside>
+
+      {/* Mobile Bottom Navigation Bar */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-[#E5E7EB] px-2 py-2 flex items-center justify-around shadow-lg">
+        {currentLinks.slice(0, 5).map((item) => {
+          const Icon = item.icon;
+          const isActive = currentPath === item.path;
+          return (
+            <button
+              key={item.path}
+              onClick={() => onNavigate(item.path)}
+              className={`flex flex-col items-center gap-1 p-2 rounded-xl text-[10px] font-bold transition-colors cursor-pointer ${
+                isActive ? 'text-[#2563EB]' : 'text-gray-500 hover:text-[#2563EB]'
+              }`}
+            >
+              <Icon className="w-5 h-5" />
+              <span className="truncate max-w-[60px]">{item.name}</span>
+            </button>
+          );
+        })}
+      </div>
+    </>
+  );
+};
