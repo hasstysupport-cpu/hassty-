@@ -178,7 +178,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
       </aside>
 
       {/* Mobile Bottom Navigation Bar */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-[#E5E7EB] px-2 py-2 flex items-center justify-around shadow-lg">
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-[#E5E7EB] px-1 sm:px-3 py-2 flex items-center justify-around shadow-[0_-4px_20px_rgba(0,0,0,0.06)] pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         {currentLinks.slice(0, 5).map((item) => {
           const Icon = item.icon;
           const isActive = currentPath === item.path;
@@ -186,12 +186,14 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
             <button
               key={item.path}
               onClick={() => onNavigate(item.path)}
-              className={`flex flex-col items-center gap-1 p-2 rounded-xl text-[10px] font-bold transition-colors cursor-pointer ${
+              className={`flex-1 flex flex-col items-center justify-center gap-1 py-1 px-1 rounded-xl text-[11px] font-bold transition-all cursor-pointer ${
                 isActive ? 'text-[#2563EB]' : 'text-gray-500 hover:text-[#2563EB]'
               }`}
             >
-              <Icon className="w-5 h-5" />
-              <span className="truncate max-w-[60px]">{item.name}</span>
+              <div className={`p-1 rounded-lg transition-colors ${isActive ? 'bg-[#EFF6FF]' : ''}`}>
+                <Icon className="w-5 h-5" />
+              </div>
+              <span className="truncate max-w-[68px] text-[10px] leading-tight text-center">{item.name}</span>
             </button>
           );
         })}

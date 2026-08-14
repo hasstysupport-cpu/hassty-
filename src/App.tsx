@@ -124,7 +124,7 @@ export default function App() {
       {/* 2. MAIN VIEW AREA */}
       {isDashboardRoute && isLoggedIn ? (
         // DASHBOARD LAYOUT (Sidebar + Main Content)
-        <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 flex flex-col md:flex-row gap-6 lg:gap-8 items-start">
+        <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 pb-24 sm:pb-28 lg:pb-8 flex flex-col md:flex-row gap-6 lg:gap-8 items-start">
           
           {/* Dashboard Sidebar */}
           <DashboardSidebar
@@ -135,7 +135,7 @@ export default function App() {
           />
 
           {/* Dashboard Content Container */}
-          <main className="flex-1 w-full min-w-0">
+          <main className="flex-1 w-full min-w-0 pb-6">
             {/* Student Routes */}
             {currentPath === '/student/dashboard' && (
               <StudentDashboardPage onNavigate={handleNavigate} onSelectTutor={handleSelectTutor} />
