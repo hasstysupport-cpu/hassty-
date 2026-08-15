@@ -18,6 +18,7 @@ import {
 import { SAMPLE_TUTORS, EGYPT_GOVERNORATES, CITIES_BY_GOVERNORATE, SUBJECTS_DATA } from '../data/mockData';
 import { TutorProfile } from '../types';
 import { Badge } from '../components/common/Badge';
+import { LocationSelector } from '../components/common/LocationSelector';
 
 interface SearchResultsPageProps {
   initialSubject?: string;
@@ -144,7 +145,7 @@ export const SearchResultsPage: React.FC<SearchResultsPageProps> = ({
             </div>
 
             {/* Filters Row */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 lg:flex lg:items-center">
+            <div className="flex flex-wrap items-center gap-2">
               
               {/* Subject Select */}
               <select
@@ -153,7 +154,7 @@ export const SearchResultsPage: React.FC<SearchResultsPageProps> = ({
                   setSelectedSubject(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="px-3 py-2.5 bg-gray-50 border border-[#E5E7EB] rounded-xl text-xs font-bold text-[#1F2937] focus:outline-none focus:border-[#2563EB] cursor-pointer"
+                className="px-3 py-2.5 bg-gray-50 border border-[#E5E7EB] rounded-xl text-xs font-bold text-[#1F2937] focus:outline-none focus:border-[#2563EB] cursor-pointer hover:bg-white"
               >
                 <option value="">كل المواد الدراسية</option>
                 {SUBJECTS_DATA.map((s) => (
@@ -163,38 +164,23 @@ export const SearchResultsPage: React.FC<SearchResultsPageProps> = ({
                 ))}
               </select>
 
-              {/* Governorate Select */}
-              <select
-                value={selectedGovernorate}
-                onChange={(e) => handleGovernorateChange(e.target.value)}
-                className="px-3 py-2.5 bg-gray-50 border border-[#E5E7EB] rounded-xl text-xs font-bold text-[#1F2937] focus:outline-none focus:border-[#2563EB] cursor-pointer"
-              >
-                <option value="">كل المحافظات (27)</option>
-                {EGYPT_GOVERNORATES.map((g) => (
-                  <option key={g} value={g}>
-                    {g}
-                  </option>
-                ))}
-              </select>
-
-              {/* City Dropdown (Appears if Gov has cities) */}
-              {availableCities.length > 0 && (
-                <select
-                  value={selectedCity}
-                  onChange={(e) => {
-                    setSelectedCity(e.target.value);
+              {/* Smart Location Selector Dropdown */}
+              <div className="w-full sm:w-auto min-w-[200px]">
+                <LocationSelector
+                  selectedGovernorate={selectedGovernorate}
+                  selectedCity={selectedCity}
+                  onSelectGovernorate={(gov) => {
+                    handleGovernorateChange(gov);
                     setCurrentPage(1);
                   }}
-                  className="px-3 py-2.5 bg-[#EFF6FF] border border-blue-200 text-[#2563EB] rounded-xl text-xs font-bold focus:outline-none focus:border-[#2563EB] cursor-pointer animate-fadeIn"
-                >
-                  <option value="">كل مناطق {selectedGovernorate}</option>
-                  {availableCities.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-              )}
+                  onSelectCity={(city) => {
+                    setSelectedCity(city);
+                    setCurrentPage(1);
+                  }}
+                  showCitySelect={true}
+                  placeholder="المحافظة والمدينة..."
+                />
+              </div>
 
               {/* Stage Filter */}
               <select
@@ -284,7 +270,7 @@ export const SearchResultsPage: React.FC<SearchResultsPageProps> = ({
             {displayedTutors.map((tutor) => (
               <div
                 key={tutor.id}
-                className="bg-white border border-[#E5E7EB] rounded-2xl p-5 sm:p-6 hover:border-blue-300 transition-all hover:shadow-xs flex flex-col justify-between"
+                className="bg-white border border-[#E5E7EB] rounded-2xl p-5 sm:p-6 hover:border-blue-300 transition-all hover:shadow-md hover:-translate-y-0.5 flex flex-col justify-between"
               >
                 <div>
                   

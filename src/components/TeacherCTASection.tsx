@@ -8,15 +8,16 @@ interface TeacherCTASectionProps {
 export const TeacherCTASection: React.FC<TeacherCTASectionProps> = ({ onJoinAsTeacher }) => {
   return (
     <section className="bg-[#1E3A8A] text-white py-16 lg:py-20 relative overflow-hidden">
-      {/* Background subtle geometric accents */}
+      {/* Background subtle geometric accents and gentle animated glows */}
       <div 
-        className="absolute top-0 right-0 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none"
+        className="absolute top-0 right-0 w-[450px] h-[450px] bg-blue-500/15 rounded-full blur-3xl pointer-events-none animate-pulse-subtle"
         aria-hidden="true"
       />
       <div 
-        className="absolute bottom-0 left-0 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"
+        className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-sky-400/15 rounded-full blur-3xl pointer-events-none animate-pulse-subtle"
         aria-hidden="true"
       />
+      <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.06)_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="max-w-4xl mx-auto text-center">

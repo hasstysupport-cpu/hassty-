@@ -16,7 +16,247 @@
 }
 
 .bg-dot-pattern-light {
-  background-image: radial-gradient(rgba(37, 99, 235, 0.15) 1px, transparent 1px);
-  background-size: 20px 20px;
+  background-image: radial-gradient(rgba(37, 99, 235, 0.12) 1px, transparent 1px);
+  background-size: 24px 24px;
 }
+
+.bg-grid-pattern {
+  background-size: 36px 36px;
+  background-image: 
+    linear-gradient(to right, rgba(37, 99, 235, 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(37, 99, 235, 0.045) 1px, transparent 1px);
+}
+
+/* Educational subtle mathematics & geometry watermark background */
+.bg-edu-pattern {
+  background-color: #ffffff;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(37, 99, 235, 0.08) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(16, 185, 129, 0.06) 0px, transparent 50%),
+    radial-gradient(at 50% 100%, rgba(37, 99, 235, 0.06) 0px, transparent 50%),
+    radial-gradient(rgba(37, 99, 235, 0.08) 1.2px, transparent 1.2px);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 28px 28px;
+}
+
+.bg-hero-mesh {
+  background-color: #FAFCFF;
+  background-image: 
+    radial-gradient(at 15% 15%, rgba(37, 99, 235, 0.12) 0px, transparent 45%),
+    radial-gradient(at 85% 10%, rgba(14, 165, 233, 0.10) 0px, transparent 40%),
+    radial-gradient(at 50% 60%, rgba(37, 99, 235, 0.05) 0px, transparent 60%),
+    radial-gradient(at 90% 85%, rgba(16, 185, 129, 0.08) 0px, transparent 45%),
+    linear-gradient(to right, rgba(37, 99, 235, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(37, 99, 235, 0.035) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 32px 32px, 32px 32px;
+}
+
+/* Keyframes Animations */
+@keyframes float-slow {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(1.5deg);
+  }
+}
+
+@keyframes float-reverse {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(10px) rotate(-1.5deg);
+  }
+}
+
+@keyframes pulse-subtle {
+  0%, 100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes page-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.995);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes drawer-slide {
+  0% {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes step-slide-right {
+  0% {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes step-slide-left {
+  0% {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-drawer {
+  animation: drawer-slide 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-step-next {
+  animation: step-slide-right 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-step-prev {
+  animation: step-slide-left 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes spin-slow {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 28s linear infinite;
+}
+
+@keyframes scale-up-bounce {
+  0% {
+    opacity: 0;
+    transform: scale(0.85) translateY(10px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.03) translateY(-2px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes scan-flash {
+  0% {
+    opacity: 0.8;
+    background-color: rgba(16, 185, 129, 0.45);
+  }
+  50% {
+    opacity: 0.4;
+    background-color: rgba(16, 185, 129, 0.2);
+  }
+  100% {
+    opacity: 0;
+    background-color: transparent;
+  }
+}
+
+@keyframes success-ring {
+  0% {
+    transform: scale(0.7);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+.animate-scaleUp {
+  animation: scale-up-bounce 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.animate-scan-flash {
+  animation: scan-flash 0.6s ease-out forwards;
+}
+
+.animate-success-ring {
+  animation: success-ring 0.8s cubic-bezier(0, 0, 0.2, 1) forwards;
+}
+
+@keyframes shine {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.animate-float-slow {
+  animation: float-slow 6s ease-in-out infinite;
+}
+
+.animate-float-reverse {
+  animation: float-reverse 7s ease-in-out infinite;
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 5s ease-in-out infinite;
+}
+
+.page-transition {
+  animation: page-enter 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Button & Card Micro-Interactions */
+button, a, input, select, textarea {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-primary-shine {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary-shine::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.25),
+    transparent
+  );
+  transform: skewX(-20deg);
+  transition: 0.6s;
+}
+
+.btn-primary-shine:hover::after {
+  left: 150%;
+}
+
+
 

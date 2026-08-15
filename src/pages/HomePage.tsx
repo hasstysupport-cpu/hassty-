@@ -15,7 +15,7 @@ interface HomePageProps {
   onNavigate: (path: string) => void;
   onOpenQRSimulator?: () => void;
   onOpenAuth?: (mode: 'login' | 'register', role?: AccountRole) => void;
-  onSearchWithParams?: (subject: string, governorate: string) => void;
+  onSearchWithParams?: (subject: string, governorate: string, city?: string) => void;
   onSelectTutor?: (tutorId: string) => void;
 }
 
@@ -25,9 +25,9 @@ export const HomePage: React.FC<HomePageProps> = ({
   onOpenAuth,
   onSearchWithParams,
 }) => {
-  const handleSearch = (subject: string, governorate: string) => {
+  const handleSearch = (subject: string, governorate: string, city: string = '') => {
     if (onSearchWithParams) {
-      onSearchWithParams(subject, governorate);
+      onSearchWithParams(subject, governorate, city);
     } else {
       onNavigate('/search');
     }

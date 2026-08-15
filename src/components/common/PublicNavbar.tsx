@@ -122,7 +122,7 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
 
             <button
               onClick={() => handleLinkClick('/login')}
-              className="px-4 py-2.5 text-sm font-bold text-[#1E3A8A] hover:text-[#2563EB] hover:bg-[#EFF6FF] rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
+              className="px-4 py-2.5 text-sm font-bold text-[#1E3A8A] hover:text-[#2563EB] hover:bg-[#EFF6FF] rounded-xl transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
             >
               <LogIn className="w-4 h-4" />
               <span>تسجيل الدخول</span>
@@ -130,7 +130,7 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
 
             <button
               onClick={() => handleLinkClick('/signup')}
-              className="px-5 py-2.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-sm font-bold rounded-xl transition-all shadow-xs hover:shadow-md flex items-center gap-2 cursor-pointer"
+              className="btn-primary-shine px-5 py-2.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-sm font-bold rounded-xl transition-all shadow-md hover:shadow-blue-500/25 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 flex items-center gap-2 cursor-pointer"
             >
               <span>إنشاء حساب</span>
               <ArrowLeft className="w-4 h-4" />
@@ -157,9 +157,9 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
         </div>
       </div>
 
-      {/* Mobile Drawer Menu */}
+      {/* Mobile Drawer Menu with smooth animation */}
       {isMobileMenuOpen && (
-        <div className="md:hidden bg-white border-b border-[#E5E7EB] px-4 pt-3 pb-6 space-y-3">
+        <div className="md:hidden bg-white/95 backdrop-blur-md border-b border-[#E5E7EB] px-4 pt-3 pb-6 space-y-3 shadow-xl animate-drawer origin-top">
           <div className="space-y-1">
             {navLinks.map((link) => {
               const isActive = currentPath === link.path;
@@ -167,7 +167,7 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
                 <button
                   key={link.path}
                   onClick={() => handleLinkClick(link.path)}
-                  className={`w-full text-right px-4 py-3 rounded-xl text-base font-bold transition-colors cursor-pointer ${
+                  className={`w-full text-right px-4 py-3 rounded-xl text-base font-bold transition-all cursor-pointer active:scale-[0.98] ${
                     isActive
                       ? 'bg-[#EFF6FF] text-[#2563EB]'
                       : 'text-[#1F2937] hover:bg-gray-50'
@@ -184,19 +184,19 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
             <div className="grid grid-cols-3 gap-2">
               <button
                 onClick={() => handleLinkClick('/student/dashboard')}
-                className="p-2 text-center text-xs font-bold bg-[#EFF6FF] text-[#2563EB] rounded-xl border border-blue-200"
+                className="p-2.5 text-center text-xs font-bold bg-[#EFF6FF] text-[#2563EB] rounded-xl border border-blue-200 hover:bg-blue-100 transition-all active:scale-95 cursor-pointer"
               >
                 الطالب
               </button>
               <button
                 onClick={() => handleLinkClick('/parent/dashboard')}
-                className="p-2 text-center text-xs font-bold bg-amber-50 text-amber-800 rounded-xl border border-amber-200"
+                className="p-2.5 text-center text-xs font-bold bg-amber-50 text-amber-800 rounded-xl border border-amber-200 hover:bg-amber-100 transition-all active:scale-95 cursor-pointer"
               >
                 ولي الأمر
               </button>
               <button
                 onClick={() => handleLinkClick('/teacher/dashboard')}
-                className="p-2 text-center text-xs font-bold bg-emerald-50 text-emerald-800 rounded-xl border border-emerald-200"
+                className="p-2.5 text-center text-xs font-bold bg-emerald-50 text-emerald-800 rounded-xl border border-emerald-200 hover:bg-emerald-100 transition-all active:scale-95 cursor-pointer"
               >
                 المعلم
               </button>
@@ -206,13 +206,13 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
           <div className="pt-2 grid grid-cols-2 gap-2">
             <button
               onClick={() => handleLinkClick('/login')}
-              className="w-full py-2.5 text-center text-sm font-bold text-[#1E3A8A] bg-gray-50 border border-gray-200 rounded-xl cursor-pointer"
+              className="w-full py-3 text-center text-sm font-bold text-[#1E3A8A] bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl transition-all active:scale-95 cursor-pointer"
             >
               تسجيل الدخول
             </button>
             <button
               onClick={() => handleLinkClick('/signup')}
-              className="w-full py-2.5 text-center text-sm font-bold text-white bg-[#2563EB] rounded-xl cursor-pointer"
+              className="btn-primary-shine w-full py-3 text-center text-sm font-bold text-white bg-[#2563EB] hover:bg-[#1D4ED8] rounded-xl shadow-md transition-all active:scale-95 cursor-pointer"
             >
               إنشاء حساب
             </button>

@@ -33,8 +33,12 @@ export const HowItWorksSection: React.FC<HowItWorksSectionProps> = ({
   };
 
   return (
-    <section id="how-it-works" className="py-16 lg:py-24 bg-white border-b border-gray-200">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section id="how-it-works" className="py-16 lg:py-24 bg-white border-b border-gray-200 relative overflow-hidden bg-grid-pattern">
+      {/* Background soft glow rings */}
+      <div className="absolute top-1/2 left-0 -translate-y-1/2 w-80 h-80 bg-blue-50/60 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-10 right-10 w-64 h-64 bg-indigo-50/50 rounded-full blur-2xl pointer-events-none" />
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         
         {/* Section Heading */}
         <div className="text-center max-w-2xl mx-auto mb-14">

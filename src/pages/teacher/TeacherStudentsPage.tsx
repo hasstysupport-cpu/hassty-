@@ -16,7 +16,11 @@ import { MOCK_TEACHER_STUDENTS, MOCK_TEACHER_GROUPS } from '../../data/mockData'
 import { TeacherStudentItem } from '../../types';
 import { Badge } from '../../components/common/Badge';
 
-export const TeacherStudentsPage: React.FC = () => {
+interface TeacherStudentsPageProps {
+  onNavigate?: (path: string) => void;
+}
+
+export const TeacherStudentsPage: React.FC<TeacherStudentsPageProps> = ({ onNavigate }) => {
   const [students, setStudents] = useState<TeacherStudentItem[]>(MOCK_TEACHER_STUDENTS);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGroup, setSelectedGroup] = useState('all');
@@ -86,13 +90,23 @@ export const TeacherStudentsPage: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="px-5 py-3 bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-2 cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          <span>إضافة طالب جديد للمجموعة</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={() => onNavigate && onNavigate('/teacher/scan')}
+            className="px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-2 cursor-pointer active:scale-95"
+          >
+            <QrCode className="w-4 h-4" />
+            <span>قيد طالب فوري بالـ QR</span>
+          </button>
+
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="px-4 py-3 bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-2 cursor-pointer active:scale-95"
+          >
+            <Plus className="w-4 h-4" />
+            <span>إضافة يدوية</span>
+          </button>
+        </div>
       </div>
 
       {/* Filter and Search Bar */}

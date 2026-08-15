@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { MOCK_TEACHER_STUDENTS, MOCK_TEACHER_GROUPS } from '../../data/mockData';
 import { Badge } from '../../components/common/Badge';
+import { TeacherAttendanceChart } from '../../components/teacher/TeacherAttendanceChart';
 
 interface TeacherDashboardPageProps {
   onNavigate: (path: string) => void;
@@ -42,22 +43,30 @@ export const TeacherDashboardPage: React.FC<TeacherDashboardPageProps> = ({
           </p>
         </div>
 
-        {/* Big Action: Open QR Scanner */}
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
+        {/* Big Actions: Open QR Hub for Attendance, Add Student & Confirm Fees */}
+        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
           <button
             onClick={() => onNavigate('/teacher/scan')}
-            className="w-full sm:w-auto px-6 py-4 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-sm rounded-2xl transition-all shadow-lg hover:shadow-emerald-500/20 flex items-center justify-center gap-2.5 cursor-pointer animate-pulse"
+            className="w-full sm:w-auto px-5 py-3.5 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs rounded-2xl transition-all shadow-lg hover:shadow-emerald-500/20 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
           >
-            <ScanLine className="w-6 h-6" />
-            <span>فتح ماسح الـ QR لتسجيل الحضور</span>
+            <ScanLine className="w-5 h-5" />
+            <span>تسجيل حضور (QR)</span>
           </button>
 
           <button
-            onClick={() => onNavigate('/teacher/students')}
-            className="w-full sm:w-auto px-5 py-4 bg-white/10 hover:bg-white/20 text-white font-bold text-xs rounded-2xl border border-white/20 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+            onClick={() => onNavigate('/teacher/scan')}
+            className="w-full sm:w-auto px-4 py-3.5 bg-blue-500 hover:bg-blue-600 text-white font-black text-xs rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-95"
           >
-            <Users className="w-4 h-4" />
-            <span>قائمة الطلاب (310)</span>
+            <QrCode className="w-4 h-4" />
+            <span>إضافة طالب بالـ QR</span>
+          </button>
+
+          <button
+            onClick={() => onNavigate('/teacher/scan')}
+            className="w-full sm:w-auto px-4 py-3.5 bg-purple-600 hover:bg-purple-700 text-white font-black text-xs rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+          >
+            <DollarSign className="w-4 h-4" />
+            <span>تأكيد سداد قسط (QR)</span>
           </button>
         </div>
       </div>
@@ -111,7 +120,10 @@ export const TeacherDashboardPage: React.FC<TeacherDashboardPageProps> = ({
 
       </div>
 
-      {/* 3. Live Check-Ins & Groups Overview */}
+      {/* 3. Monthly Sessions & Attendance Analytics (Recharts) */}
+      <TeacherAttendanceChart />
+
+      {/* 4. Live Check-Ins & Groups Overview */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
         {/* Left 2 Cols: Live Check-in Feed */}

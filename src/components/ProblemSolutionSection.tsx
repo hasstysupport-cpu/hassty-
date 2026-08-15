@@ -4,8 +4,14 @@ import { PROBLEM_SOLUTION_CARDS } from '../data/mockData';
 
 export const ProblemSolutionSection: React.FC = () => {
   return (
-    <section id="problem-solution" className="py-16 lg:py-20 bg-[#F8FAFF] border-b border-gray-200">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section id="problem-solution" className="py-16 lg:py-20 bg-[#F8FAFF] border-b border-gray-200 relative overflow-hidden bg-dot-pattern-light">
+      {/* Subtle background decorative shapes */}
+      <div className="absolute -top-10 -right-10 w-72 h-72 bg-blue-100/40 rounded-full blur-2xl pointer-events-none" />
+      <div className="absolute -bottom-10 -left-10 w-72 h-72 bg-emerald-50/50 rounded-full blur-2xl pointer-events-none" />
+      <div className="absolute top-1/2 right-[10%] w-4 h-4 rounded-full bg-blue-300/30 animate-pulse pointer-events-none hidden md:block"></div>
+      <div className="absolute top-1/3 left-[8%] w-5 h-5 rounded-lg border border-blue-200/50 rotate-45 pointer-events-none hidden md:block"></div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         
         {/* Section Header */}
         <div className="max-w-3xl mx-auto text-center mb-12">

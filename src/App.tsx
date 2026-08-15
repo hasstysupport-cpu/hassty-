@@ -52,6 +52,9 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [currentRole, setCurrentRole] = useState<AccountRole>('student');
   const [selectedTutorId, setSelectedTutorId] = useState<string>(SAMPLE_TUTORS[0].id);
+  const [searchSubject, setSearchSubject] = useState<string>('');
+  const [searchGovernorate, setSearchGovernorate] = useState<string>('');
+  const [searchCity, setSearchCity] = useState<string>('');
 
   // Scroll to top on navigation
   useEffect(() => {
@@ -66,6 +69,13 @@ export default function App() {
       setSelectedTutorId(id);
     }
     setCurrentPath(path);
+  };
+
+  const handleSearchWithParams = (subject: string, governorate: string, city: string = '') => {
+    setSearchSubject(subject);
+    setSearchGovernorate(governorate);
+    setSearchCity(city);
+    setCurrentPath('/search');
   };
 
   // Login handler
@@ -135,7 +145,7 @@ export default function App() {
           />
 
           {/* Dashboard Content Container */}
-          <main className="flex-1 w-full min-w-0 pb-6">
+          <main className="flex-1 w-full min-w-0 pb-6 page-transition">
             {/* Student Routes */}
             {currentPath === '/student/dashboard' && (
               <StudentDashboardPage onNavigate={handleNavigate} onSelectTutor={handleSelectTutor} />
@@ -159,10 +169,10 @@ export default function App() {
             {currentPath === '/teacher/dashboard' && (
               <TeacherDashboardPage onNavigate={handleNavigate} />
             )}
-            {currentPath === '/teacher/students' && <TeacherStudentsPage />}
+            {currentPath === '/teacher/students' && <TeacherStudentsPage onNavigate={handleNavigate} />}
             {currentPath === '/teacher/groups' && <TeacherGroupsPage />}
             {currentPath === '/teacher/scan' && <TeacherScanPage />}
-            {currentPath === '/teacher/payments' && <TeacherPaymentsPage />}
+            {currentPath === '/teacher/payments' && <TeacherPaymentsPage onNavigate={handleNavigate} />}
             {currentPath === '/teacher/availability' && <TeacherAvailabilityPage />}
             {currentPath === '/teacher/profile' && <TeacherProfileEditPage />}
             {currentPath === '/teacher/reviews' && <TeacherReviewsPage />}
@@ -170,13 +180,23 @@ export default function App() {
         </div>
       ) : (
         // PUBLIC / AUTH PAGES LAYOUT
-        <main className="flex-1">
+        <main className="flex-1 page-transition">
           {currentPath === '/' && (
-            <HomePage onNavigate={handleNavigate} onSelectTutor={handleSelectTutor} />
+            <HomePage
+              onNavigate={handleNavigate}
+              onSelectTutor={handleSelectTutor}
+              onSearchWithParams={handleSearchWithParams}
+            />
           )}
 
           {currentPath === '/search' && (
-            <SearchResultsPage onNavigate={handleNavigate} onSelectTutor={handleSelectTutor} />
+            <SearchResultsPage
+              onNavigate={handleNavigate}
+              onSelectTutor={handleSelectTutor}
+              initialSubject={searchSubject}
+              initialGovernorate={searchGovernorate}
+              initialCity={searchCity}
+            />
           )}
 
           {currentPath.startsWith('/tutor') && (

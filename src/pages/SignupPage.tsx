@@ -16,6 +16,7 @@ import {
 import { AccountRole } from '../types';
 import { EGYPT_GOVERNORATES, SUBJECTS_DATA } from '../data/mockData';
 import { Badge } from '../components/common/Badge';
+import { LocationSelector } from '../components/common/LocationSelector';
 
 interface SignupPageProps {
   initialRole?: AccountRole;
@@ -106,7 +107,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({
 
         {/* Step 1: Select Role */}
         {step === 1 && (
-          <div className="bg-white border border-[#E5E7EB] rounded-3xl p-6 sm:p-8 shadow-xs space-y-4 animate-fadeIn">
+          <div className="bg-white border border-[#E5E7EB] rounded-3xl p-6 sm:p-8 shadow-xs space-y-4 animate-step-prev">
             <h3 className="text-base font-bold text-[#1E3A8A] text-center mb-4">
               الخطوة 1: حدد نوع الحساب المناسب لك
             </h3>
@@ -114,13 +115,13 @@ export const SignupPage: React.FC<SignupPageProps> = ({
             {/* Student Card */}
             <button
               onClick={() => handleStep1Select('student')}
-              className={`w-full p-4.5 rounded-2xl border-2 text-right transition-all flex items-start gap-4 cursor-pointer ${
+              className={`w-full p-4.5 rounded-2xl border-2 text-right transition-all flex items-start gap-4 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] ${
                 role === 'student'
-                  ? 'border-[#2563EB] bg-[#EFF6FF]'
+                  ? 'border-[#2563EB] bg-[#EFF6FF] shadow-sm'
                   : 'border-gray-200 hover:border-blue-200 bg-gray-50/50'
               }`}
             >
-              <div className="w-12 h-12 rounded-xl bg-[#2563EB] text-white flex items-center justify-center shrink-0">
+              <div className="w-12 h-12 rounded-xl bg-[#2563EB] text-white flex items-center justify-center shrink-0 shadow-xs">
                 <Users className="w-6 h-6" />
               </div>
               <div className="flex-1">
@@ -139,13 +140,13 @@ export const SignupPage: React.FC<SignupPageProps> = ({
             {/* Parent Card */}
             <button
               onClick={() => handleStep1Select('parent')}
-              className={`w-full p-4.5 rounded-2xl border-2 text-right transition-all flex items-start gap-4 cursor-pointer ${
+              className={`w-full p-4.5 rounded-2xl border-2 text-right transition-all flex items-start gap-4 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] ${
                 role === 'parent'
-                  ? 'border-[#1E3A8A] bg-blue-50'
+                  ? 'border-[#1E3A8A] bg-blue-50 shadow-sm'
                   : 'border-gray-200 hover:border-blue-200 bg-gray-50/50'
               }`}
             >
-              <div className="w-12 h-12 rounded-xl bg-[#1E3A8A] text-white flex items-center justify-center shrink-0">
+              <div className="w-12 h-12 rounded-xl bg-[#1E3A8A] text-white flex items-center justify-center shrink-0 shadow-xs">
                 <ShieldCheck className="w-6 h-6" />
               </div>
               <div className="flex-1">
@@ -164,13 +165,13 @@ export const SignupPage: React.FC<SignupPageProps> = ({
             {/* Teacher Card */}
             <button
               onClick={() => handleStep1Select('teacher')}
-              className={`w-full p-4.5 rounded-2xl border-2 text-right transition-all flex items-start gap-4 cursor-pointer ${
+              className={`w-full p-4.5 rounded-2xl border-2 text-right transition-all flex items-start gap-4 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] ${
                 role === 'teacher'
-                  ? 'border-[#10B981] bg-emerald-50'
+                  ? 'border-[#10B981] bg-emerald-50 shadow-sm'
                   : 'border-gray-200 hover:border-emerald-200 bg-gray-50/50'
               }`}
             >
-              <div className="w-12 h-12 rounded-xl bg-[#10B981] text-white flex items-center justify-center shrink-0">
+              <div className="w-12 h-12 rounded-xl bg-[#10B981] text-white flex items-center justify-center shrink-0 shadow-xs">
                 <BookOpen className="w-6 h-6" />
               </div>
               <div className="flex-1">
@@ -202,7 +203,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({
 
         {/* Step 2: Role Form */}
         {step === 2 && (
-          <div className="bg-white border border-[#E5E7EB] rounded-3xl p-6 sm:p-8 shadow-xs space-y-5 animate-fadeIn">
+          <div className="bg-white border border-[#E5E7EB] rounded-3xl p-6 sm:p-8 shadow-xs space-y-5 animate-step-next">
             <div className="flex items-center justify-between pb-3 border-b border-gray-100">
               <div>
                 <span className="text-[11px] font-bold text-[#2563EB]">الخطوة 2 من 3</span>
@@ -256,27 +257,25 @@ export const SignupPage: React.FC<SignupPageProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-[#1F2937] mb-1.5">
-                    المحافظة <span className="text-[#EF4444]">*</span>
+                    المحافظة والمدينة <span className="text-[#EF4444]">*</span>
                   </label>
-                  <select
-                    value={governorate}
-                    onChange={(e) => setGovernorate(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-[#E5E7EB] rounded-xl text-xs text-right focus:bg-white focus:outline-none focus:border-[#2563EB] cursor-pointer"
-                  >
-                    {EGYPT_GOVERNORATES.map((gov) => (
-                      <option key={gov} value={gov}>{gov}</option>
-                    ))}
-                  </select>
+                  <LocationSelector
+                    selectedGovernorate={governorate}
+                    selectedCity={area}
+                    onSelectGovernorate={(gov) => setGovernorate(gov || 'القاهرة')}
+                    onSelectCity={(city) => setArea(city)}
+                    showCitySelect={true}
+                    placeholder="اختر المحافظة والمدينة"
+                  />
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-[#1F2937] mb-1.5">
-                    المنطقة / الحي <span className="text-[#EF4444]">*</span>
+                    العنوان / تفاصيل الشارع
                   </label>
                   <input
                     type="text"
-                    required
-                    placeholder="مثال: الدقي / مدينة نصر"
+                    placeholder="مثال: شارع عباس العقاد بجوار مسجد..."
                     value={area}
                     onChange={(e) => setArea(e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-gray-50 border border-[#E5E7EB] rounded-xl text-xs text-right focus:bg-white focus:outline-none focus:border-[#2563EB]"
@@ -425,8 +424,8 @@ export const SignupPage: React.FC<SignupPageProps> = ({
 
         {/* Step 3: Success Confirmation */}
         {step === 3 && (
-          <div className="bg-white border border-[#E5E7EB] rounded-3xl p-8 shadow-xs text-center space-y-5 animate-fadeIn">
-            <div className="w-16 h-16 rounded-full bg-emerald-100 text-[#10B981] flex items-center justify-center mx-auto shadow-xs">
+          <div className="bg-white border border-[#E5E7EB] rounded-3xl p-8 shadow-xs text-center space-y-5 animate-step-next">
+            <div className="w-16 h-16 rounded-full bg-emerald-100 text-[#10B981] flex items-center justify-center mx-auto shadow-xs animate-bounce">
               <CheckCircle2 className="w-10 h-10" />
             </div>
 
@@ -441,7 +440,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({
 
             {role === 'student' && (
               <div className="p-4 bg-[#F8FAFF] border border-blue-200 rounded-2xl max-w-xs mx-auto text-center space-y-2">
-                <div className="w-20 h-20 bg-white border border-gray-200 rounded-xl mx-auto flex items-center justify-center">
+                <div className="w-20 h-20 bg-white border border-gray-200 rounded-xl mx-auto flex items-center justify-center shadow-xs">
                   <QrCode className="w-14 h-14 text-[#2563EB]" />
                 </div>
                 <div className="text-xs font-bold text-[#1E3A8A]">كود بطاقتك الشخصية</div>
@@ -451,7 +450,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({
 
             <button
               onClick={handleFinish}
-              className="w-full py-3.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-sm rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer"
+              className="btn-primary-shine w-full py-3.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-sm rounded-xl transition-all shadow-md hover:shadow-blue-500/25 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
             >
               <span>الدخول إلى لوحة التحكم</span>
               <ArrowLeft className="w-4 h-4" />

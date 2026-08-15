@@ -13,7 +13,11 @@ import {
 import { MOCK_TEACHER_STUDENTS } from '../../data/mockData';
 import { Badge } from '../../components/common/Badge';
 
-export const TeacherPaymentsPage: React.FC = () => {
+interface TeacherPaymentsPageProps {
+  onNavigate?: (path: string) => void;
+}
+
+export const TeacherPaymentsPage: React.FC<TeacherPaymentsPageProps> = ({ onNavigate }) => {
   const [downloadedInvoice, setDownloadedInvoice] = useState<string | null>(null);
 
   const totalStudents = 310;
@@ -32,17 +36,27 @@ export const TeacherPaymentsPage: React.FC = () => {
     <div className="space-y-8 text-right">
       
       {/* Header */}
-      <div className="bg-white border border-[#E5E7EB] rounded-3xl p-6 sm:p-8 shadow-xs">
-        <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#2563EB] bg-[#EFF6FF] px-3 py-1 rounded-full border border-blue-200 mb-2">
-          <DollarSign className="w-3.5 h-3.5" />
-          <span>الأرباح والعمولة التدريجية</span>
+      <div className="bg-white border border-[#E5E7EB] rounded-3xl p-6 sm:p-8 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#2563EB] bg-[#EFF6FF] px-3 py-1 rounded-full border border-blue-200 mb-2">
+            <DollarSign className="w-3.5 h-3.5" />
+            <span>الأرباح والعمولة التدريجية</span>
+          </div>
+          <h2 className="text-xl sm:text-2xl font-black text-[#1E3A8A]">
+            المستحقات المالية وحساب العمولة
+          </h2>
+          <p className="text-xs text-[#6B7280] mt-1">
+            نظام عمولة عادل وتدريجي — كلما زاد عدد طلابك تنخفض نسبة العمولة حتى تصل إلى 1% فقط
+          </p>
         </div>
-        <h2 className="text-xl sm:text-2xl font-black text-[#1E3A8A]">
-          المستحقات المالية وحساب العمولة
-        </h2>
-        <p className="text-xs text-[#6B7280] mt-1">
-          نظام عمولة عادل وتدريجي — كلما زاد عدد طلابك تنخفض نسبة العمولة حتى تصل إلى 1% فقط
-        </p>
+
+        <button
+          onClick={() => onNavigate && onNavigate('/teacher/scan')}
+          className="px-5 py-3 bg-[#1E3A8A] hover:bg-[#1E40AF] text-white text-xs font-bold rounded-2xl transition-all shadow-sm flex items-center gap-2.5 cursor-pointer active:scale-95 shrink-0"
+        >
+          <Receipt className="w-4 h-4 text-emerald-400" />
+          <span>تأكيد تحصيل قسط بمسح الـ QR</span>
+        </button>
       </div>
 
       {/* Tiered Commission Breakdown Box */}

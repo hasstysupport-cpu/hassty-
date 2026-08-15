@@ -31,8 +31,8 @@ export const FeaturesSection: React.FC = () => {
   };
 
   return (
-    <section id="features" className="py-16 lg:py-24 bg-white border-b border-gray-200">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section id="features" className="py-16 lg:py-24 bg-[#FAFBFD] border-b border-gray-200 relative overflow-hidden bg-dot-pattern-light">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         
         {/* Section Header */}
         <div className="text-center max-w-2xl mx-auto mb-14">
