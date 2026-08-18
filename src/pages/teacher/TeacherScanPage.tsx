@@ -33,6 +33,7 @@ import { dbService } from '../../lib/supabaseService';
 import { isSupabaseConfigured } from '../../lib/supabase';
 import { detectActiveLiveGroup, formatTimeArabic } from '../../lib/scheduleSync';
 import { PLAY_AUDIO_SOUND } from '../../lib/soundUtils';
+import { whatsappService } from '../../lib/whatsappService';
 import { StudentGroup, TeacherStudentItem } from '../../types';
 
 type ScanMode = 'attendance' | 'add_student' | 'collect_fee';
@@ -222,6 +223,28 @@ export const TeacherScanPage: React.FC = () => {
       badgeType = 'navy';
       whatsappPreview = `رسالة واتساب لولي الأمر: "تم استلام مبلغ ${price} ج.م قيمة اشتراك حصة الكيمياء للطالب ${student.name}. إيصال رقم INV-${Date.now().toString().slice(-4)} ✅"`;
       soundToPlay = 'success';
+    }
+
+    // Trigger Real WhatsApp Notification Dispatch
+    if (activeMode === 'attendance') {
+      whatsappService.sendAttendanceNotice({
+        parentPhone: student.parentPhone || '01080158828',
+        studentName: student.name,
+        groupName: selectedGroup.name,
+        status: attendanceStatus,
+        offsetMinutes: simulatedOffsetMinutes,
+        timeString: nowTimeStr,
+      }).catch((e) => console.warn('WhatsApp notice error:', e));
+    } else if (activeMode === 'collect_fee') {
+      const price = selectedGroup.priceAmount || Number(feeAmount) || 120;
+      whatsappService.sendPaymentReceipt({
+        parentPhone: student.parentPhone || '01080158828',
+        studentName: student.name,
+        groupName: selectedGroup.name,
+        amount: price,
+        invoiceNumber: `INV-${Date.now().toString().slice(-4)}`,
+        billingType: selectedGroup.billingType || 'per_session',
+      }).catch((e) => console.warn('WhatsApp receipt error:', e));
     }
 
     // Play Instant Audio Tone

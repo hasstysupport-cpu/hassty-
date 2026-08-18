@@ -371,7 +371,6 @@ export interface TeacherCancellationLog {
   whatsappNoticeSent: boolean;
 }
 
-// 7. Teacher Revision Session
 export interface RevisionSessionItem {
   id: string;
   title: string;
@@ -387,3 +386,75 @@ export interface RevisionSessionItem {
   bookedSeats: number;
   isExamNight: boolean;
 }
+
+export type AccountBadgeType = 'none' | 'verified' | 'suspicious' | 'fraudulent';
+
+export interface AdminUserAccount {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string;
+  role: AccountRole | 'admin';
+  createdAt: string;
+  status: 'active' | 'suspended';
+  badge: AccountBadgeType;
+  grade?: string;
+  subject?: string;
+  governorate?: string;
+  area?: string;
+  studentsCount?: number;
+  totalRevenue?: number;
+  qrCode?: string;
+  avatarUrl?: string;
+  nationalId?: string;
+  parentPhone?: string;
+}
+
+export interface TeacherVerificationRequest {
+  id: string;
+  teacherId: string;
+  teacherName: string;
+  phone: string;
+  subject: string;
+  stage: string;
+  governorate: string;
+  area: string;
+  bio: string;
+  experienceYears: number | string;
+  idCardImageUrl: string;
+  certificateImageUrl?: string;
+  submittedAt: string;
+  status: 'pending' | 'approved' | 'rejected';
+  rejectionReason?: string;
+  actionedAt?: string;
+  actionedBy?: string;
+}
+
+export interface AdminSafetyReport {
+  id: string;
+  reporterName: string;
+  reporterRole: 'student' | 'parent';
+  reporterPhone: string;
+  targetTeacherId: string;
+  targetTeacherName: string;
+  category: 'inappropriate_conduct' | 'external_payment_demand' | 'absence_no_notice' | 'verbal_abuse' | 'other';
+  description: string;
+  createdAt: string;
+  status: 'new' | 'in_review' | 'resolved';
+  teacherSuspended?: boolean;
+}
+
+export interface TeacherCommissionTrackingItem {
+  id: string;
+  teacherId: string;
+  teacherName: string;
+  subject: string;
+  activeStudentsCount: number;
+  monthlyGrossEgp: number;
+  tierRate: number; // e.g. 1.0% or 1.5% or 2.0%
+  dueCommissionEgp: number;
+  paymentStatus: 'paid' | 'overdue' | 'pending';
+  lastPaymentDate?: string;
+  billingCycle: string;
+}
+

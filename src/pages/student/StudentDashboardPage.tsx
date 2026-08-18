@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { MOCK_CURRENT_STUDENT, MOCK_STUDENT_LESSONS, SAMPLE_TUTORS, MOCK_PAYMENTS } from '../../data/mockData';
 import { Badge } from '../../components/common/Badge';
+import { useAuth } from '../../lib/AuthContext';
 
 interface StudentDashboardPageProps {
   onNavigate: (path: string) => void;
@@ -29,7 +30,14 @@ export const StudentDashboardPage: React.FC<StudentDashboardPageProps> = ({
   onNavigate,
   onSelectTutor,
 }) => {
-  const student = MOCK_CURRENT_STUDENT;
+  const { user } = useAuth();
+  const student = {
+    ...MOCK_CURRENT_STUDENT,
+    name: user?.name || MOCK_CURRENT_STUDENT.name,
+    grade: user?.profileData?.grade || MOCK_CURRENT_STUDENT.grade,
+    qrCode: user?.profileData?.qrCode || MOCK_CURRENT_STUDENT.qrCode,
+    phone: user?.phone || MOCK_CURRENT_STUDENT.phone,
+  };
   const upcomingLessons = MOCK_STUDENT_LESSONS.slice(0, 3);
   const myTutors = SAMPLE_TUTORS.slice(0, 3);
 

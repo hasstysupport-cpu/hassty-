@@ -152,6 +152,13 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             <button onClick={() => onNavigate('/about')} className="hover:text-[#2563EB] transition-colors cursor-pointer">سياسة الخصوصية</button>
             <span>•</span>
             <button onClick={() => onNavigate('/contact')} className="hover:text-[#2563EB] transition-colors cursor-pointer">الأسئلة الشائعة</button>
+            <span>•</span>
+            <button
+              onClick={() => onNavigate('/admin')}
+              className="text-[#1E3A8A] hover:text-[#2563EB] font-bold transition-colors cursor-pointer flex items-center gap-1"
+            >
+              <span>بوابة الإدارة (admin.hassty.com)</span>
+            </button>
           </div>
         </div>
 

@@ -26,6 +26,8 @@ import { MOCK_TEACHER_STUDENTS, MOCK_TEACHER_GROUPS, MOCK_BOOKING_REQUESTS, MOCK
 import { BookingRequest } from '../../types';
 import { Badge } from '../../components/common/Badge';
 import { TeacherAttendanceChart } from '../../components/teacher/TeacherAttendanceChart';
+import { useAuth } from '../../lib/AuthContext';
+import { Send, ExternalLink } from 'lucide-react';
 
 interface TeacherDashboardPageProps {
   onNavigate: (path: string) => void;
@@ -34,6 +36,9 @@ interface TeacherDashboardPageProps {
 export const TeacherDashboardPage: React.FC<TeacherDashboardPageProps> = ({
   onNavigate,
 }) => {
+  const { user } = useAuth();
+  const teacherName = user?.name || 'المعلم';
+  const teacherSubject = user?.profileData?.subject || 'المادة الأكاديمية';
   const [bookingRequests, setBookingRequests] = useState<BookingRequest[]>(MOCK_BOOKING_REQUESTS);
   const [activeSessionNotes, setActiveSessionNotes] = useState('');
   const [notesSuccess, setNotesSuccess] = useState(false);
@@ -78,10 +83,10 @@ export const TeacherDashboardPage: React.FC<TeacherDashboardPageProps> = ({
             <span>لوحة المعلم المعتمد</span>
           </div>
           <h2 className="text-2xl sm:text-3xl font-black text-white">
-            أهلاً بك، أستاذ حسام إبراهيم 👋
+            أهلاً بك، أستاذ {teacherName} 👋
           </h2>
           <p className="text-xs sm:text-sm text-blue-100 max-w-xl">
-            مادة الكيمياء للثانوية العامة — لديك اليوم <strong className="text-white font-bold">28 طالب</strong> حاضرين في سنتر الأهرام.
+            مادة {teacherSubject} — مرحباً بك في منصة حِصّتي لإدارة الحصص والطلاب والـ QR الذكي.
           </p>
         </div>
 
@@ -120,6 +125,37 @@ export const TeacherDashboardPage: React.FC<TeacherDashboardPageProps> = ({
           <span>{actionNotice}</span>
         </div>
       )}
+
+      {/* Telegram Verification Banner */}
+      <div className="bg-gradient-to-r from-blue-50 via-sky-50 to-indigo-50 border-2 border-blue-200 rounded-3xl p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-3 text-right">
+          <div className="w-12 h-12 rounded-2xl bg-[#229ED9] text-white flex items-center justify-center shrink-0 shadow-sm">
+            <Send className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 mb-0.5">
+              <h4 className="text-sm font-black text-[#1E3A8A]">توثيق وتفعيل حساب المعلم</h4>
+              <span className="text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
+                خطوة هامة
+              </span>
+            </div>
+            <p className="text-xs text-gray-600">
+              لكي يظهر حسابك للطلاب وأولياء الأمور في نتائج البحث وتفعيل الشارة الزرقاء، يرجى التواصل مع الدعم عبر Telegram.
+            </p>
+          </div>
+        </div>
+
+        <a
+          href="https://t.me/MCV_M"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full sm:w-auto shrink-0 px-5 py-3 bg-[#229ED9] hover:bg-[#1E88E5] text-white font-bold text-xs rounded-2xl transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
+        >
+          <Send className="w-4 h-4" />
+          <span>تواصل مع الدعم (t.me/MCV_M)</span>
+          <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+        </a>
+      </div>
 
       {/* 2. Key Stats Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6">

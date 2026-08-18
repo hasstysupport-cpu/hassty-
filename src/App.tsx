@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { AccountRole } from './types';
 import { SAMPLE_TUTORS } from './data/mockData';
+import { useAuth } from './lib/AuthContext';
 
 // Common Components
 import { PublicNavbar } from './components/common/PublicNavbar';
@@ -22,6 +23,8 @@ import { ContactPage } from './pages/ContactPage';
 import { ForTeachersPage } from './pages/ForTeachersPage';
 import { LoginPage } from './pages/LoginPage';
 import { SignupPage } from './pages/SignupPage';
+import { WhatsAppStudioPage } from './pages/admin/WhatsAppStudioPage';
+import { HasstyAdminApp } from './pages/admin/HasstyAdminApp';
 
 // Student Pages
 import { StudentDashboardPage } from './pages/student/StudentDashboardPage';
@@ -47,10 +50,12 @@ import { TeacherProfileEditPage } from './pages/teacher/TeacherProfileEditPage';
 import { TeacherReviewsPage } from './pages/teacher/TeacherReviewsPage';
 
 export default function App() {
+  const { user, logout } = useAuth();
+
   // Navigation & session state
   const [currentPath, setCurrentPath] = useState<string>('/');
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
-  const [currentRole, setCurrentRole] = useState<AccountRole>('student');
+  const isLoggedIn = !!user;
+  const currentRole: AccountRole = user?.role || 'student';
   const [selectedTutorId, setSelectedTutorId] = useState<string>(SAMPLE_TUTORS[0].id);
   const [searchSubject, setSearchSubject] = useState<string>('');
   const [searchGovernorate, setSearchGovernorate] = useState<string>('');
@@ -80,8 +85,6 @@ export default function App() {
 
   // Login handler
   const handleLogin = (role: AccountRole) => {
-    setIsLoggedIn(true);
-    setCurrentRole(role);
     if (role === 'student') setCurrentPath('/student/dashboard');
     if (role === 'parent') setCurrentPath('/parent/dashboard');
     if (role === 'teacher') setCurrentPath('/teacher/dashboard');
@@ -89,7 +92,7 @@ export default function App() {
 
   // Logout handler
   const handleLogout = () => {
-    setIsLoggedIn(false);
+    logout();
     setCurrentPath('/');
   };
 
@@ -105,6 +108,12 @@ export default function App() {
     currentPath.startsWith('/parent') ||
     currentPath.startsWith('/teacher');
 
+  const isAdminAppRoute = currentPath.startsWith('/admin') || window.location.hostname.startsWith('admin.');
+
+  if (isAdminAppRoute) {
+    return <HasstyAdminApp onSwitchToPublicApp={() => setCurrentPath('/')} />;
+  }
+
   return (
     <div className="min-h-screen bg-[#F8FAFF] text-[#1F2937] font-['Tajawal',sans-serif] selection:bg-[#EFF6FF] selection:text-[#2563EB] flex flex-col antialiased">
       
@@ -113,9 +122,9 @@ export default function App() {
         <LoggedInNavbar
           currentRole={currentRole}
           currentPath={currentPath}
+          userName={user?.name}
           onNavigate={handleNavigate}
           onRoleChange={(newRole) => {
-            setCurrentRole(newRole);
             if (newRole === 'student') setCurrentPath('/student/dashboard');
             if (newRole === 'parent') setCurrentPath('/parent/dashboard');
             if (newRole === 'teacher') setCurrentPath('/teacher/dashboard');
@@ -221,6 +230,10 @@ export default function App() {
 
           {currentPath === '/signup' && (
             <SignupPage onNavigate={handleNavigate} onSignupSuccess={handleLogin} />
+          )}
+
+          {currentPath === '/whatsapp-studio' && (
+            <WhatsAppStudioPage />
           )}
         </main>
       )}

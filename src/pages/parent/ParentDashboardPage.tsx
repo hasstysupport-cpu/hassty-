@@ -24,6 +24,7 @@ import {
 import { MOCK_PARENT_CHILDREN, MOCK_ATTENDANCE_RECORDS, ALL_EGYPT_GRADES } from '../../data/mockData';
 import { Badge } from '../../components/common/Badge';
 import { Modal } from '../../components/common/Modal';
+import { useAuth } from '../../lib/AuthContext';
 
 interface ParentDashboardPageProps {
   onNavigate: (path: string) => void;
@@ -32,6 +33,8 @@ interface ParentDashboardPageProps {
 export const ParentDashboardPage: React.FC<ParentDashboardPageProps> = ({
   onNavigate,
 }) => {
+  const { user } = useAuth();
+  const parentName = user?.name || 'ولي الأمر';
   const [children, setChildren] = useState(MOCK_PARENT_CHILDREN);
   const [selectedChildId, setSelectedChildId] = useState(MOCK_PARENT_CHILDREN[0].id);
   const [isAddChildModalOpen, setIsAddChildModalOpen] = useState(false);

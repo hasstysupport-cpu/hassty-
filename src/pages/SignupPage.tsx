@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   QrCode,
   Users,
@@ -6,17 +6,22 @@ import {
   BookOpen,
   ArrowLeft,
   CheckCircle2,
-  UploadCloud,
   MapPin,
   Sparkles,
   Phone,
   User,
-  GraduationCap
+  GraduationCap,
+  MessageCircle,
+  AlertCircle,
+  Send,
+  ExternalLink
 } from 'lucide-react';
 import { AccountRole } from '../types';
 import { EGYPT_GOVERNORATES, SUBJECTS_DATA } from '../data/mockData';
 import { Badge } from '../components/common/Badge';
 import { LocationSelector } from '../components/common/LocationSelector';
+import { whatsappService } from '../lib/whatsappService';
+import { useAuth } from '../lib/AuthContext';
 
 interface SignupPageProps {
   initialRole?: AccountRole;
@@ -29,8 +34,9 @@ export const SignupPage: React.FC<SignupPageProps> = ({
   onNavigate,
   onSignupSuccess,
 }) => {
+  const { signupUser } = useAuth();
   const [role, setRole] = useState<AccountRole>(initialRole);
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1); // 1: role, 2: details, 3: whatsapp otp, 4: success
 
   // Form Fields
   const [name, setName] = useState('');
@@ -48,27 +54,113 @@ export const SignupPage: React.FC<SignupPageProps> = ({
   // Teacher specific
   const [subject, setSubject] = useState('كيمياء');
   const [experience, setExperience] = useState('8 سنوات');
-  const [idCardUploaded, setIdCardUploaded] = useState(false);
 
+  // WhatsApp OTP Verification State
+  const [requestId, setRequestId] = useState('');
+  const [otp, setOtp] = useState(['', '', '', '']);
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [timerSeconds, setTimerSeconds] = useState(0);
+
+  useEffect(() => {
+    let interval: any = null;
+    if (timerSeconds > 0) {
+      interval = setInterval(() => setTimerSeconds((prev) => prev - 1), 1000);
+    }
+    return () => clearInterval(interval);
+  }, [timerSeconds]);
 
   const handleStep1Select = (selected: AccountRole) => {
     setRole(selected);
     setStep(2);
   };
 
-  const handleSubmitRegistration = (e: React.FormEvent) => {
+  /**
+   * Submit registration details and send real WhatsApp OTP
+   */
+  const handleSubmitRegistration = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !phone) return;
     setIsLoading(true);
-    setTimeout(() => {
+    setErrorMessage('');
+
+    try {
+      const res = await whatsappService.requestOtp(phone, 'signup');
       setIsLoading(false);
-      setStep(3);
-    }, 600);
+
+      if (res.success && res.requestId) {
+        setRequestId(res.requestId);
+        setStep(3); // Go to OTP verification step
+        setTimerSeconds(60);
+      } else {
+        setErrorMessage(res.error || 'تعذر إرسال رمز التحقق لرقم الواتساب');
+      }
+    } catch (err: any) {
+      setIsLoading(false);
+      setErrorMessage('حدث خطأ أثناء إرسال كود الواتساب، يرجى المحاولة مرة أخرى');
+    }
+  };
+
+  /**
+   * Verify WhatsApp OTP
+   */
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const fullCode = otp.join('');
+    if (fullCode.length !== 4) {
+      setErrorMessage('يرجى إدخال الـ 4 أرقام الخاصة بكود التحقق');
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorMessage('');
+
+    try {
+      const res = await whatsappService.verifyOtp(requestId, fullCode);
+      setIsLoading(false);
+
+      if (res.success && res.verified) {
+        await signupUser({
+          phone,
+          role,
+          name: name.trim(),
+          governorate,
+          area,
+          grade: role === 'student' ? grade : undefined,
+          subject: role === 'teacher' ? subject : undefined,
+          experience: role === 'teacher' ? experience : undefined,
+          parentPhone: role === 'student' ? parentPhone : undefined,
+        });
+
+        // Send a welcome message via WhatsApp
+        whatsappService.sendMessage(
+          phone,
+          `*مرحباً بك في منصة حِصّتي* 🎉\n\nأهلاً بك يا *${name}*! تم تفعيل حسابك بنجاح كـ (${role === 'student' ? 'طالب' : role === 'teacher' ? 'مدرس' : 'ولي أمر'}).\n\nنتمنى لك تجربة تعليمية استثنائية! 🚀`
+        );
+        setStep(4); // Success step
+      } else {
+        setErrorMessage(res.error || 'كود التحقق غير صحيح أو انتهت صلاحيته');
+      }
+    } catch (err: any) {
+      setIsLoading(false);
+      setErrorMessage('فشل التحقق من الكود، يرجى المحاولة مرة أخرى');
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (timerSeconds > 0) return;
+    setIsLoading(true);
+    setErrorMessage('');
+    const res = await whatsappService.requestOtp(phone, 'signup');
+    setIsLoading(false);
+    if (res.success && res.requestId) {
+      setRequestId(res.requestId);
+      setTimerSeconds(60);
+    }
   };
 
   const handleFinish = () => {
-    onSignupSuccess(role, name || (role === 'student' ? 'زياد أحمد' : role === 'teacher' ? 'أ. حسام إبراهيم' : 'ولي الأمر'));
+    onSignupSuccess(role, name);
   };
 
   return (
@@ -94,14 +186,15 @@ export const SignupPage: React.FC<SignupPageProps> = ({
             إنشاء حساب جديد
           </h2>
           <p className="mt-1 text-xs text-[#6B7280]">
-            اختر نوع حسابك وانضم لمنظومة الدروس الخصوصية الأذكى في مصر
+            انضم لمنظومة الدروس الخصوصية الأذكى في مصر مع توثيق فوري عبر WhatsApp
           </p>
 
           {/* Stepper Dots */}
           <div className="flex items-center justify-center gap-2 mt-4">
-            <div className={`w-8 h-2 rounded-full ${step >= 1 ? 'bg-[#2563EB]' : 'bg-gray-200'}`} />
-            <div className={`w-8 h-2 rounded-full ${step >= 2 ? 'bg-[#2563EB]' : 'bg-gray-200'}`} />
-            <div className={`w-8 h-2 rounded-full ${step >= 3 ? 'bg-[#2563EB]' : 'bg-gray-200'}`} />
+            <div className={`w-7 h-2 rounded-full ${step >= 1 ? 'bg-[#2563EB]' : 'bg-gray-200'}`} />
+            <div className={`w-7 h-2 rounded-full ${step >= 2 ? 'bg-[#2563EB]' : 'bg-gray-200'}`} />
+            <div className={`w-7 h-2 rounded-full ${step >= 3 ? 'bg-[#2563EB]' : 'bg-gray-200'}`} />
+            <div className={`w-7 h-2 rounded-full ${step >= 4 ? 'bg-emerald-500' : 'bg-gray-200'}`} />
           </div>
         </div>
 
@@ -201,12 +294,12 @@ export const SignupPage: React.FC<SignupPageProps> = ({
           </div>
         )}
 
-        {/* Step 2: Role Form */}
+        {/* Step 2: Role Form Details */}
         {step === 2 && (
           <div className="bg-white border border-[#E5E7EB] rounded-3xl p-6 sm:p-8 shadow-xs space-y-5 animate-step-next">
             <div className="flex items-center justify-between pb-3 border-b border-gray-100">
               <div>
-                <span className="text-[11px] font-bold text-[#2563EB]">الخطوة 2 من 3</span>
+                <span className="text-[11px] font-bold text-[#2563EB]">الخطوة 2: إدخال البيانات</span>
                 <h3 className="text-base font-bold text-[#1E3A8A]">
                   بيانات حساب {role === 'student' ? 'الطالب' : role === 'parent' ? 'ولي الأمر' : 'المعلم'}
                 </h3>
@@ -219,6 +312,13 @@ export const SignupPage: React.FC<SignupPageProps> = ({
                 تغيير النوع
               </button>
             </div>
+
+            {errorMessage && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs font-bold text-red-800 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                <span>{errorMessage}</span>
+              </div>
+            )}
 
             <form onSubmit={handleSubmitRegistration} className="space-y-4">
               
@@ -240,12 +340,12 @@ export const SignupPage: React.FC<SignupPageProps> = ({
 
                 <div>
                   <label className="block text-xs font-bold text-[#1F2937] mb-1.5">
-                    رقم الهاتف المحمول <span className="text-[#EF4444]">*</span>
+                    رقم هاتف الواتساب <span className="text-[#EF4444]">*</span>
                   </label>
                   <input
                     type="tel"
                     required
-                    placeholder="01012345678"
+                    placeholder="010XXXXXXXX"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-gray-50 border border-[#E5E7EB] rounded-xl text-xs text-right focus:bg-white focus:outline-none focus:border-[#2563EB]"
@@ -372,34 +472,6 @@ export const SignupPage: React.FC<SignupPageProps> = ({
                       />
                     </div>
                   </div>
-
-                  {/* ID Card upload simulation */}
-                  <div>
-                    <label className="block text-xs font-bold text-[#1F2937] mb-1.5">
-                      صورة بطاقة الرقم القومي (للتوثيق واعتماد الشارة الزرقاء)
-                    </label>
-                    <div
-                      onClick={() => setIdCardUploaded(!idCardUploaded)}
-                      className={`p-4 border-2 border-dashed rounded-2xl text-center cursor-pointer transition-colors ${
-                        idCardUploaded
-                          ? 'border-[#10B981] bg-emerald-50'
-                          : 'border-gray-300 hover:border-blue-300 bg-gray-50'
-                      }`}
-                    >
-                      {idCardUploaded ? (
-                        <div className="flex items-center justify-center gap-2 text-xs font-bold text-[#10B981]">
-                          <CheckCircle2 className="w-5 h-5" />
-                          <span>تم رفع صورة البطاقة بنجاح (national-id.jpg)</span>
-                        </div>
-                      ) : (
-                        <div className="space-y-1">
-                          <UploadCloud className="w-6 h-6 text-gray-400 mx-auto" />
-                          <p className="text-xs font-bold text-[#1E3A8A]">اضغط لرفع صورة وجه وظهر البطاقة</p>
-                          <span className="text-[10px] text-gray-400">JPG أو PNG بحد أقصى 5 ميجابايت</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
                 </div>
               )}
 
@@ -409,10 +481,11 @@ export const SignupPage: React.FC<SignupPageProps> = ({
                 className="w-full py-3.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-sm rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
                 {isLoading ? (
-                  <span>جاري إنشاء الحساب...</span>
+                  <span>جاري إرسال كود التحقق...</span>
                 ) : (
                   <>
-                    <span>متابعة وإنشاء الحساب</span>
+                    <MessageCircle className="w-4 h-4" />
+                    <span>متابعة وتأكيد رقم WhatsApp</span>
                     <ArrowLeft className="w-4 h-4" />
                   </>
                 )}
@@ -422,21 +495,146 @@ export const SignupPage: React.FC<SignupPageProps> = ({
           </div>
         )}
 
-        {/* Step 3: Success Confirmation */}
+        {/* Step 3: WhatsApp OTP Verification */}
         {step === 3 && (
-          <div className="bg-white border border-[#E5E7EB] rounded-3xl p-8 shadow-xs text-center space-y-5 animate-step-next">
+          <div className="bg-white border border-[#E5E7EB] rounded-3xl p-6 sm:p-8 shadow-xs space-y-5 animate-fadeIn">
+            <div className="text-center space-y-1.5">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto border border-emerald-200">
+                <MessageCircle className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-black text-[#1E3A8A]">تأكيد رقم الهاتف عبر WhatsApp</h3>
+              <p className="text-xs text-gray-500">
+                أرسلنا كود تحقق سري إلى حساب واتساب للرقم <strong className="text-[#1E3A8A] font-mono" dir="ltr">{phone}</strong>
+              </p>
+              <p className="text-[11px] text-[#6B7280]">
+                افتح تطبيق WhatsApp الخاص بهذا الرقم وقم بإدخال الكود المكون من 4 أرقام أدناه.
+              </p>
+            </div>
+
+            {errorMessage && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs font-bold text-red-800 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                <span>{errorMessage}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleVerifyOtp} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-[#1F2937] mb-2 text-center">
+                  أدخل رمز التحقق (OTP)
+                </label>
+                <div className="flex justify-center gap-2.5" dir="ltr">
+                  {otp.map((digit, idx) => (
+                    <input
+                      key={idx}
+                      id={`signup-otp-${idx}`}
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={1}
+                      value={digit}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '');
+                        const newOtp = [...otp];
+                        newOtp[idx] = val;
+                        setOtp(newOtp);
+                        if (val && idx < 3) {
+                          const nextInput = document.getElementById(`signup-otp-${idx + 1}`);
+                          nextInput?.focus();
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Backspace' && !otp[idx] && idx > 0) {
+                          const prevInput = document.getElementById(`signup-otp-${idx - 1}`);
+                          prevInput?.focus();
+                        }
+                      }}
+                      className="w-12 h-14 text-center font-mono font-black text-2xl bg-gray-50 border-2 border-blue-200 rounded-xl focus:border-[#2563EB] focus:bg-white focus:outline-none transition-colors"
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-xs text-gray-500 pt-1">
+                <span>لم يصلك الكود؟</span>
+                <button
+                  type="button"
+                  disabled={timerSeconds > 0 || isLoading}
+                  onClick={handleResendOtp}
+                  className="font-bold text-[#2563EB] hover:underline disabled:text-gray-400 cursor-pointer"
+                >
+                  {timerSeconds > 0 ? `إعادة الإرسال بعد (${timerSeconds}ث)` : 'إعادة إرسال الكود'}
+                </button>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading || otp.join('').length !== 4}
+                className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {isLoading ? (
+                  <span>جاري التحقق وتفعيل الحساب...</span>
+                ) : (
+                  <>
+                    <span>تأكيد الحساب ومتابعة</span>
+                    <CheckCircle2 className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* Step 4: Success Confirmation */}
+        {step === 4 && (
+          <div className="bg-white border border-[#E5E7EB] rounded-3xl p-6 sm:p-8 shadow-xs text-center space-y-5 animate-step-next">
             <div className="w-16 h-16 rounded-full bg-emerald-100 text-[#10B981] flex items-center justify-center mx-auto shadow-xs animate-bounce">
               <CheckCircle2 className="w-10 h-10" />
             </div>
 
             <div>
               <h3 className="text-xl font-black text-[#1E3A8A]">
-                مرحباً بك في حصتي يا {name || 'بطل'}! 🎉
+                مرحباً بك في حصتي يا {name || 'أستاذ'}! 🎉
               </h3>
               <p className="text-xs text-[#6B7280] mt-1 max-w-sm mx-auto">
-                تم إنشاء حسابك بنجاح وتفعيل كود الـ QR الخاص بك. يمكنك الآن الدخول ومباشرة استخدام كافة الميزات.
+                {role === 'teacher'
+                  ? 'تم إنشاء حساب المعلم بنجاح! لتوثيق الحساب وإظهاره للطلاب وأولياء الأمور في نتائج البحث:'
+                  : 'تم تفعيل حسابك بنجاح عبر WhatsApp وإنشاء كود الـ QR الرقمي الخاص بك.'}
               </p>
             </div>
+
+            {/* Teacher Telegram Verification Requirement Box */}
+            {role === 'teacher' && (
+              <div className="p-5 bg-gradient-to-br from-[#EFF6FF] to-blue-50/60 border-2 border-[#2563EB]/30 rounded-2xl text-right space-y-3.5 shadow-sm">
+                <div className="flex items-center gap-2.5 text-[#1E3A8A]">
+                  <div className="w-9 h-9 rounded-xl bg-[#2563EB] text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black">خطوة التوثيق وتفعيل الحساب</h4>
+                    <p className="text-[11px] text-gray-500 font-medium">مطلوب لاعتماد الشارة الزرقاء والظهور في البحث</p>
+                  </div>
+                </div>
+
+                <p className="text-xs text-gray-700 leading-relaxed">
+                  لكي يظهر حسابك للطلاب وأولياء الأمور كمعلم موثوق ومفعل، يرجى التواصل مع فريق الدعم المباشر عبر تليجرام لإتمام اعتماد ملفك التدريسي:
+                </p>
+
+                <a
+                  href="https://t.me/MCV_M"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-3 px-4 bg-[#229ED9] hover:bg-[#1E88E5] text-white font-bold text-xs rounded-xl transition-all shadow-md hover:shadow-blue-400/30 flex items-center justify-center gap-2.5 active:scale-98"
+                >
+                  <Send className="w-4 h-4" />
+                  <span>تواصل مع الدعم عبر Telegram (t.me/MCV_M)</span>
+                  <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+                </a>
+
+                <div className="text-[10px] text-center text-gray-500 flex items-center justify-center gap-1">
+                  <span>يتم الرد والاعتماد السريع على مدار 24 ساعة ⚡</span>
+                </div>
+              </div>
+            )}
 
             {role === 'student' && (
               <div className="p-4 bg-[#F8FAFF] border border-blue-200 rounded-2xl max-w-xs mx-auto text-center space-y-2">

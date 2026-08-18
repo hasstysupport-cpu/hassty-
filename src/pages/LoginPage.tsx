@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   QrCode,
   Phone,
@@ -8,9 +8,14 @@ import {
   Lock,
   Sparkles,
   Users,
-  KeyRound
+  KeyRound,
+  MessageCircle,
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
 import { AccountRole } from '../types';
+import { whatsappService } from '../lib/whatsappService';
+import { useAuth } from '../lib/AuthContext';
 
 interface LoginPageProps {
   onNavigate: (path: string) => void;
@@ -21,30 +26,111 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   onNavigate,
   onLoginSuccess,
 }) => {
+  const { loginUser } = useAuth();
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
-  const [phone, setPhone] = useState('01098765432');
-  const [otp, setOtp] = useState(['4', '8', '2', '1']);
+  const [phone, setPhone] = useState('');
+  const [otp, setOtp] = useState(['', '', '', '']);
   const [selectedRole, setSelectedRole] = useState<AccountRole>('student');
   const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSendOtp = (e: React.FormEvent) => {
+  // WhatsApp OTP State
+  const [requestId, setRequestId] = useState<string>('');
+  const [errorMessage, setErrorMessage] = useState<string>('');
+  const [successInfo, setSuccessInfo] = useState<string>('');
+  const [timerSeconds, setTimerSeconds] = useState<number>(0);
+  const [isGatewayConnected, setIsGatewayConnected] = useState<boolean | null>(null);
+
+  // Check WhatsApp gateway status on mount
+  useEffect(() => {
+    whatsappService.checkStatus().then((res) => {
+      setIsGatewayConnected(res.connected);
+    });
+  }, []);
+
+  // Timer countdown for resend OTP
+  useEffect(() => {
+    let interval: any = null;
+    if (timerSeconds > 0) {
+      interval = setInterval(() => {
+        setTimerSeconds((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [timerSeconds]);
+
+  /**
+   * Send WhatsApp OTP via Backend
+   */
+  const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!phone) return;
     setIsLoading(true);
-    setTimeout(() => {
+    setErrorMessage('');
+    setSuccessInfo('');
+
+    try {
+      const res = await whatsappService.requestOtp(phone, 'login');
       setIsLoading(false);
-      setStep('otp');
-    }, 600);
+
+      if (res.success && res.requestId) {
+        setRequestId(res.requestId);
+        setStep('otp');
+        setTimerSeconds(60); // 60s cooldown for resend
+        setSuccessInfo(`تم إرسال كود التحقق السري إلى حساب واتساب للرقم (${res.formattedNumber})`);
+      } else {
+        setErrorMessage(res.error || 'تعذر إرسال رمز التحقق، يرجى التأكد من الرقم');
+      }
+    } catch (err: any) {
+      setIsLoading(false);
+      setErrorMessage('حدث خطأ أثناء الاتصال بالخادم، يرجى المحاولة مرة أخرى');
+    }
   };
 
-  const handleVerifyOtp = (e: React.FormEvent) => {
+  /**
+   * Verify WhatsApp OTP
+   */
+  const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
+    const fullCode = otp.join('');
+    if (fullCode.length !== 4) {
+      setErrorMessage('يرجى إدخال الـ 4 أرقام الخاصة بكود التحقق');
+      return;
+    }
+
     setIsLoading(true);
-    setTimeout(() => {
+    setErrorMessage('');
+
+    try {
+      const res = await whatsappService.verifyOtp(requestId, fullCode);
       setIsLoading(false);
-      onLoginSuccess(selectedRole, phone);
-    }, 600);
+
+      if (res.success && res.verified) {
+        await loginUser(phone, selectedRole);
+        onLoginSuccess(selectedRole, phone);
+      } else {
+        setErrorMessage(res.error || 'كود التحقق غير صحيح أو انتهت صلاحيته');
+      }
+    } catch (err: any) {
+      setIsLoading(false);
+      setErrorMessage('فشل التحقق من الكود، يرجى المحاولة مرة أخرى');
+    }
+  };
+
+  /**
+   * Quick Resend OTP
+   */
+  const handleResendOtp = async () => {
+    if (timerSeconds > 0) return;
+    setIsLoading(true);
+    setErrorMessage('');
+    const res = await whatsappService.requestOtp(phone, 'login');
+    setIsLoading(false);
+    if (res.success && res.requestId) {
+      setRequestId(res.requestId);
+      setTimerSeconds(60);
+      setSuccessInfo('تمت إعادة إرسال كود جديد عبر واتساب');
+    }
   };
 
   return (
@@ -68,17 +154,37 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           تسجيل الدخول إلى حسابك
         </h2>
         <p className="mt-1 text-xs text-[#6B7280]">
-          الدخول السريع عبر رقم الهاتف وكود التحقق الفوري (SMS / واتساب)
+          الدخول السريع والآمن عبر رقم الهاتف وكود التحقق الفوري على واتساب
         </p>
+
+        {/* WhatsApp Gateway Connectivity Badge */}
+        <div className="mt-3 flex items-center justify-center">
+          {isGatewayConnected === true ? (
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+              <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+              <span>خادم واتساب متصل وجاهز (Baileys API) ✓</span>
+            </div>
+          ) : isGatewayConnected === false ? (
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-900 border border-amber-200">
+              <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+              <span>واتساب غير مقترن بالسيرفر حالياً (يمكنك تسجيل الدخول بالكود المباشر)</span>
+            </div>
+          ) : (
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-gray-50 text-gray-600 border border-gray-200">
+              <RefreshCw className="w-3 h-3 animate-spin text-gray-400" />
+              <span>جاري التحقق من اتصال الواتساب...</span>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md px-4">
         <div className="bg-white border border-[#E5E7EB] py-8 px-6 sm:px-8 rounded-3xl shadow-xs space-y-6">
           
-          {/* Quick Role Selector for Demo Experience */}
+          {/* Quick Role Selector */}
           <div>
             <label className="block text-xs font-bold text-[#6B7280] mb-2">
-              الدخول كـ:
+              نوع الحساب:
             </label>
             <div className="grid grid-cols-3 gap-2">
               <button
@@ -90,7 +196,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     : 'bg-gray-50 border-gray-200 text-gray-600'
                 }`}
               >
-                طالب (زياد)
+                طالب
               </button>
               <button
                 type="button"
@@ -112,17 +218,25 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     : 'bg-gray-50 border-gray-200 text-gray-600'
                 }`}
               >
-                مدرس (أ. حسام)
+                مدرس
               </button>
             </div>
           </div>
+
+          {/* Error & Info Alerts */}
+          {errorMessage && (
+            <div className="p-3.5 bg-red-50 border border-red-200 rounded-2xl text-xs font-bold text-red-800 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
 
           {step === 'phone' ? (
             /* STEP 1: Phone Input Form */
             <form onSubmit={handleSendOtp} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-[#1F2937] mb-1.5">
-                  رقم الهاتف المحمول
+                  رقم الهاتف المحمول (المرتبط بواتساب)
                 </label>
                 <div className="relative">
                   <input
@@ -136,8 +250,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   />
                   <Phone className="w-4 h-4 text-gray-400 absolute right-3.5 top-3.5" />
                 </div>
-                <p className="text-[11px] text-[#6B7280] mt-1">
-                  سيصلك رمز تحقق سري في رسالة نصية أو عبر تطبيق واتساب.
+                <p className="text-[11px] text-[#6B7280] mt-1.5 flex items-center gap-1">
+                  <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>سيصلك رمز تحقق سري من 4 أرقام عبر تطبيق WhatsApp فوراً.</span>
                 </p>
               </div>
 
@@ -159,62 +274,99 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 className="w-full py-3.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-sm rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
                 {isLoading ? (
-                  <span>جاري الإرسال...</span>
+                  <span>جاري إرسال كود الواتساب...</span>
                 ) : (
                   <>
-                    <span>إرسال كود التحقق</span>
+                    <MessageCircle className="w-4 h-4" />
+                    <span>إرسال رمز التحقق عبر WhatsApp</span>
                     <ArrowLeft className="w-4 h-4" />
                   </>
                 )}
               </button>
             </form>
           ) : (
-            /* STEP 2: OTP Verification Form */
+            /* STEP 2: WhatsApp OTP Verification Form */
             <form onSubmit={handleVerifyOtp} className="space-y-4 animate-fadeIn">
-              <div className="p-3 bg-[#EFF6FF] border border-blue-200 rounded-2xl text-center space-y-1">
-                <span className="text-xs font-bold text-[#2563EB]">تم إرسال كود التحقق إلى:</span>
-                <p className="text-xs font-mono font-bold text-[#1E3A8A]" dir="ltr">{phone}</p>
+              <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl text-center space-y-1.5">
+                <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-emerald-800">
+                  <MessageCircle className="w-4 h-4 text-emerald-600" />
+                  <span>تم إرسال كود التحقق السري إلى حساب واتساب:</span>
+                </div>
+                <p className="text-sm font-mono font-black text-[#1E3A8A]" dir="ltr">{phone}</p>
+                <p className="text-[11px] text-[#6B7280]">
+                  افتح تطبيق WhatsApp الخاص بهذا الرقم وقم بإدخال الكود المكون من 4 أرقام أدناه.
+                </p>
+
                 <button
                   type="button"
-                  onClick={() => setStep('phone')}
-                  className="text-[11px] text-[#2563EB] underline"
+                  onClick={() => {
+                    setStep('phone');
+                    setOtp(['', '', '', '']);
+                    setErrorMessage('');
+                  }}
+                  className="text-[11px] text-[#2563EB] hover:underline block mx-auto mt-2 cursor-pointer font-bold"
                 >
-                  تعديل الرقم
+                  تعديل رقم الهاتف
                 </button>
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-[#1F2937] mb-2 text-center">
-                  أدخل رمز التحقق المكون من 4 أرقام
+                  أدخل رمز التحقق (OTP) المكون من 4 أرقام
                 </label>
                 <div className="flex justify-center gap-2.5" dir="ltr">
                   {otp.map((digit, idx) => (
                     <input
                       key={idx}
+                      id={`otp-${idx}`}
                       type="text"
+                      inputMode="numeric"
                       maxLength={1}
                       value={digit}
                       onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '');
                         const newOtp = [...otp];
-                        newOtp[idx] = e.target.value;
+                        newOtp[idx] = val;
                         setOtp(newOtp);
+                        if (val && idx < 3) {
+                          const nextInput = document.getElementById(`otp-${idx + 1}`);
+                          nextInput?.focus();
+                        }
                       }}
-                      className="w-12 h-13 text-center font-mono font-black text-xl bg-gray-50 border-2 border-blue-200 rounded-xl focus:border-[#2563EB] focus:bg-white focus:outline-none"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Backspace' && !otp[idx] && idx > 0) {
+                          const prevInput = document.getElementById(`otp-${idx - 1}`);
+                          prevInput?.focus();
+                        }
+                      }}
+                      className="w-12 h-14 text-center font-mono font-black text-2xl bg-gray-50 border-2 border-blue-200 rounded-xl focus:border-[#2563EB] focus:bg-white focus:outline-none transition-colors"
                     />
                   ))}
                 </div>
               </div>
 
+              <div className="flex items-center justify-between text-xs text-gray-500 pt-1">
+                <span>لم يصلك الكود على واتساب؟</span>
+                <button
+                  type="button"
+                  disabled={timerSeconds > 0 || isLoading}
+                  onClick={handleResendOtp}
+                  className="font-bold text-[#2563EB] hover:underline disabled:text-gray-400 cursor-pointer"
+                >
+                  {timerSeconds > 0 ? `إعادة الإرسال بعد (${timerSeconds}ث)` : 'إعادة إرسال الكود'}
+                </button>
+              </div>
+
               <button
                 type="submit"
-                disabled={isLoading}
-                className="w-full py-3.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-sm rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                disabled={isLoading || otp.join('').length !== 4}
+                className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
                 {isLoading ? (
-                  <span>جاري التحقق والدخول...</span>
+                  <span>جاري التحقق والربط...</span>
                 ) : (
                   <>
-                    <span>تأكيد والدخول للوحة التحكم</span>
+                    <span>تأكيد الكود والدخول</span>
                     <CheckCircle2 className="w-4 h-4" />
                   </>
                 )}

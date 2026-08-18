@@ -91,45 +91,6 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
 
           {/* Left: Action Buttons */}
           <div className="hidden md:flex items-center gap-3">
-            {/* Quick Portal Switch Dropdown for Demo */}
-            <div className="relative group">
-              <button
-                className="px-3 py-2 text-xs font-bold text-[#1E3A8A] bg-[#F8FAFF] border border-[#E5E7EB] rounded-xl hover:border-blue-300 flex items-center gap-1.5 transition-all cursor-pointer"
-                title="الانتقال المباشر للوحات التحكم التجريبية"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-[#2563EB]" />
-                <span>لوحات التحكم المباشرة</span>
-              </button>
-              <div className="absolute left-0 top-full pt-1 hidden group-hover:block z-50 min-w-[210px]">
-                <div className="bg-white border border-[#E5E7EB] rounded-xl shadow-lg p-2 text-right space-y-1">
-                  <div className="text-[11px] font-bold text-[#6B7280] px-2 py-1 border-b border-gray-100">
-                    تصفح كـ :
-                  </div>
-                  <button
-                    onClick={() => handleLinkClick('/student/dashboard')}
-                    className="w-full text-right px-2.5 py-1.5 text-xs font-bold text-[#1F2937] hover:bg-[#EFF6FF] hover:text-[#2563EB] rounded-lg transition-colors flex items-center justify-between"
-                  >
-                    <span>لوحة الطالب</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-[#2563EB]">طالب</span>
-                  </button>
-                  <button
-                    onClick={() => handleLinkClick('/parent/dashboard')}
-                    className="w-full text-right px-2.5 py-1.5 text-xs font-bold text-[#1F2937] hover:bg-amber-50 hover:text-amber-800 rounded-lg transition-colors flex items-center justify-between"
-                  >
-                    <span>لوحة ولي الأمر (متعدد الأبناء)</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-900">ولي أمر</span>
-                  </button>
-                  <button
-                    onClick={() => handleLinkClick('/teacher/dashboard')}
-                    className="w-full text-right px-2.5 py-1.5 text-xs font-bold text-[#1F2937] hover:bg-emerald-50 hover:text-emerald-800 rounded-lg transition-colors flex items-center justify-between"
-                  >
-                    <span>لوحة المدرس والسناتر</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900">مدرس</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-
             {/* Login Button */}
             <button
               onClick={handleLoginClick}
@@ -185,41 +146,17 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
             })}
           </nav>
 
-          <div className="pt-3 border-t border-gray-100 space-y-2">
-            <div className="text-xs font-bold text-[#6B7280] px-2 mb-1">
-              الدخول المباشر للوحات التجريبية:
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                onClick={() => handleLinkClick('/student/dashboard')}
-                className="py-2 px-1 text-center bg-[#EFF6FF] text-[#2563EB] font-bold text-xs rounded-xl"
-              >
-                طالب
-              </button>
-              <button
-                onClick={() => handleLinkClick('/parent/dashboard')}
-                className="py-2 px-1 text-center bg-amber-50 text-amber-800 font-bold text-xs rounded-xl"
-              >
-                ولي أمر
-              </button>
-              <button
-                onClick={() => handleLinkClick('/teacher/dashboard')}
-                className="py-2 px-1 text-center bg-emerald-50 text-emerald-800 font-bold text-xs rounded-xl"
-              >
-                مدرس
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 pt-2">
+          <div className="pt-3 border-t border-gray-100">
+            <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={handleLoginClick}
-                className="w-full py-2.5 text-center text-xs font-bold text-[#1E3A8A] border border-[#E5E7EB] rounded-xl"
+                className="w-full py-2.5 text-center text-xs font-bold text-[#1E3A8A] border border-[#E5E7EB] rounded-xl cursor-pointer"
               >
                 تسجيل الدخول
               </button>
               <button
                 onClick={handleSignupClick}
-                className="w-full py-2.5 text-center text-xs font-bold text-white bg-[#2563EB] rounded-xl"
+                className="w-full py-2.5 text-center text-xs font-bold text-white bg-[#2563EB] rounded-xl cursor-pointer"
               >
                 إنشاء حساب
               </button>
