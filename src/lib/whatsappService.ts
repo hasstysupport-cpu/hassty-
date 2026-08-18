@@ -1,3 +1,5 @@
+import { getBrowserFingerprint } from './browserFingerprint';
+
 /**
  * WhatsApp Gateway and Messaging Service Client
  * Full integration with the documented WhatsApp API (v1 endpoints, media, interactive buttons, reactions, and lists)
@@ -246,14 +248,26 @@ export const whatsappService = {
   },
 
   /**
-   * 11. Send Secure WhatsApp OTP with server-side generation
+   * 11. Send Secure WhatsApp OTP with server-side generation & Fingerprint Rate-Limiting
    */
   async requestOtp(number: string, purpose: 'login' | 'signup' = 'login'): Promise<OtpSendResult> {
     try {
+      const fingerprint = await getBrowserFingerprint();
       const res = await fetch('/api/otp/send', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ number, purpose }),
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Client-Fingerprint': fingerprint.visitorId
+        },
+        body: JSON.stringify({ 
+          number, 
+          purpose,
+          fingerprint: fingerprint.visitorId,
+          meta: {
+            platform: fingerprint.platform,
+            timezone: fingerprint.timezone
+          }
+        }),
       });
       return await res.json();
     } catch (e: any) {
@@ -269,14 +283,22 @@ export const whatsappService = {
   },
 
   /**
-   * 12. Verify WhatsApp OTP
+   * 12. Verify WhatsApp OTP with Fingerprint Validation
    */
   async verifyOtp(requestId: string, code: string): Promise<OtpVerifyResult> {
     try {
+      const fingerprint = await getBrowserFingerprint();
       const res = await fetch('/api/otp/verify', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId, code }),
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Client-Fingerprint': fingerprint.visitorId
+        },
+        body: JSON.stringify({ 
+          requestId, 
+          code,
+          fingerprint: fingerprint.visitorId 
+        }),
       });
       return await res.json();
     } catch (e: any) {

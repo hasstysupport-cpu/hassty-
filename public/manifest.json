@@ -1,0 +1,19 @@
+{
+  "name": "حصتي | منصة المدرسين الخصوصيين في مصر",
+  "short_name": "حصتي",
+  "description": "المنصة الأولى في مصر للربط بين الطلاب وأولياء الأمور والمدرسين الخصوصيين الموثقين بنظام حضور فوري بكود QR",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563EB",
+  "lang": "ar",
+  "dir": "rtl",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AdminSidebar, AdminTab } from '../../components/admin/AdminSidebar';
 import { AdminDashboardHome } from './AdminDashboardHome';
 import { AccountsManagementPage } from './AccountsManagementPage';
@@ -14,6 +14,23 @@ import {
   INITIAL_COMMISSION_DATA
 } from '../../data/adminMockData';
 import { AccountBadgeType, AdminUserAccount } from '../../types';
+import {
+  seedAdminDatabaseIfEmpty,
+  subscribeToUsers,
+  subscribeToVerifications,
+  subscribeToReports,
+  subscribeToCommissions,
+  dbUpdateAccountBadge,
+  dbToggleAccountStatus,
+  dbDeleteAccount,
+  dbApproveVerification,
+  dbRejectVerification,
+  dbSuspendTeacherFromReport,
+  dbResolveReport,
+  dbDismissReport,
+  dbMarkCommissionPaid
+} from '../../lib/adminFirestoreService';
+import { Loader2 } from 'lucide-react';
 
 interface HasstyAdminAppProps {
   onSwitchToPublicApp?: () => void;
@@ -30,12 +47,56 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
   });
 
   const [currentTab, setCurrentTab] = useState<AdminTab>('dashboard');
+  const [isDbLoading, setIsDbLoading] = useState<boolean>(true);
 
-  // Application Data States
+  // Application Real-time Firestore States
   const [accounts, setAccounts] = useState<AdminUserAccount[]>(INITIAL_ADMIN_ACCOUNTS);
   const [verificationRequests, setVerificationRequests] = useState(INITIAL_VERIFICATION_REQUESTS);
   const [safetyReports, setSafetyReports] = useState(INITIAL_SAFETY_REPORTS);
   const [commissions, setCommissions] = useState(INITIAL_COMMISSION_DATA);
+
+  // Initialize DB and real-time listeners
+  useEffect(() => {
+    let unsubUsers: (() => void) | undefined;
+    let unsubVerifs: (() => void) | undefined;
+    let unsubReports: (() => void) | undefined;
+    let unsubComms: (() => void) | undefined;
+
+    async function initRealtimeSync() {
+      try {
+        await seedAdminDatabaseIfEmpty();
+        
+        unsubUsers = subscribeToUsers((data) => {
+          setAccounts(data);
+          setIsDbLoading(false);
+        });
+
+        unsubVerifs = subscribeToVerifications((data) => {
+          setVerificationRequests(data);
+        });
+
+        unsubReports = subscribeToReports((data) => {
+          setSafetyReports(data);
+        });
+
+        unsubComms = subscribeToCommissions((data) => {
+          setCommissions(data);
+        });
+      } catch (err) {
+        console.warn('Firestore subscription init warning:', err);
+        setIsDbLoading(false);
+      }
+    }
+
+    initRealtimeSync();
+
+    return () => {
+      if (unsubUsers) unsubUsers();
+      if (unsubVerifs) unsubVerifs();
+      if (unsubReports) unsubReports();
+      if (unsubComms) unsubComms();
+    };
+  }, []);
 
   // Auth Handlers
   const handleLoginSuccess = (email: string) => {
@@ -51,32 +112,51 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
     localStorage.removeItem('hassty_admin_email');
   };
 
-  // Badge & Accounts Handlers
-  const handleUpdateAccountBadge = (accountId: string, newBadge: AccountBadgeType) => {
+  // Badge & Accounts Handlers with Live Firestore DB Writes
+  const handleUpdateAccountBadge = async (accountId: string, newBadge: AccountBadgeType) => {
+    // Optimistic UI update
     setAccounts((prev) =>
       prev.map((acc) => (acc.id === accountId ? { ...acc, badge: newBadge } : acc))
     );
+    try {
+      await dbUpdateAccountBadge(accountId, newBadge);
+    } catch (e) {
+      console.error('Failed to update account badge in Firestore:', e);
+    }
   };
 
-  const handleToggleAccountStatus = (accountId: string) => {
+  const handleToggleAccountStatus = async (accountId: string) => {
+    const target = accounts.find((a) => a.id === accountId);
+    if (!target) return;
+    const nextStatus = target.status === 'active' ? 'suspended' : 'active';
+    
+    // Optimistic UI update
     setAccounts((prev) =>
-      prev.map((acc) =>
-        acc.id === accountId
-          ? { ...acc, status: acc.status === 'active' ? 'suspended' : 'active' }
-          : acc
-      )
+      prev.map((acc) => (acc.id === accountId ? { ...acc, status: nextStatus } : acc))
     );
+    try {
+      await dbToggleAccountStatus(accountId, target.status);
+    } catch (e) {
+      console.error('Failed to toggle status in Firestore:', e);
+    }
   };
 
-  const handleDeleteAccount = (accountId: string) => {
+  const handleDeleteAccount = async (accountId: string) => {
+    // Optimistic UI update
     setAccounts((prev) => prev.filter((acc) => acc.id !== accountId));
+    try {
+      await dbDeleteAccount(accountId);
+    } catch (e) {
+      console.error('Failed to delete account in Firestore:', e);
+    }
   };
 
-  // Verification Queue Handlers
-  const handleApproveTeacherVerification = (requestId: string) => {
+  // Verification Queue Handlers with Live Firestore DB Writes
+  const handleApproveTeacherVerification = async (requestId: string) => {
     const targetReq = verificationRequests.find((r) => r.id === requestId);
     if (!targetReq) return;
 
+    // Optimistic UI update
     setVerificationRequests((prev) =>
       prev.map((r) =>
         r.id === requestId
@@ -90,34 +170,28 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
       )
     );
 
-    // Also update or add to accounts as verified
-    setAccounts((prev) => {
-      const exists = prev.find((a) => a.id === targetReq.teacherId || a.phone === targetReq.phone);
-      if (exists) {
-        return prev.map((a) =>
-          a.id === exists.id ? { ...a, badge: 'verified', status: 'active' } : a
-        );
-      }
-      const newAcc: AdminUserAccount = {
-        id: targetReq.teacherId,
-        name: targetReq.teacherName,
-        phone: targetReq.phone,
-        role: 'teacher',
-        createdAt: targetReq.submittedAt.split(' ')[0],
-        status: 'active',
-        badge: 'verified',
-        subject: targetReq.subject,
-        grade: targetReq.stage,
-        governorate: targetReq.governorate,
-        area: targetReq.area,
-        studentsCount: 0,
-        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-      };
-      return [newAcc, ...prev];
-    });
+    const teacherData: Partial<AdminUserAccount> = {
+      name: targetReq.teacherName,
+      phone: targetReq.phone,
+      role: 'teacher',
+      status: 'active',
+      badge: 'verified',
+      subject: targetReq.subject,
+      grade: targetReq.stage,
+      governorate: targetReq.governorate,
+      area: targetReq.area,
+      nationalId: targetReq.nationalId,
+    };
+
+    try {
+      await dbApproveVerification(requestId, targetReq.teacherId, adminEmail, teacherData);
+    } catch (e) {
+      console.error('Failed to approve teacher verification in Firestore:', e);
+    }
   };
 
-  const handleRejectTeacherVerification = (requestId: string, reason: string) => {
+  const handleRejectTeacherVerification = async (requestId: string, reason: string) => {
+    // Optimistic UI update
     setVerificationRequests((prev) =>
       prev.map((r) =>
         r.id === requestId
@@ -131,10 +205,17 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
           : r
       )
     );
+
+    try {
+      await dbRejectVerification(requestId, reason, adminEmail);
+    } catch (e) {
+      console.error('Failed to reject teacher verification in Firestore:', e);
+    }
   };
 
-  // Safety Reports Handlers
-  const handleSuspendTeacherFromReport = (teacherId: string, reportId: string) => {
+  // Safety Reports Handlers with Live Firestore DB Writes
+  const handleSuspendTeacherFromReport = async (teacherId: string, reportId: string) => {
+    // Optimistic UI update
     setSafetyReports((prev) =>
       prev.map((r) =>
         r.id === reportId ? { ...r, teacherSuspended: true, status: 'in_review' } : r
@@ -145,20 +226,41 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
         acc.id === teacherId ? { ...acc, status: 'suspended', badge: 'fraudulent' } : acc
       )
     );
+
+    try {
+      await dbSuspendTeacherFromReport(teacherId, reportId);
+    } catch (e) {
+      console.error('Failed to suspend teacher from report in Firestore:', e);
+    }
   };
 
-  const handleResolveSafetyReport = (reportId: string) => {
+  const handleResolveSafetyReport = async (reportId: string) => {
+    // Optimistic UI update
     setSafetyReports((prev) =>
       prev.map((r) => (r.id === reportId ? { ...r, status: 'resolved' } : r))
     );
+
+    try {
+      await dbResolveReport(reportId);
+    } catch (e) {
+      console.error('Failed to resolve safety report in Firestore:', e);
+    }
   };
 
-  const handleDismissSafetyReport = (reportId: string) => {
+  const handleDismissSafetyReport = async (reportId: string) => {
+    // Optimistic UI update
     setSafetyReports((prev) => prev.filter((r) => r.id !== reportId));
+
+    try {
+      await dbDismissReport(reportId);
+    } catch (e) {
+      console.error('Failed to dismiss safety report in Firestore:', e);
+    }
   };
 
-  // Commission Handler
-  const handleMarkCommissionPaid = (id: string) => {
+  // Commission Handler with Live Firestore DB Writes
+  const handleMarkCommissionPaid = async (id: string) => {
+    // Optimistic UI update
     setCommissions((prev) =>
       prev.map((c) =>
         c.id === id
@@ -170,6 +272,12 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
           : c
       )
     );
+
+    try {
+      await dbMarkCommissionPaid(id);
+    } catch (e) {
+      console.error('Failed to mark commission paid in Firestore:', e);
+    }
   };
 
   // If not logged in, render the secure Admin Login Page
@@ -204,50 +312,59 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
 
       {/* 2. Main Content View Area */}
       <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full overflow-y-auto">
-        {currentTab === 'dashboard' && (
-          <AdminDashboardHome
-            accounts={accounts}
-            verificationRequests={verificationRequests}
-            safetyReports={safetyReports}
-            onNavigateTab={setCurrentTab}
-          />
-        )}
+        {isDbLoading ? (
+          <div className="py-20 flex flex-col items-center justify-center gap-3 text-slate-500">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            <p className="text-sm font-bold">جاري المزامنة مع قاعدة بيانات حِصّتي السحابية (Firestore)...</p>
+          </div>
+        ) : (
+          <>
+            {currentTab === 'dashboard' && (
+              <AdminDashboardHome
+                accounts={accounts}
+                verificationRequests={verificationRequests}
+                safetyReports={safetyReports}
+                onNavigateTab={setCurrentTab}
+              />
+            )}
 
-        {currentTab === 'accounts' && (
-          <AccountsManagementPage
-            accounts={accounts}
-            onUpdateAccountBadge={handleUpdateAccountBadge}
-            onToggleAccountStatus={handleToggleAccountStatus}
-            onDeleteAccount={handleDeleteAccount}
-          />
-        )}
+            {currentTab === 'accounts' && (
+              <AccountsManagementPage
+                accounts={accounts}
+                onUpdateAccountBadge={handleUpdateAccountBadge}
+                onToggleAccountStatus={handleToggleAccountStatus}
+                onDeleteAccount={handleDeleteAccount}
+              />
+            )}
 
-        {currentTab === 'verification' && (
-          <TeacherVerificationQueuePage
-            requests={verificationRequests}
-            onApproveRequest={handleApproveTeacherVerification}
-            onRejectRequest={handleRejectTeacherVerification}
-          />
-        )}
+            {currentTab === 'verification' && (
+              <TeacherVerificationQueuePage
+                requests={verificationRequests}
+                onApproveRequest={handleApproveTeacherVerification}
+                onRejectRequest={handleRejectTeacherVerification}
+              />
+            )}
 
-        {currentTab === 'reports' && (
-          <SafetyReportsPage
-            reports={safetyReports}
-            onSuspendTeacher={handleSuspendTeacherFromReport}
-            onResolveReport={handleResolveSafetyReport}
-            onDismissReport={handleDismissSafetyReport}
-          />
-        )}
+            {currentTab === 'reports' && (
+              <SafetyReportsPage
+                reports={safetyReports}
+                onSuspendTeacher={handleSuspendTeacherFromReport}
+                onResolveReport={handleResolveSafetyReport}
+                onDismissReport={handleDismissSafetyReport}
+              />
+            )}
 
-        {currentTab === 'analytics' && (
-          <SiteAnalyticsPage accounts={accounts} />
-        )}
+            {currentTab === 'analytics' && (
+              <SiteAnalyticsPage accounts={accounts} />
+            )}
 
-        {currentTab === 'commissions' && (
-          <CommissionTrackingPage
-            commissions={commissions}
-            onMarkPaid={handleMarkCommissionPaid}
-          />
+            {currentTab === 'commissions' && (
+              <CommissionTrackingPage
+                commissions={commissions}
+                onMarkPaid={handleMarkCommissionPaid}
+              />
+            )}
+          </>
         )}
       </main>
 

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useSEO } from '../lib/useSEO';
 import {
   Search,
   MapPin,
@@ -43,6 +44,13 @@ export const SearchResultsPage: React.FC<SearchResultsPageProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 4;
+
+  useSEO({
+    title: selectedSubject ? `مدرسين ${selectedSubject} المعتمدين في مصر` : 'البحث عن المدرسين الخصوصيين المعتمدين',
+    description: `ابحث عن أفضل المدرسين الخصوصيين في ${selectedSubject || 'جميع المواد'} بمحافظة ${selectedGovernorate || 'مصر'} مع تقييمات الطلاب، الأسعار، وحجز الحصص الفوري.`,
+    canonicalPath: '/search',
+    keywords: `مدرس ${selectedSubject || 'خصوصي'}, مدرسين ثانوية عامة, دروس خصوصية ${selectedGovernorate || 'مصر'}, حجز حصص`,
+  });
 
   const availableCities = useMemo(() => {
     if (!selectedGovernorate || !CITIES_BY_GOVERNORATE[selectedGovernorate]) {

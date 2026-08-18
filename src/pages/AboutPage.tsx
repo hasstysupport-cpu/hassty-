@@ -1,4 +1,5 @@
 import React from 'react';
+import { useSEO } from '../lib/useSEO';
 import {
   QrCode,
   ShieldCheck,
@@ -20,6 +21,13 @@ interface AboutPageProps {
 }
 
 export const AboutPage: React.FC<AboutPageProps> = ({ onNavigate }) => {
+  useSEO({
+    title: 'عن منصة حصتي - الرؤية والرسومة التعليمية في مصر',
+    description: 'تعرف على قصة منصة حصتي، المنظومة المصرية المبتكرة لربط الطلاب والمدرسين الخصوصيين بنظام الحضور الذكي بالـ QR كود وتقارير المتابعة الفورية لأولياء الأمور.',
+    canonicalPath: '/about',
+    keywords: 'عن حصتي, رؤية منصة حصتي, فريق حصتي التعليمية, نظام حضور الطلاب, التعليم في مصر',
+  });
+
   return (
     <div className="bg-[#F8FAFF] min-h-screen pb-16 text-right">
       

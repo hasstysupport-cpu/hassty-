@@ -1,3 +1,4 @@
+import { verifyAdminCredentialsSecurely, HASSTY_DOMAINS } from '../../lib/securityConfig';
 import React, { useState } from 'react';
 import {
   Lock,
@@ -5,10 +6,9 @@ import {
   KeyRound,
   AlertCircle,
   CheckCircle2,
-  Server,
   ArrowLeft,
-  Sparkles,
-  Info
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 interface AdminLoginPageProps {
@@ -16,50 +16,17 @@ interface AdminLoginPageProps {
   onBackToPublicSite?: () => void;
 }
 
-/**
- * =========================================================================
- * ARCHITECTURAL & SECURITY NOTICE (Next.js / Edge Middleware Specification):
- * =========================================================================
- * In the standalone Next.js deployment of admin.hassty.com, configure the IP allowlist
- * in `middleware.ts` before requests reach this login screen:
- *
- * ```typescript
- * // middleware.ts (Next.js Edge Middleware for admin.hassty.com)
- * import { NextResponse } from 'next/server';
- * import type { NextRequest } from 'next/server';
- *
- * const ALLOWED_ADMIN_IPS = (process.env.ADMIN_ALLOWED_IPS || '197.34.120.10,156.204.88.1').split(',');
- *
- * export function middleware(request: NextRequest) {
- *   // Extract client IP from headers (x-forwarded-for or request.ip)
- *   const forwardedFor = request.headers.get('x-forwarded-for');
- *   const clientIp = forwardedFor ? forwardedFor.split(',')[0].trim() : request.ip || '127.0.0.1';
- *
- *   const isIpAllowed = ALLOWED_ADMIN_IPS.some(ip => ip.trim() === clientIp || ip.trim() === '*');
- *
- *   if (!isIpAllowed && process.env.NODE_ENV === 'production') {
- *     // Return 403 Forbidden or redirect unauthorized devices
- *     return new NextResponse('Access Denied: Your IP address is not permitted to access Hassty Admin Panel.', {
- *       status: 403,
- *       headers: { 'content-type': 'text/plain; charset=utf-8' },
- *     });
- *   }
- *   return NextResponse.next();
- * }
- * export const config = { matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'] };
- * ```
- */
-
 export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
   onLoginSuccess,
   onBackToPublicSite,
 }) => {
-  const [emailOrUsername, setEmailOrUsername] = useState('admin@hassty.com');
-  const [password, setPassword] = useState('hassty2026');
+  const [emailOrUsername, setEmailOrUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
 
@@ -70,26 +37,27 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
 
     setIsLoading(true);
 
-    // Verify credentials
-    setTimeout(() => {
+    try {
+      // Secure cryptographically hashed verification without exposing secrets
+      const verification = await verifyAdminCredentialsSecurely(emailOrUsername, password);
       setIsLoading(false);
-      // Valid credentials for founding team admin
-      if (
-        (emailOrUsername.trim().toLowerCase() === 'admin@hassty.com' || emailOrUsername.trim().toLowerCase() === 'admin') &&
-        (password === 'hassty2026' || password.length >= 6)
-      ) {
+
+      if (verification.success) {
         onLoginSuccess(emailOrUsername.trim());
       } else {
-        setErrorMessage('بيانات الدخول غير صحيحة. حسابات المسؤولين تنشأ يدوياً فقط بواسطة الإدارة.');
+        setErrorMessage(verification.error || 'بيانات الدخول غير صحيحة.');
       }
-    }, 600);
+    } catch {
+      setIsLoading(false);
+      setErrorMessage('حدث خطأ في معالجة طلب الدخول الآمن، يرجى المحاولة لاحقاً');
+    }
   };
 
   return (
-    <div className="min-h-screen bg-[#0F172A] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 font-['Tajawal',sans-serif] text-right antialiased relative overflow-hidden">
+    <div className="min-h-screen bg-[#0B1120] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 font-['Tajawal',sans-serif] text-right antialiased relative overflow-hidden select-none">
       
       {/* Background Decorative Grid */}
-      <div className="absolute inset-0 bg-[radial-gradient(#1E3A8A_1px,transparent_1px)] [background-size:24px_24px] opacity-20 pointer-events-none" />
+      <div className="absolute inset-0 bg-[radial-gradient(#1E3A8A_1px,transparent_1px)] [background-size:24px_24px] opacity-15 pointer-events-none" />
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
         
@@ -105,7 +73,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
             </span>
           </div>
           <p className="text-xs text-slate-400 font-mono">
-            admin.hassty.com — بوابة التحكم المركزية
+            {HASSTY_DOMAINS.PUBLIC_URL}/admin — بوابة التحكم المركزية
           </p>
         </div>
 
@@ -143,6 +111,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
                   value={emailOrUsername}
                   onChange={(e) => setEmailOrUsername(e.target.value)}
                   placeholder="admin@hassty.com"
+                  autoComplete="username"
                   className="w-full text-right px-4 py-3 bg-[#0F172A] border border-slate-700 rounded-2xl text-white text-xs font-mono placeholder:text-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
                   required
                 />
@@ -155,17 +124,29 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
                 <label className="block text-xs font-bold text-slate-200">
                   كلمة المرور
                 </label>
-                <span className="text-[10px] text-slate-400">تشفير 256-bit</span>
+                <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                  <Lock className="w-3 h-3 text-emerald-400" />
+                  <span>تشفير SHA-256</span>
+                </span>
               </div>
               <div className="relative">
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full text-right px-4 py-3 bg-[#0F172A] border border-slate-700 rounded-2xl text-white text-xs font-mono placeholder:text-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                  placeholder="••••••••••••"
+                  autoComplete="current-password"
+                  className="w-full text-right px-4 py-3 pl-11 bg-[#0F172A] border border-slate-700 rounded-2xl text-white text-xs font-mono placeholder:text-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1 rounded transition-colors cursor-pointer"
+                  title={showPassword ? 'إخفاء' : 'إظهار'}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
 
@@ -173,7 +154,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3.5 px-4 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-2xl transition-all shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50"
+              className="w-full py-3.5 px-4 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-2xl transition-all shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50 mt-2"
             >
               {isLoading ? (
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -186,12 +167,10 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
             </button>
           </form>
 
-          {/* Quick Demo Help */}
-          <div className="pt-2 text-center border-t border-slate-800 text-[11px] text-slate-400">
-            <span>حساب تجريبي افتراضي: </span>
-            <span className="font-mono text-blue-400">admin@hassty.com</span>
-            <span> / </span>
-            <span className="font-mono text-blue-400">hassty2026</span>
+          {/* Security Banner */}
+          <div className="pt-2 text-center border-t border-slate-800 text-[11px] text-slate-400 flex items-center justify-center gap-1.5">
+            <Shield className="w-3.5 h-3.5 text-blue-400" />
+            <span>نظام محمي برقم البصمة والتشفير ضد هجمات القوة الغاشمة</span>
           </div>
         </div>
 
@@ -203,7 +182,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
               className="text-xs text-slate-400 hover:text-white transition-colors inline-flex items-center gap-1.5 cursor-pointer"
             >
               <ArrowLeft className="w-3.5 h-3.5 rotate-180" />
-              <span>العودة إلى منصة حِصّتي الرئيسية (hassty.com)</span>
+              <span>العودة إلى منصة حِصّتي الرئيسية (hassty.vercel.app)</span>
             </button>
           </div>
         )}

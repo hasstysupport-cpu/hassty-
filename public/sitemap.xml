@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml"
+        xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
+        http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
+
+  <!-- Home Page / الصفحة الرئيسية -->
+  <url>
+    <loc>https://hassty.vercel.app/</loc>
+    <lastmod>2026-08-18</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://hassty.vercel.app/" />
+  </url>
+
+  <!-- Search & Find Tutors / البحث عن المدرسين -->
+  <url>
+    <loc>https://hassty.vercel.app/search</loc>
+    <lastmod>2026-08-18</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.95</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://hassty.vercel.app/search" />
+  </url>
+
+  <!-- Teachers Page / صفحة المدرسين -->
+  <url>
+    <loc>https://hassty.vercel.app/teachers</loc>
+    <lastmod>2026-08-18</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.90</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://hassty.vercel.app/teachers" />
+  </url>
+
+  <!-- For Teachers (Join us) / انضم كمدرس -->
+  <url>
+    <loc>https://hassty.vercel.app/for-teachers</loc>
+    <lastmod>2026-08-18</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://hassty.vercel.app/for-teachers" />
+  </url>
+
+  <!-- About Hassty / عن منصة حصتي -->
+  <url>
+    <loc>https://hassty.vercel.app/about</loc>
+    <lastmod>2026-08-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.75</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://hassty.vercel.app/about" />
+  </url>
+
+  <!-- Contact Us / اتصل بنا والدعم الفني -->
+  <url>
+    <loc>https://hassty.vercel.app/contact</loc>
+    <lastmod>2026-08-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.70</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://hassty.vercel.app/contact" />
+  </url>
+
+  <!-- Register / حساب جديد -->
+  <url>
+    <loc>https://hassty.vercel.app/signup</loc>
+    <lastmod>2026-08-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.65</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://hassty.vercel.app/signup" />
+  </url>
+
+  <!-- Login / تسجيل الدخول -->
+  <url>
+    <loc>https://hassty.vercel.app/login</loc>
+    <lastmod>2026-08-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.60</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://hassty.vercel.app/login" />
+  </url>
+
+</urlset>

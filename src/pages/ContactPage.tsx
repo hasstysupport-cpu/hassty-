@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useSEO } from '../lib/useSEO';
 import {
   Mail,
   Phone,
@@ -28,6 +29,13 @@ export const ContactPage: React.FC<ContactPageProps> = ({ onNavigate }) => {
     email: '',
     subject: 'استفسار عام',
     message: '',
+  });
+
+  useSEO({
+    title: 'اتصل بنا والدعم الفني - منصة حصتي',
+    description: 'تواصل مع فريق الدعم الفني لمنصة حصتي للاستفسارات العامة، دعم المدرسين والطلاب، أو عبر الواتساب والبريد الإلكتروني المباشر.',
+    canonicalPath: '/contact',
+    keywords: 'اتصل بنا حصتي, دعم منصة حصتي, خدمة العملاء, مساعدة أولياء الأمور والطلاب',
   });
 
   const handleSubmit = (e: React.FormEvent) => {

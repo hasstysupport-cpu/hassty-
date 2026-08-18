@@ -1,4 +1,5 @@
 import React from 'react';
+import { useSEO } from '../lib/useSEO';
 import {
   TrendingDown,
   Sparkles,
@@ -22,6 +23,13 @@ interface ForTeachersPageProps {
 }
 
 export const ForTeachersPage: React.FC<ForTeachersPageProps> = ({ onNavigate }) => {
+  useSEO({
+    title: 'انضم كمدرس معتمد - نمِّ دخلك وطلّابك',
+    description: 'انضم إلى منصة حصتي كمعلم معتمد واستفد من نظام إدارة المجموعات والـ QR كود لمتابعة الطلاب، أقل نسبة عمولة في مصر، وإعلانات موجهة لمنطقتك.',
+    canonicalPath: '/for-teachers',
+    keywords: 'انضم كمدرس, تدريس خصوصي مصر, زيادة طلاب الدروس, نظام حضور الطلاب للمدرسين, سناتر تعليمية',
+  });
+
   return (
     <div className="bg-[#F8FAFF] min-h-screen pb-16 text-right">
       

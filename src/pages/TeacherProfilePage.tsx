@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useSEO } from '../lib/useSEO';
 import {
   Star,
   ShieldCheck,
@@ -44,6 +45,13 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
 
   // Find tutor by id, or default to first tutor
   const tutor = SAMPLE_TUTORS.find((t) => t.id === tutorId) || SAMPLE_TUTORS[0];
+
+  useSEO({
+    title: `${tutor.name} - مدرس ${tutor.subject} في ${tutor.governorate}`,
+    description: `احجز حصتك مع الأستاذ ${tutor.name}، مدرس ${tutor.subject} في ${tutor.governorate} - ${tutor.area}. تقييم ${tutor.rating} من 5 ونظام حضور ذكي بالـ QR.`,
+    canonicalPath: `/tutor/${tutor.id}`,
+    keywords: `مدرس ${tutor.subject}, ${tutor.name}, دروس خصوصية ${tutor.governorate}, مدرس ثانوية عامة ${tutor.subject}`,
+  });
 
   // Related tutors
   const relatedTutors = SAMPLE_TUTORS.filter((t) => t.id !== tutor.id).slice(0, 3);

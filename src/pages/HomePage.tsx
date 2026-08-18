@@ -1,4 +1,5 @@
 import React from 'react';
+import { useSEO } from '../lib/useSEO';
 import { HeroSection } from '../components/HeroSection';
 import { ProblemSolutionSection } from '../components/ProblemSolutionSection';
 import { HowItWorksSection } from '../components/HowItWorksSection';
@@ -25,6 +26,12 @@ export const HomePage: React.FC<HomePageProps> = ({
   onOpenAuth,
   onSearchWithParams,
 }) => {
+  useSEO({
+    title: 'الرئيسية - احجز أفضل المدرسين الخصوصيين في مصر',
+    description: 'ابحث عن أفضل المدرسين الخصوصيين المعتمدين لمختلف المراحل الدراسية واللغات في مصر مع نظام الحضور الذكي بالـ QR كود وإشعارات فورية لأولياء الأمور.',
+    canonicalPath: '/',
+  });
+
   const handleSearch = (subject: string, governorate: string, city: string = '') => {
     if (onSearchWithParams) {
       onSearchWithParams(subject, governorate, city);
