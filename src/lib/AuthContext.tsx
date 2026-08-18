@@ -34,6 +34,7 @@ interface AuthContextType {
   user: UserSession | null;
   loading: boolean;
   loginUser: (phone: string, role: AccountRole, name?: string) => Promise<UserSession>;
+  checkPhoneExists: (phone: string) => Promise<{ exists: boolean; userData?: any }>;
   signupUser: (data: {
     phone: string;
     role: AccountRole;
@@ -90,6 +91,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     loadSession();
   }, [user?.uid]);
+
+  const checkPhoneExists = async (phone: string): Promise<{ exists: boolean; userData?: any }> => {
+    const cleanPhone = phone.trim().replace(/\s+/g, '');
+    if (!cleanPhone) return { exists: false };
+
+    try {
+      // Query users collection where phone equals cleanPhone
+      const q = query(collection(db, 'users'), where('phone', '==', cleanPhone));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        return { exists: true, userData: snap.docs[0].data() };
+      }
+
+      // Check document IDs like student_010xxx, teacher_010xxx, parent_010xxx
+      const roles: AccountRole[] = ['student', 'teacher', 'parent'];
+      for (const r of roles) {
+        const docSnap = await getDoc(doc(db, 'users', `${r}_${cleanPhone.replace(/\+/g, '')}`));
+        if (docSnap.exists()) {
+          return { exists: true, userData: docSnap.data() };
+        }
+      }
+
+      return { exists: false };
+    } catch (err) {
+      console.warn('Check phone existence error:', err);
+      return { exists: false };
+    }
+  };
 
   const loginUser = async (phone: string, role: AccountRole, name?: string): Promise<UserSession> => {
     const cleanPhone = phone.trim();
@@ -247,7 +276,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, loginUser, signupUser, updateUserProfile, logout }}>
+    <AuthContext.Provider value={{ user, loading, loginUser, checkPhoneExists, signupUser, updateUserProfile, logout }}>
       {children}
     </AuthContext.Provider>
   );

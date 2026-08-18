@@ -34,53 +34,7 @@ const COMMISSIONS_COLLECTION = 'commissions';
  * Initializes Firestore collections with structured real-world data if they are empty.
  */
 export async function seedAdminDatabaseIfEmpty() {
-  try {
-    const usersSnap = await getDocs(collection(db, USERS_COLLECTION));
-    if (usersSnap.empty) {
-      console.log('Seeding initial admin users into Firestore...');
-      const batch = writeBatch(db);
-      for (const account of INITIAL_ADMIN_ACCOUNTS) {
-        const ref = doc(db, USERS_COLLECTION, account.id);
-        batch.set(ref, account);
-      }
-      await batch.commit();
-    }
-
-    const verificationsSnap = await getDocs(collection(db, VERIFICATIONS_COLLECTION));
-    if (verificationsSnap.empty) {
-      console.log('Seeding initial verifications into Firestore...');
-      const batch = writeBatch(db);
-      for (const req of INITIAL_VERIFICATION_REQUESTS) {
-        const ref = doc(db, VERIFICATIONS_COLLECTION, req.id);
-        batch.set(ref, req);
-      }
-      await batch.commit();
-    }
-
-    const reportsSnap = await getDocs(collection(db, REPORTS_COLLECTION));
-    if (reportsSnap.empty) {
-      console.log('Seeding initial reports into Firestore...');
-      const batch = writeBatch(db);
-      for (const rep of INITIAL_SAFETY_REPORTS) {
-        const ref = doc(db, REPORTS_COLLECTION, rep.id);
-        batch.set(ref, rep);
-      }
-      await batch.commit();
-    }
-
-    const commsSnap = await getDocs(collection(db, COMMISSIONS_COLLECTION));
-    if (commsSnap.empty) {
-      console.log('Seeding initial commissions into Firestore...');
-      const batch = writeBatch(db);
-      for (const com of INITIAL_COMMISSION_DATA) {
-        const ref = doc(db, COMMISSIONS_COLLECTION, com.id);
-        batch.set(ref, com);
-      }
-      await batch.commit();
-    }
-  } catch (err) {
-    console.warn('Auto-seed admin database notice:', err);
-  }
+  // Real database mode - no automatic mock seeding
 }
 
 /**
@@ -90,8 +44,7 @@ export function subscribeToUsers(callback: (users: AdminUserAccount[]) => void) 
   const q = collection(db, USERS_COLLECTION);
   return onSnapshot(q, (snapshot) => {
     if (snapshot.empty) {
-      // Return initial if empty so UI stays responsive
-      callback(INITIAL_ADMIN_ACCOUNTS);
+      callback([]);
       return;
     }
     const accounts: AdminUserAccount[] = snapshot.docs.map((docSnap) => {
@@ -102,7 +55,7 @@ export function subscribeToUsers(callback: (users: AdminUserAccount[]) => void) 
         phone: data.phone || '',
         email: data.email || '',
         role: data.role || 'student',
-        createdAt: data.createdAt ? String(data.createdAt).split('T')[0] : '2026-08-01',
+        createdAt: data.createdAt ? String(data.createdAt).split('T')[0] : '2026-08-18',
         status: data.status || 'active',
         badge: data.badge || (data.isVerified ? 'verified' : 'none'),
         subject: data.subject,
@@ -131,7 +84,7 @@ export function subscribeToVerifications(callback: (reqs: TeacherVerificationReq
   const q = collection(db, VERIFICATIONS_COLLECTION);
   return onSnapshot(q, (snapshot) => {
     if (snapshot.empty) {
-      callback(INITIAL_VERIFICATION_REQUESTS);
+      callback([]);
       return;
     }
     const list: TeacherVerificationRequest[] = snapshot.docs.map((d) => ({
@@ -141,7 +94,7 @@ export function subscribeToVerifications(callback: (reqs: TeacherVerificationReq
     callback(list);
   }, (err) => {
     console.error('Firestore subscribeToVerifications error:', err);
-    callback(INITIAL_VERIFICATION_REQUESTS);
+    callback([]);
   });
 }
 
@@ -152,7 +105,7 @@ export function subscribeToReports(callback: (reps: AdminSafetyReport[]) => void
   const q = collection(db, REPORTS_COLLECTION);
   return onSnapshot(q, (snapshot) => {
     if (snapshot.empty) {
-      callback(INITIAL_SAFETY_REPORTS);
+      callback([]);
       return;
     }
     const list: AdminSafetyReport[] = snapshot.docs.map((d) => ({
@@ -162,7 +115,7 @@ export function subscribeToReports(callback: (reps: AdminSafetyReport[]) => void
     callback(list);
   }, (err) => {
     console.error('Firestore subscribeToReports error:', err);
-    callback(INITIAL_SAFETY_REPORTS);
+    callback([]);
   });
 }
 
@@ -173,7 +126,7 @@ export function subscribeToCommissions(callback: (comms: TeacherCommissionTracki
   const q = collection(db, COMMISSIONS_COLLECTION);
   return onSnapshot(q, (snapshot) => {
     if (snapshot.empty) {
-      callback(INITIAL_COMMISSION_DATA);
+      callback([]);
       return;
     }
     const list: TeacherCommissionTrackingItem[] = snapshot.docs.map((d) => ({
@@ -183,7 +136,7 @@ export function subscribeToCommissions(callback: (comms: TeacherCommissionTracki
     callback(list);
   }, (err) => {
     console.error('Firestore subscribeToCommissions error:', err);
-    callback(INITIAL_COMMISSION_DATA);
+    callback([]);
   });
 }
 

@@ -34,7 +34,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({
   onNavigate,
   onSignupSuccess,
 }) => {
-  const { signupUser } = useAuth();
+  const { signupUser, checkPhoneExists } = useAuth();
   const [role, setRole] = useState<AccountRole>(initialRole);
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1); // 1: role, 2: details, 3: whatsapp otp, 4: success
 
@@ -85,6 +85,15 @@ export const SignupPage: React.FC<SignupPageProps> = ({
     setErrorMessage('');
 
     try {
+      // 1. Verify if phone is already registered in Firestore database
+      const { exists } = await checkPhoneExists(phone);
+      if (exists) {
+        setIsLoading(false);
+        setErrorMessage(`عذراً، رقم الهاتف (${phone}) مسجل بالفعل في منصة حصتي. يرجى تسجيل الدخول بدلاً من إنشاء حساب جديد.`);
+        return;
+      }
+
+      // 2. Request OTP via WhatsApp
       const res = await whatsappService.requestOtp(phone, 'signup');
       setIsLoading(false);
 

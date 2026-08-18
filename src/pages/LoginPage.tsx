@@ -26,7 +26,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   onNavigate,
   onLoginSuccess,
 }) => {
-  const { loginUser } = useAuth();
+  const { loginUser, checkPhoneExists } = useAuth();
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState(['', '', '', '']);
@@ -70,6 +70,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     setSuccessInfo('');
 
     try {
+      // 1. Verify if phone exists in Firestore database first
+      const { exists } = await checkPhoneExists(phone);
+      if (!exists) {
+        setIsLoading(false);
+        setErrorMessage(`عذراً، رقم الهاتف (${phone}) غير مسجل في قاعدة البيانات. يرجى إنشاء حساب جديد أولاً.`);
+        return;
+      }
+
+      // 2. Send WhatsApp OTP
       const res = await whatsappService.requestOtp(phone, 'login');
       setIsLoading(false);
 
@@ -375,7 +384,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           )}
 
           {/* Switch to Register */}
-          <div className="pt-4 border-t border-gray-100 text-center space-y-2">
+          <div className="pt-4 border-t border-gray-100 text-center">
             <p className="text-xs text-[#6B7280]">
               ليس لديك حساب بعد؟{' '}
               <button
@@ -385,15 +394,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 إنشاء حساب جديد
               </button>
             </p>
-            <div>
-              <button
-                onClick={() => onNavigate('/admin')}
-                className="text-[11px] text-[#1E3A8A] font-bold hover:underline inline-flex items-center gap-1 cursor-pointer bg-blue-50 px-3 py-1 rounded-lg border border-blue-100"
-              >
-                <ShieldCheck className="w-3.5 h-3.5 text-[#2563EB]" />
-                <span>تسجيل دخول المسؤولين والإدارة (/admin)</span>
-              </button>
-            </div>
           </div>
 
         </div>

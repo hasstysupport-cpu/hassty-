@@ -50,10 +50,10 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
   const [isDbLoading, setIsDbLoading] = useState<boolean>(true);
 
   // Application Real-time Firestore States
-  const [accounts, setAccounts] = useState<AdminUserAccount[]>(INITIAL_ADMIN_ACCOUNTS);
-  const [verificationRequests, setVerificationRequests] = useState(INITIAL_VERIFICATION_REQUESTS);
-  const [safetyReports, setSafetyReports] = useState(INITIAL_SAFETY_REPORTS);
-  const [commissions, setCommissions] = useState(INITIAL_COMMISSION_DATA);
+  const [accounts, setAccounts] = useState<AdminUserAccount[]>([]);
+  const [verificationRequests, setVerificationRequests] = useState<any[]>([]);
+  const [safetyReports, setSafetyReports] = useState<any[]>([]);
+  const [commissions, setCommissions] = useState<any[]>([]);
 
   // Initialize DB and real-time listeners
   useEffect(() => {

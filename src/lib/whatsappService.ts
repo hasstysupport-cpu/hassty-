@@ -58,6 +58,35 @@ export interface InteractiveListSection {
   }>;
 }
 
+const DIRECT_WHATSAPP_SERVER = 'http://54.85.197.100:3000';
+
+async function postGatewayApi(endpoint: string, body: any): Promise<any> {
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const contentType = res.headers.get('content-type') || '';
+    if (res.ok && contentType.includes('application/json')) {
+      return await res.json();
+    }
+  } catch (e) {
+    console.warn(`Local proxy to ${endpoint} failed, attempting direct gateway:`, e);
+  }
+
+  try {
+    const directRes = await fetch(`${DIRECT_WHATSAPP_SERVER}${endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    return await directRes.json();
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'فشل الاتصال بسيرفر الواتساب' };
+  }
+}
+
 export const whatsappService = {
   /**
    * 1. Check connection status of WhatsApp Gateway: GET /api/v1/status
@@ -65,7 +94,27 @@ export const whatsappService = {
   async checkStatus(): Promise<WhatsAppGatewayStatus> {
     try {
       const res = await fetch('/api/v1/status');
-      const data = await res.json();
+      const contentType = res.headers.get('content-type') || '';
+      if (res.ok && contentType.includes('application/json')) {
+        const data = await res.json();
+        return {
+          success: data.success === true,
+          connected: data.connected === true || data.data?.whatsapp === 'connected',
+          whatsapp: data.data?.whatsapp || (data.connected ? 'connected' : 'disconnected'),
+          session: data.data?.session,
+          uptime: data.data?.uptime,
+          data: data.data,
+          error: data.error,
+        };
+      }
+    } catch (e: any) {
+      console.warn('Express proxy check failed, attempting direct WhatsApp gateway check:', e);
+    }
+
+    // Fallback: Direct server check for Vercel / static hosting
+    try {
+      const directRes = await fetch(`${DIRECT_WHATSAPP_SERVER}/api/v1/status`);
+      const data = await directRes.json();
       return {
         success: data.success === true,
         connected: data.connected === true || data.data?.whatsapp === 'connected',
@@ -75,8 +124,8 @@ export const whatsappService = {
         data: data.data,
         error: data.error,
       };
-    } catch (e: any) {
-      return { success: false, connected: false, error: e?.message || 'Network error' };
+    } catch (err: any) {
+      return { success: false, connected: false, error: err?.message || 'Network error' };
     }
   },
 
@@ -84,20 +133,11 @@ export const whatsappService = {
    * 2. Send Plain/Unicode Text Message: POST /api/v1/send/text
    */
   async sendMessage(number: string, message: string): Promise<WhatsAppSendResult> {
-    try {
-      const res = await fetch('/api/v1/send/text', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ number, message }),
-      });
-      return await res.json();
-    } catch (e: any) {
-      return { success: false, error: e?.message || 'Failed to send WhatsApp message' };
-    }
+    return postGatewayApi('/api/v1/send/text', { number, message });
   },
 
   /**
-   * 3. Send Interactive Message with Buttons (Copy Code, URL, Quick Reply, Call): POST /api/v1/send/interactive
+   * 3. Send Interactive Message with Buttons: POST /api/v1/send/interactive
    */
   async sendInteractive(params: {
     number: string;
@@ -105,20 +145,11 @@ export const whatsappService = {
     footer?: string;
     buttons: InteractiveButton[];
   }): Promise<WhatsAppSendResult> {
-    try {
-      const res = await fetch('/api/v1/send/interactive', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(params),
-      });
-      return await res.json();
-    } catch (e: any) {
-      return { success: false, error: e?.message || 'Failed to send interactive message' };
-    }
+    return postGatewayApi('/api/v1/send/interactive', params);
   },
 
   /**
-   * 4. Send Interactive List (Single Select): POST /api/v1/send/interactive
+   * 4. Send Interactive List: POST /api/v1/send/interactive
    */
   async sendInteractiveList(params: {
     number: string;
@@ -126,83 +157,35 @@ export const whatsappService = {
     text: string;
     sections: InteractiveListSection[];
   }): Promise<WhatsAppSendResult> {
-    try {
-      const res = await fetch('/api/v1/send/interactive', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...params,
-          type: 'single_select',
-        }),
-      });
-      return await res.json();
-    } catch (e: any) {
-      return { success: false, error: e?.message || 'Failed to send interactive list' };
-    }
+    return postGatewayApi('/api/v1/send/interactive', { ...params, type: 'single_select' });
   },
 
   /**
    * 5. Send Image: POST /api/v1/send/image
    */
   async sendImage(number: string, url: string, caption?: string): Promise<WhatsAppSendResult> {
-    try {
-      const res = await fetch('/api/v1/send/image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ number, url, caption }),
-      });
-      return await res.json();
-    } catch (e: any) {
-      return { success: false, error: e?.message || 'Failed to send image' };
-    }
+    return postGatewayApi('/api/v1/send/image', { number, url, caption });
   },
 
   /**
    * 6. Send Video: POST /api/v1/send/video
    */
   async sendVideo(number: string, url: string, caption?: string): Promise<WhatsAppSendResult> {
-    try {
-      const res = await fetch('/api/v1/send/video', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ number, url, caption }),
-      });
-      return await res.json();
-    } catch (e: any) {
-      return { success: false, error: e?.message || 'Failed to send video' };
-    }
+    return postGatewayApi('/api/v1/send/video', { number, url, caption });
   },
 
   /**
    * 7. Send Document: POST /api/v1/send/document
    */
   async sendDocument(number: string, url: string, fileName: string, mimetype?: string): Promise<WhatsAppSendResult> {
-    try {
-      const res = await fetch('/api/v1/send/document', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ number, url, fileName, mimetype: mimetype || 'application/pdf' }),
-      });
-      return await res.json();
-    } catch (e: any) {
-      return { success: false, error: e?.message || 'Failed to send document' };
-    }
+    return postGatewayApi('/api/v1/send/document', { number, url, fileName, mimetype: mimetype || 'application/pdf' });
   },
 
   /**
-   * 8. Send Audio / Voice note: POST /api/v1/send/audio
+   * 8. Send Audio: POST /api/v1/send/audio
    */
   async sendAudio(number: string, url: string, ptt: boolean = true): Promise<WhatsAppSendResult> {
-    try {
-      const res = await fetch('/api/v1/send/audio', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ number, url, ptt }),
-      });
-      return await res.json();
-    } catch (e: any) {
-      return { success: false, error: e?.message || 'Failed to send audio' };
-    }
+    return postGatewayApi('/api/v1/send/audio', { number, url, ptt });
   },
 
   /**
@@ -215,36 +198,18 @@ export const whatsappService = {
     name?: string;
     address?: string;
   }): Promise<WhatsAppSendResult> {
-    try {
-      const res = await fetch('/api/v1/send/location', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(params),
-      });
-      return await res.json();
-    } catch (e: any) {
-      return { success: false, error: e?.message || 'Failed to send location' };
-    }
+    return postGatewayApi('/api/v1/send/location', params);
   },
 
   /**
-   * 10. Send Emoji Reaction: POST /api/v1/send/reaction
+   * 10. Send Reaction: POST /api/v1/send/reaction
    */
   async sendReaction(params: {
     number: string;
     messageKey: { remoteJid: string; fromMe: boolean; id: string };
     emoji: string;
   }): Promise<WhatsAppSendResult> {
-    try {
-      const res = await fetch('/api/v1/send/reaction', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(params),
-      });
-      return await res.json();
-    } catch (e: any) {
-      return { success: false, error: e?.message || 'Failed to send reaction' };
-    }
+    return postGatewayApi('/api/v1/send/reaction', params);
   },
 
   /**
@@ -269,15 +234,50 @@ export const whatsappService = {
           }
         }),
       });
-      return await res.json();
+
+      const contentType = res.headers.get('content-type') || '';
+      if (res.ok && contentType.includes('application/json')) {
+        const json = await res.json();
+        if (json.success) return json;
+      }
     } catch (e: any) {
+      console.warn('Proxy OTP endpoint failed, switching to direct gateway fallback:', e);
+    }
+
+    // Direct Fallback for Vercel / Static deployments:
+    try {
+      const code = Math.floor(1000 + Math.random() * 9000).toString();
+      const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      sessionStorage.setItem(`otp_${requestId}`, JSON.stringify({ code, expiresAt: Date.now() + 5 * 60 * 1000 }));
+
+      const cleanNum = number.replace(/\D/g, '');
+      const sendRes = await fetch(`${DIRECT_WHATSAPP_SERVER}/api/v1/send/text`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          number: cleanNum,
+          message: `رمز التحقق السري لمنصة حِصّتي هو: ${code}\nيرجى عدم مشاركته مع أي شخص. ينتهي خلال 5 دقائق.`
+        })
+      });
+
+      const sendData = await sendRes.json();
+      return {
+        success: sendData.success === true,
+        requestId,
+        formattedNumber: cleanNum,
+        whatsappSent: sendData.success === true,
+        expiresInSeconds: 300,
+        debugCode: code,
+        error: sendData.success ? undefined : (sendData.error || 'تعذر إرسال الرسالة عبر الواتساب')
+      };
+    } catch (err: any) {
       return {
         success: false,
         requestId: '',
         formattedNumber: number,
         whatsappSent: false,
         expiresInSeconds: 0,
-        error: e?.message || 'Failed to request OTP',
+        error: err?.message || 'فشل الاتصال بسيرفر الواتساب',
       };
     }
   },
@@ -300,9 +300,35 @@ export const whatsappService = {
           fingerprint: fingerprint.visitorId 
         }),
       });
-      return await res.json();
+
+      const contentType = res.headers.get('content-type') || '';
+      if (res.ok && contentType.includes('application/json')) {
+        const json = await res.json();
+        if (json.success || json.verified !== undefined) return json;
+      }
     } catch (e: any) {
-      return { success: false, verified: false, error: e?.message || 'OTP verification request failed' };
+      console.warn('Proxy verify OTP endpoint failed, fallback to client verification:', e);
+    }
+
+    // Fallback verification for Vercel / Static deployments
+    try {
+      const storedStr = sessionStorage.getItem(`otp_${requestId}`);
+      if (!storedStr) {
+        return { success: false, verified: false, error: 'رمز التحقق منتهي أو غير صحيح' };
+      }
+      const stored = JSON.parse(storedStr);
+      if (Date.now() > stored.expiresAt) {
+        sessionStorage.removeItem(`otp_${requestId}`);
+        return { success: false, verified: false, error: 'انتهت صلاحية كود التحقق' };
+      }
+      if (stored.code === code.trim()) {
+        sessionStorage.removeItem(`otp_${requestId}`);
+        return { success: true, verified: true };
+      } else {
+        return { success: false, verified: false, error: 'رمز التحقق غير صحيح، يرجى المحاولة مرة أخرى' };
+      }
+    } catch (err: any) {
+      return { success: false, verified: false, error: 'حدث خطأ أثناء التحقق من الكود' };
     }
   },
 
