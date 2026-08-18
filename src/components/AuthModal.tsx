@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, GraduationCap, ShieldAlert, Presentation, CheckCircle2, User, Lock, Phone, MapPin, BookOpen, ArrowLeft } from 'lucide-react';
 import { AccountRole } from '../types';
 import { EGYPT_GOVERNORATES, SUBJECTS_DATA } from '../data/mockData';
@@ -46,9 +47,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }, 2000);
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-gray-200 overflow-hidden my-8 text-right">
+      <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-gray-200 overflow-hidden my-8 text-right animate-scaleUp">
         
         {/* Modal Header */}
         <div className="p-5 sm:p-6 border-b border-gray-200 flex items-center justify-between bg-[#F8FAFF]">
@@ -323,6 +324,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         </div>
 
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

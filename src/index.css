@@ -80,14 +80,25 @@
   }
 }
 
-@keyframes page-enter {
+@keyframes fade-in-simple {
   0% {
     opacity: 0;
-    transform: translateY(8px) scale(0.995);
   }
   100% {
     opacity: 1;
-    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-fadeIn {
+  animation: fade-in-simple 0.2s ease-out forwards;
+}
+
+@keyframes page-enter {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
   }
 }
 

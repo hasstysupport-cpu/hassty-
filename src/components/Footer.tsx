@@ -1,5 +1,6 @@
 import React from 'react';
-import { QrCode, Mail, MessageCircle, MapPin, ShieldCheck, Heart } from 'lucide-react';
+import { Mail, MessageCircle, MapPin, ShieldCheck, Heart } from 'lucide-react';
+import { BrandLogo } from './common/BrandLogo';
 
 interface FooterProps {
   onNavigate: (path: string) => void;
@@ -15,13 +16,8 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
           
           {/* Brand Info & Tagline (Col 1-2) */}
           <div className="lg:col-span-2">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-[#2563EB] flex items-center justify-center text-white shadow-xs">
-                <QrCode className="w-5 h-5 stroke-[2.2]" />
-              </div>
-              <span className="text-2xl font-black text-[#1E3A8A] tracking-tight">
-                حِصّتي
-              </span>
+            <div className="mb-4">
+              <BrandLogo size="md" />
             </div>
 
             <p className="text-sm text-[#6B7280] leading-relaxed max-w-sm mb-6">

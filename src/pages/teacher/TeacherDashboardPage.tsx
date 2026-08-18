@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Users,
   ScanLine,
@@ -12,9 +12,18 @@ import {
   ArrowLeft,
   Calendar,
   Sparkles,
-  QrCode
+  QrCode,
+  Check,
+  X,
+  Phone,
+  MessageCircle,
+  FileText,
+  AlertCircle,
+  ShieldCheck,
+  Award
 } from 'lucide-react';
-import { MOCK_TEACHER_STUDENTS, MOCK_TEACHER_GROUPS } from '../../data/mockData';
+import { MOCK_TEACHER_STUDENTS, MOCK_TEACHER_GROUPS, MOCK_BOOKING_REQUESTS, MOCK_ATTENDANCE_TIME_WINDOW_STATS } from '../../data/mockData';
+import { BookingRequest } from '../../types';
 import { Badge } from '../../components/common/Badge';
 import { TeacherAttendanceChart } from '../../components/teacher/TeacherAttendanceChart';
 
@@ -25,6 +34,39 @@ interface TeacherDashboardPageProps {
 export const TeacherDashboardPage: React.FC<TeacherDashboardPageProps> = ({
   onNavigate,
 }) => {
+  const [bookingRequests, setBookingRequests] = useState<BookingRequest[]>(MOCK_BOOKING_REQUESTS);
+  const [activeSessionNotes, setActiveSessionNotes] = useState('');
+  const [notesSuccess, setNotesSuccess] = useState(false);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
+
+  const handleApproveRequest = (reqId: string, studentName: string) => {
+    setBookingRequests((prev) =>
+      prev.map((r) => (r.id === reqId ? { ...r, status: 'approved' as const } : r))
+    );
+    setActionNotice(`تمت الموافقة على طلب انضمام الطالب (${studentName}) وإرسال إشعار واتساب لولي الأمر بنجاح ✅`);
+    setTimeout(() => setActionNotice(null), 4000);
+  };
+
+  const handleRejectRequest = (reqId: string, studentName: string) => {
+    setBookingRequests((prev) =>
+      prev.map((r) => (r.id === reqId ? { ...r, status: 'rejected' as const, rejectionReason: 'المجموعة مكتملة العدد حالياً' } : r))
+    );
+    setActionNotice(`تم الاعتذار عن طلب الطالب (${studentName}) وإعلامه بالمواعيد البديلة المتاحة.`);
+    setTimeout(() => setActionNotice(null), 4000);
+  };
+
+  const handleSaveNotes = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeSessionNotes) return;
+    setNotesSuccess(true);
+    setTimeout(() => {
+      setNotesSuccess(false);
+      setActiveSessionNotes('');
+    }, 3000);
+  };
+
+  const pendingRequests = bookingRequests.filter((r) => r.status === 'pending');
+
   return (
     <div className="space-y-8 text-right">
       
@@ -62,22 +104,30 @@ export const TeacherDashboardPage: React.FC<TeacherDashboardPageProps> = ({
           </button>
 
           <button
-            onClick={() => onNavigate('/teacher/scan')}
+            onClick={() => onNavigate('/teacher/groups')}
             className="w-full sm:w-auto px-4 py-3.5 bg-purple-600 hover:bg-purple-700 text-white font-black text-xs rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-95"
           >
-            <DollarSign className="w-4 h-4" />
-            <span>تأكيد سداد قسط (QR)</span>
+            <Layers className="w-4 h-4" />
+            <span>إدارة المجموعات</span>
           </button>
         </div>
       </div>
 
+      {/* Action Notice Alert */}
+      {actionNotice && (
+        <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200 text-[#1E3A8A] text-xs font-bold flex items-center gap-2.5 animate-drawer">
+          <CheckCircle2 className="w-4 h-4 text-[#2563EB] shrink-0" />
+          <span>{actionNotice}</span>
+        </div>
+      )}
+
       {/* 2. Key Stats Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6">
         
-        <div className="bg-white border border-[#E5E7EB] rounded-2xl p-5 space-y-1">
+        <div className="bg-white border border-[#E5E7EB] rounded-3xl p-5 space-y-1">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-[#6B7280]">إجمالي الطلاب</span>
-            <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#2563EB] flex items-center justify-center">
+            <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#2563EB] flex items-center justify-center">
               <Users className="w-4 h-4" />
             </div>
           </div>
@@ -85,136 +135,210 @@ export const TeacherDashboardPage: React.FC<TeacherDashboardPageProps> = ({
           <span className="text-[10px] text-[#10B981] font-bold">شريحة العمولة: 1.0% فقط</span>
         </div>
 
-        <div className="bg-white border border-[#E5E7EB] rounded-2xl p-5 space-y-1">
+        <div className="bg-white border border-[#E5E7EB] rounded-3xl p-5 space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-[#6B7280]">حضور اليوم</span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-[#10B981] flex items-center justify-center">
+            <span className="text-xs font-bold text-[#6B7280]">حضور اليوم بالنافذة</span>
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-[#10B981] flex items-center justify-center">
               <CheckCircle2 className="w-4 h-4" />
             </div>
           </div>
           <p className="text-2xl font-black text-[#10B981]">28 طالب</p>
-          <span className="text-[10px] text-[#6B7280]">مجموعة السبت (سنتر الأهرام)</span>
+          <span className="text-[10px] text-[#6B7280]">24 في الموعد | 4 متأخرين</span>
         </div>
 
-        <div className="bg-white border border-[#E5E7EB] rounded-2xl p-5 space-y-1">
+        <div className="bg-white border border-[#E5E7EB] rounded-3xl p-5 space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-[#6B7280]">أرباح الشهر المتوقعة</span>
-            <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
-              <DollarSign className="w-4 h-4" />
+            <span className="text-xs font-bold text-[#6B7280]">طلبات الحجز الجديدة</span>
+            <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+              <Clock className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-xl font-black text-[#1E3A8A] font-mono">37,200 ج.م</p>
-          <span className="text-[10px] text-emerald-700 font-bold">صافي بعد عمولة 1%</span>
+          <p className="text-2xl font-black text-amber-600">{pendingRequests.length} طلبات</p>
+          <span className="text-[10px] text-amber-700 font-bold">تحتاج موافقتك أو رفضك</span>
         </div>
 
-        <div className="bg-white border border-[#E5E7EB] rounded-2xl p-5 space-y-1">
+        <div className="bg-white border border-[#E5E7EB] rounded-3xl p-5 space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-[#6B7280]">متوسط التقييم</span>
-            <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-500 flex items-center justify-center">
-              <Star className="w-4 h-4 fill-amber-400" />
+            <span className="text-xs font-bold text-[#6B7280]">مؤشر الجودة والاستقرار</span>
+            <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+              <Award className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-2xl font-black text-[#1E3A8A]">4.9 / 5.0</p>
-          <span className="text-[10px] text-[#6B7280]">من 128 تقييم حقيقي</span>
+          <p className="text-2xl font-black text-[#1E3A8A]">98.5%</p>
+          <span className="text-[10px] text-emerald-700 font-bold">معدل استمرار والتزام ممتاز</span>
         </div>
 
       </div>
 
-      {/* 3. Monthly Sessions & Attendance Analytics (Recharts) */}
-      <TeacherAttendanceChart />
-
-      {/* 4. Live Check-Ins & Groups Overview */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        {/* Left 2 Cols: Live Check-in Feed */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-[#1E3A8A] flex items-center gap-2">
-              <Clock className="w-4 h-4 text-[#2563EB]" />
-              <span>آخر عمليات تسجيل الحضور بالـ QR اليوم</span>
-            </h3>
-            <button
-              onClick={() => onNavigate('/teacher/scan')}
-              className="text-xs font-bold text-[#2563EB] hover:underline flex items-center gap-1 cursor-pointer"
-            >
-              <span>فتح الكاميرا والمسح</span>
-              <ArrowLeft className="w-3.5 h-3.5" />
-            </button>
+      {/* 3. NEW: Teacher Booking Requests Approval / Rejection Section */}
+      <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-xs space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+              <Clock className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-black text-[#1E3A8A]">
+                طلبات حجز الحصص الواردة ({bookingRequests.length})
+              </h3>
+              <p className="text-xs text-[#6B7280]">
+                طلبات انضمام الطلاب للمجموعات — يمكنك قبول الطلب لحجز المقعد أو الاعتذار
+              </p>
+            </div>
           </div>
+          <span className="text-xs font-bold text-amber-700 bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
+            {pendingRequests.length} قيد الانتظار
+          </span>
+        </div>
 
-          <div className="bg-white border border-[#E5E7EB] rounded-3xl p-5 divide-y divide-gray-100 shadow-xs">
-            {MOCK_TEACHER_STUDENTS.slice(0, 4).map((student) => (
-              <div key={student.id} className="py-3.5 first:pt-0 last:pb-0 flex items-center justify-between gap-3 text-xs">
-                <div className="flex items-center gap-3">
-                  <img
-                    src={student.avatarUrl}
-                    alt={student.name}
-                    className="w-10 h-10 rounded-xl object-cover border border-gray-200"
-                    referrerPolicy="no-referrer"
-                  />
-                  <div>
-                    <h4 className="font-bold text-[#1E3A8A] text-sm">{student.name}</h4>
-                    <p className="text-[11px] text-[#6B7280]">
-                      {student.groupName} — كود: <span className="font-mono text-[#2563EB]">{student.qrCode}</span>
-                    </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+          {bookingRequests.map((req) => (
+            <div
+              key={req.id}
+              className={`p-4 rounded-2xl border transition-all text-xs space-y-3 ${
+                req.status === 'approved'
+                  ? 'bg-emerald-50/50 border-emerald-200'
+                  : req.status === 'rejected'
+                  ? 'bg-gray-50 border-gray-200 opacity-70'
+                  : 'bg-[#F8FAFF] border-blue-200 shadow-xs'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-1.5">
+                    <strong className="text-sm font-bold text-[#1E3A8A]">{req.studentName}</strong>
+                    <Badge variant={req.status === 'approved' ? 'success' : req.status === 'rejected' ? 'danger' : 'warning'} size="sm">
+                      {req.status === 'approved' ? 'تمت الموافقة ✓' : req.status === 'rejected' ? 'تم الاعتذار ✕' : 'قيد الموافقة'}
+                    </Badge>
                   </div>
+                  <p className="text-[11px] text-[#6B7280]">{req.grade} — {req.groupName}</p>
                 </div>
+                <span className="text-[11px] font-mono text-gray-500">{req.date}</span>
+              </div>
 
-                <div className="text-left">
-                  <Badge variant={student.attendanceRate >= 90 ? 'success' : 'warning'} size="sm">
-                    حضور {student.attendanceRate}%
-                  </Badge>
-                  <span className="text-[10px] text-gray-400 block mt-1">تم مسح الكود اليوم ✓</span>
+              <div className="grid grid-cols-2 gap-2 text-[11px] bg-white p-2.5 rounded-xl border border-gray-100">
+                <div>
+                  <span className="text-gray-500 block">الموعد المطلوب:</span>
+                  <strong className="text-[#1F2937]">{req.slotTime}</strong>
+                </div>
+                <div>
+                  <span className="text-gray-500 block">واتساب ولي الأمر:</span>
+                  <strong className="text-[#2563EB] font-mono" dir="ltr">{req.parentPhone}</strong>
                 </div>
               </div>
-            ))}
+
+              {req.status === 'pending' && (
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    onClick={() => handleApproveRequest(req.id, req.studentName)}
+                    className="flex-1 py-2 bg-[#10B981] hover:bg-emerald-600 text-white font-bold rounded-xl flex items-center justify-center gap-1 cursor-pointer transition-colors shadow-xs"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>قبول واعتماد الحجز</span>
+                  </button>
+                  <button
+                    onClick={() => handleRejectRequest(req.id, req.studentName)}
+                    className="py-2 px-3 bg-red-50 hover:bg-red-100 text-[#EF4444] border border-red-200 font-bold rounded-xl flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                    <span>اعتذار</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 4. Attendance Window Rule & Quick Session Notes */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        {/* Attendance Window Rule Box */}
+        <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-xs space-y-4">
+          <div className="flex items-center gap-2">
+            <Clock className="w-5 h-5 text-[#2563EB]" />
+            <h3 className="text-base font-bold text-[#1E3A8A]">
+              نظام "نافذة تسجيل الحضور الذكية"
+            </h3>
+          </div>
+          <p className="text-xs text-[#6B7280]">
+            توزيع وتصنيف أوقات حضور الطلاب تلقائياً وفق وقت الحصة:
+          </p>
+
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-emerald-500" />
+                <strong className="text-emerald-900">في الموعد (حتى 15 دقيقة بعد البداية):</strong>
+              </div>
+              <span className="text-emerald-700 font-bold">حاضر (أخضر ✅)</span>
+            </div>
+
+            <div className="flex items-center justify-between p-3 rounded-2xl bg-amber-50 border border-amber-200 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-amber-500" />
+                <strong className="text-amber-900">من 15 دقيقة وحتى منتصف الحصة:</strong>
+              </div>
+              <span className="text-amber-700 font-bold">حاضر متأخر (برتقالي ⏰)</span>
+            </div>
+
+            <div className="flex items-center justify-between p-3 rounded-2xl bg-red-50 border border-red-200 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-red-500" />
+                <strong className="text-red-900">بعد انقضاء نصف الحصة:</strong>
+              </div>
+              <span className="text-red-700 font-bold">غائب (أحمر ❌)</span>
+            </div>
+          </div>
+
+          <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-2xl text-xs text-[#1E3A8A] flex items-center gap-2">
+            <MessageCircle className="w-4 h-4 text-[#2563EB] shrink-0" />
+            <span>يتم إرسال إشعار واتساب لولي الأمر تلقائياً إذا تأخر الطالب لأكثر من 10 دقائق.</span>
           </div>
         </div>
 
-        {/* Right 1 Col: Groups List */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-[#1E3A8A] flex items-center gap-2">
-              <Layers className="w-4 h-4 text-[#2563EB]" />
-              <span>مجموعاتي الحالية</span>
+        {/* Quick Educational Follow-up Notes */}
+        <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-xs space-y-4">
+          <div className="flex items-center gap-2">
+            <FileText className="w-5 h-5 text-[#2563EB]" />
+            <h3 className="text-base font-bold text-[#1E3A8A]">
+              إضافة متابعة دراسية وواجب الحصة
             </h3>
-            <button
-              onClick={() => onNavigate('/teacher/groups')}
-              className="text-xs font-bold text-[#2563EB] hover:underline cursor-pointer"
-            >
-              إدارة
-            </button>
           </div>
+          <p className="text-xs text-[#6B7280]">
+            تظهر هذه الملاحظات والواجبات فورياً في حساب الطالب وحساب ولي الأمر
+          </p>
 
-          <div className="bg-white border border-[#E5E7EB] rounded-3xl p-5 space-y-3 shadow-xs">
-            {MOCK_TEACHER_GROUPS.map((group) => (
-              <div
-                key={group.id}
-                className="p-3 rounded-2xl border border-gray-100 bg-gray-50/70 space-y-1.5"
-              >
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-[#1E3A8A]">{group.name}</h4>
-                  <span className="text-[10px] font-bold text-[#2563EB] bg-blue-50 px-2 py-0.5 rounded-md">
-                    {group.currentStudents}/{group.maxCapacity} طالب
-                  </span>
-                </div>
-                <div className="text-[11px] text-[#6B7280]">
-                  {group.schedule} ({group.location})
-                </div>
+          <form onSubmit={handleSaveNotes} className="space-y-3">
+            <textarea
+              rows={4}
+              placeholder="مثال: تم شرح الباب الثاني (الروابط الكيميائية)، الطالب شارك بامتياز. الواجب: حل تدريبات صـ 45 حتى 48 من المذكرة."
+              value={activeSessionNotes}
+              onChange={(e) => setActiveSessionNotes(e.target.value)}
+              className="w-full p-3 bg-gray-50 border border-gray-200 rounded-2xl text-xs text-right focus:bg-white focus:outline-none focus:border-[#2563EB]"
+            />
+
+            {notesSuccess && (
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span>تم حفظ الملاحظات وإرسال ملخص الحصة لأولياء الأمور بنجاح!</span>
               </div>
-            ))}
+            )}
 
             <button
-              onClick={() => onNavigate('/teacher/groups')}
-              className="w-full py-2.5 bg-[#EFF6FF] hover:bg-blue-100 text-[#2563EB] text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer mt-2"
+              type="submit"
+              className="w-full py-2.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
             >
-              <Plus className="w-4 h-4" />
-              <span>إنشاء مجموعة جديدة</span>
+              <FileText className="w-4 h-4" />
+              <span>نشر المتابعة والواجب للطلاب وأولياء الأمور</span>
             </button>
-          </div>
+          </form>
         </div>
 
       </div>
+
+      {/* 5. Monthly Sessions & Attendance Analytics (Recharts) */}
+      <TeacherAttendanceChart />
 
     </div>
   );

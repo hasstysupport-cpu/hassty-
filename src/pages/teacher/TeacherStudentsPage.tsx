@@ -15,6 +15,7 @@ import {
 import { MOCK_TEACHER_STUDENTS, MOCK_TEACHER_GROUPS } from '../../data/mockData';
 import { TeacherStudentItem } from '../../types';
 import { Badge } from '../../components/common/Badge';
+import { Modal } from '../../components/common/Modal';
 
 interface TeacherStudentsPageProps {
   onNavigate?: (path: string) => void;
@@ -198,107 +199,91 @@ export const TeacherStudentsPage: React.FC<TeacherStudentsPageProps> = ({ onNavi
       </div>
 
       {/* MODAL: Add New Student */}
-      {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 space-y-5 text-right relative animate-scaleUp">
-            
-            <button
-              onClick={() => setIsAddModalOpen(false)}
-              className="absolute left-4 top-4 p-2 text-gray-400 hover:text-gray-600 rounded-xl"
-            >
-              <X className="w-5 h-5" />
-            </button>
+      <Modal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        title="إضافة طالب جديد للمجموعة"
+        subtitle="أدخل بيانات الطالب أو كود بطاقة الـ QR الخاصة به"
+        icon={<Plus className="w-6 h-6" />}
+        maxWidth="md"
+      >
+        {addSuccess ? (
+          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs font-bold text-emerald-800 text-center flex items-center justify-center gap-2">
+            <CheckCircle2 className="w-5 h-5 text-[#10B981]" />
+            <span>تم قيد الطالب بنجاح في المجموعة وتفعيل متابعة الـ QR!</span>
+          </div>
+        ) : (
+          <form onSubmit={handleAddStudent} className="space-y-4 pt-1">
+            <div>
+              <label className="block text-xs font-bold text-[#1F2937] mb-1">
+                اسم الطالب بالكامل <span className="text-[#EF4444]">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="مثال: يوسف خالد إبراهيم"
+                value={newStudentName}
+                onChange={(e) => setNewStudentName(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-gray-50 border border-[#E5E7EB] rounded-xl text-xs text-right focus:bg-white focus:outline-none focus:border-[#2563EB]"
+              />
+            </div>
 
-            <div className="text-center space-y-1">
-              <div className="w-12 h-12 rounded-2xl bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center mx-auto">
-                <Plus className="w-6 h-6" />
-              </div>
-              <h3 className="text-lg font-bold text-[#1E3A8A]">إضافة طالب جديد للمجموعة</h3>
-              <p className="text-xs text-[#6B7280]">
-                أدخل بيانات الطالب أو كود بطاقة الـ QR الخاصة به
+            <div>
+              <label className="block text-xs font-bold text-[#1F2937] mb-1">
+                كود كارنيه الطالب (اختياري)
+              </label>
+              <input
+                type="text"
+                placeholder="مثال: HST-2026-09812"
+                value={newStudentCode}
+                onChange={(e) => setNewStudentCode(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-gray-50 border border-[#E5E7EB] rounded-xl text-xs font-mono text-left focus:bg-white focus:outline-none focus:border-[#2563EB]"
+              />
+              <p className="text-[10px] text-gray-400 mt-1">
+                إذا لم يكن لدى الطالب كود، سيقوم النظام بإنشاء كود فوري له.
               </p>
             </div>
 
-            {addSuccess ? (
-              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs font-bold text-emerald-800 text-center flex items-center justify-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-[#10B981]" />
-                <span>تم قيد الطالب بنجاح في المجموعة وتفعيل متابعة الـ QR!</span>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-[#1F2937] mb-1">
+                  رقم هاتف الطالب
+                </label>
+                <input
+                  type="tel"
+                  placeholder="010XXXXXXXX"
+                  value={newStudentPhone}
+                  onChange={(e) => setNewStudentPhone(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-[#E5E7EB] rounded-xl text-xs text-right focus:bg-white focus:outline-none focus:border-[#2563EB]"
+                />
               </div>
-            ) : (
-              <form onSubmit={handleAddStudent} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-[#1F2937] mb-1">
-                    اسم الطالب بالكامل <span className="text-[#EF4444]">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="مثال: يوسف خالد إبراهيم"
-                    value={newStudentName}
-                    onChange={(e) => setNewStudentName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-[#E5E7EB] rounded-xl text-xs text-right focus:bg-white focus:outline-none focus:border-[#2563EB]"
-                  />
-                </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-[#1F2937] mb-1">
-                    كود كارنيه الطالب (اختياري)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="مثال: HST-2026-09812"
-                    value={newStudentCode}
-                    onChange={(e) => setNewStudentCode(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-[#E5E7EB] rounded-xl text-xs font-mono text-left focus:bg-white focus:outline-none focus:border-[#2563EB]"
-                  />
-                  <p className="text-[10px] text-gray-400 mt-1">
-                    إذا لم يكن لدى الطالب كود، سيقوم النظام بإنشاء كود فوري له.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-[#1F2937] mb-1">
-                      رقم هاتف الطالب
-                    </label>
-                    <input
-                      type="tel"
-                      placeholder="010XXXXXXXX"
-                      value={newStudentPhone}
-                      onChange={(e) => setNewStudentPhone(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-gray-50 border border-[#E5E7EB] rounded-xl text-xs text-right focus:bg-white focus:outline-none focus:border-[#2563EB]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-[#1F2937] mb-1">
-                      المجموعة
-                    </label>
-                    <select
-                      value={newStudentGroup}
-                      onChange={(e) => setNewStudentGroup(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-gray-50 border border-[#E5E7EB] rounded-xl text-xs text-right focus:bg-white focus:outline-none focus:border-[#2563EB] cursor-pointer"
-                    >
-                      {MOCK_TEACHER_GROUPS.map((g) => (
-                        <option key={g.id} value={g.name}>{g.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full py-3 bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer"
+              <div>
+                <label className="block text-xs font-bold text-[#1F2937] mb-1">
+                  المجموعة
+                </label>
+                <select
+                  value={newStudentGroup}
+                  onChange={(e) => setNewStudentGroup(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-[#E5E7EB] rounded-xl text-xs text-right focus:bg-white focus:outline-none focus:border-[#2563EB] cursor-pointer"
                 >
-                  <Plus className="w-4 h-4" />
-                  <span>تأكيد إضافة الطالب</span>
-                </button>
-              </form>
-            )}
+                  {MOCK_TEACHER_GROUPS.map((g) => (
+                    <option key={g.id} value={g.name}>{g.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
 
-          </div>
-        </div>
-      )}
+            <button
+              type="submit"
+              className="w-full py-3 bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>تأكيد إضافة الطالب</span>
+            </button>
+          </form>
+        )}
+      </Modal>
 
     </div>
   );

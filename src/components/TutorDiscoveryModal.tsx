@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Search, MapPin, Star, ShieldCheck, Check, QrCode, Calendar, Users, Phone, ArrowLeft } from 'lucide-react';
 import { SAMPLE_TUTORS, EGYPT_GOVERNORATES, SUBJECTS_DATA } from '../data/mockData';
 import { TutorProfile } from '../types';
@@ -59,9 +60,9 @@ export const TutorDiscoveryModal: React.FC<TutorDiscoveryModalProps> = ({
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
-      <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl border border-gray-200 overflow-hidden my-8 max-h-[90vh] flex flex-col text-right">
+      <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl border border-gray-200 overflow-hidden my-8 max-h-[90vh] flex flex-col text-right animate-scaleUp">
         
         {/* Modal Header */}
         <div className="p-5 sm:p-6 border-b border-gray-200 flex items-center justify-between bg-[#F8FAFF]">
@@ -283,6 +284,7 @@ export const TutorDiscoveryModal: React.FC<TutorDiscoveryModalProps> = ({
         </div>
 
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

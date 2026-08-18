@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, QrCode, CheckCircle2, ShieldCheck, Sparkles, MessageSquare, Phone, RefreshCw, GraduationCap } from 'lucide-react';
 
 interface QRCardSimulatorModalProps {
@@ -28,9 +29,9 @@ export const QRCardSimulatorModal: React.FC<QRCardSimulatorModalProps> = ({ isOp
     setScanState('idle');
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
-      <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-gray-200 overflow-hidden my-8 flex flex-col text-right">
+      <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-gray-200 overflow-hidden my-8 flex flex-col text-right animate-scaleUp">
         
         {/* Modal Header */}
         <div className="p-5 sm:p-6 border-b border-gray-200 flex items-center justify-between bg-[#F8FAFF]">
@@ -210,6 +211,7 @@ export const QRCardSimulatorModal: React.FC<QRCardSimulatorModalProps> = ({ isOp
         </div>
 
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

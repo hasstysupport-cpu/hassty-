@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { QrCode, Bell, ChevronDown, User, Settings, LogOut, Sparkles, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { Bell, ChevronDown, User, Settings, LogOut, Sparkles, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { AccountRole } from '../../types';
+import { BrandLogo } from './BrandLogo';
 
 interface LoggedInNavbarProps {
   currentPath: string;
@@ -129,16 +130,10 @@ export const LoggedInNavbar: React.FC<LoggedInNavbarProps> = ({
           <div className="flex items-center gap-4 sm:gap-6">
             <button
               onClick={() => onNavigate('/')}
-              className="flex items-center gap-2.5 group cursor-pointer text-right"
+              className="flex items-center group cursor-pointer text-right"
               title="العودة للصفحة الرئيسية"
             >
-              <div className="w-10 h-10 rounded-xl bg-[#2563EB] flex items-center justify-center text-white shadow-xs">
-                <QrCode className="w-5 h-5 stroke-[2.2]" />
-              </div>
-              <div className="hidden sm:flex flex-col">
-                <span className="text-xl font-black text-[#1E3A8A]">حِصّتي</span>
-                <span className="text-[10px] text-[#6B7280]">لوحة التحكم</span>
-              </div>
+              <BrandLogo size="sm" showSubtitle={false} />
             </button>
 
             <div className="h-6 w-px bg-gray-200 hidden sm:block" />

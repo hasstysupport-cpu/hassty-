@@ -1,25 +1,30 @@
 import React, { useState } from 'react';
-import { QrCode, Menu, X, ArrowLeft, User, Search, Sparkles, LogIn, UserPlus } from 'lucide-react';
+import { Menu, X, ArrowLeft, User, Search, Sparkles, LogIn, UserPlus } from 'lucide-react';
 import { AccountRole } from '../../types';
+import { BrandLogo } from './BrandLogo';
 
 interface PublicNavbarProps {
   currentPath: string;
   onNavigate: (path: string) => void;
   onOpenAuth?: (mode: 'login' | 'register', role?: AccountRole) => void;
+  onOpenLogin?: () => void;
+  onOpenSignup?: () => void;
 }
 
 export const PublicNavbar: React.FC<PublicNavbarProps> = ({
   currentPath,
   onNavigate,
   onOpenAuth,
+  onOpenLogin,
+  onOpenSignup,
 }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const navLinks = [
     { name: 'الرئيسية', path: '/' },
-    { name: 'نتائج البحث', path: '/search' },
+    { name: 'المدرسين والسناتر', path: '/search' },
     { name: 'عن المنصة', path: '/about' },
-    { name: 'للمدرسين', path: '/for-teachers' },
+    { name: 'للمدرسين والعمولة', path: '/for-teachers' },
     { name: 'تواصل معنا', path: '/contact' },
   ];
 
@@ -27,6 +32,26 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
     onNavigate(path);
     setIsMobileMenuOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleLoginClick = () => {
+    if (onOpenLogin) {
+      onOpenLogin();
+    } else if (onOpenAuth) {
+      onOpenAuth('login');
+    } else {
+      onNavigate('/login');
+    }
+  };
+
+  const handleSignupClick = () => {
+    if (onOpenSignup) {
+      onOpenSignup();
+    } else if (onOpenAuth) {
+      onOpenAuth('register');
+    } else {
+      onNavigate('/signup');
+    }
   };
 
   return (
@@ -40,22 +65,7 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
               onClick={() => handleLinkClick('/')}
               className="flex items-center gap-3 group text-right cursor-pointer"
             >
-              <div className="w-11 h-11 rounded-xl bg-[#2563EB] flex items-center justify-center text-white shadow-xs group-hover:scale-105 transition-transform">
-                <QrCode className="w-6 h-6 stroke-[2.2]" />
-              </div>
-              <div className="flex flex-col">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-2xl font-black tracking-tight text-[#1E3A8A] font-['Tajawal',sans-serif]">
-                    حِصّتي
-                  </span>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-sm bg-[#EFF6FF] text-[#2563EB] border border-blue-200">
-                    مِصر
-                  </span>
-                </div>
-                <span className="text-xs text-[#6B7280] font-medium hidden sm:block">
-                  منظومة الحصص الخصوصية والـ QR
-                </span>
-              </div>
+              <BrandLogo size="md" />
             </button>
           </div>
 
@@ -88,9 +98,9 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
                 title="الانتقال المباشر للوحات التحكم التجريبية"
               >
                 <Sparkles className="w-3.5 h-3.5 text-[#2563EB]" />
-                <span>لوحات التحكم</span>
+                <span>لوحات التحكم المباشرة</span>
               </button>
-              <div className="absolute left-0 top-full pt-1 hidden group-hover:block z-50 min-w-[200px]">
+              <div className="absolute left-0 top-full pt-1 hidden group-hover:block z-50 min-w-[210px]">
                 <div className="bg-white border border-[#E5E7EB] rounded-xl shadow-lg p-2 text-right space-y-1">
                   <div className="text-[11px] font-bold text-[#6B7280] px-2 py-1 border-b border-gray-100">
                     تصفح كـ :
@@ -100,54 +110,50 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
                     className="w-full text-right px-2.5 py-1.5 text-xs font-bold text-[#1F2937] hover:bg-[#EFF6FF] hover:text-[#2563EB] rounded-lg transition-colors flex items-center justify-between"
                   >
                     <span>لوحة الطالب</span>
-                    <span className="text-[10px] bg-blue-100 text-[#2563EB] px-1.5 py-0.5 rounded">زياد</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-[#2563EB]">طالب</span>
                   </button>
                   <button
                     onClick={() => handleLinkClick('/parent/dashboard')}
-                    className="w-full text-right px-2.5 py-1.5 text-xs font-bold text-[#1F2937] hover:bg-[#EFF6FF] hover:text-[#2563EB] rounded-lg transition-colors flex items-center justify-between"
+                    className="w-full text-right px-2.5 py-1.5 text-xs font-bold text-[#1F2937] hover:bg-amber-50 hover:text-amber-800 rounded-lg transition-colors flex items-center justify-between"
                   >
-                    <span>لوحة ولي الأمر</span>
-                    <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">متابعة</span>
+                    <span>لوحة ولي الأمر (متعدد الأبناء)</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-900">ولي أمر</span>
                   </button>
                   <button
                     onClick={() => handleLinkClick('/teacher/dashboard')}
-                    className="w-full text-right px-2.5 py-1.5 text-xs font-bold text-[#1F2937] hover:bg-[#EFF6FF] hover:text-[#2563EB] rounded-lg transition-colors flex items-center justify-between"
+                    className="w-full text-right px-2.5 py-1.5 text-xs font-bold text-[#1F2937] hover:bg-emerald-50 hover:text-emerald-800 rounded-lg transition-colors flex items-center justify-between"
                   >
-                    <span>لوحة المعلم</span>
-                    <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">أ. حسام</span>
+                    <span>لوحة المدرس والسناتر</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900">مدرس</span>
                   </button>
                 </div>
               </div>
             </div>
 
+            {/* Login Button */}
             <button
-              onClick={() => handleLinkClick('/login')}
-              className="px-4 py-2.5 text-sm font-bold text-[#1E3A8A] hover:text-[#2563EB] hover:bg-[#EFF6FF] rounded-xl transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+              onClick={handleLoginClick}
+              className="px-4 py-2.5 text-xs font-bold text-[#1E3A8A] hover:text-[#2563EB] hover:bg-gray-50 border border-[#E5E7EB] rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
             >
-              <LogIn className="w-4 h-4" />
+              <LogIn className="w-3.5 h-3.5" />
               <span>تسجيل الدخول</span>
             </button>
 
+            {/* Register / CTA Button */}
             <button
-              onClick={() => handleLinkClick('/signup')}
-              className="btn-primary-shine px-5 py-2.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-sm font-bold rounded-xl transition-all shadow-md hover:shadow-blue-500/25 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 flex items-center gap-2 cursor-pointer"
+              onClick={handleSignupClick}
+              className="px-4 py-2.5 text-xs font-bold text-white bg-[#2563EB] hover:bg-[#1D4ED8] rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
             >
-              <span>إنشاء حساب</span>
-              <ArrowLeft className="w-4 h-4" />
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>إنشاء حساب جديد</span>
             </button>
           </div>
 
-          {/* Mobile Hamburger Button */}
-          <div className="flex items-center gap-2 md:hidden">
-            <button
-              onClick={() => handleLinkClick('/login')}
-              className="p-2 text-xs font-bold text-[#2563EB] bg-[#EFF6FF] rounded-xl border border-blue-200"
-            >
-              دخول
-            </button>
+          {/* Mobile Menu Toggle Button */}
+          <div className="flex md:hidden items-center gap-2">
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="p-2.5 rounded-xl border border-[#E5E7EB] text-[#1F2937] hover:bg-gray-50 focus:outline-none cursor-pointer"
+              className="p-2.5 rounded-xl text-gray-700 hover:bg-gray-100 transition-colors"
               aria-label="القائمة"
             >
               {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -157,19 +163,19 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
         </div>
       </div>
 
-      {/* Mobile Drawer Menu with smooth animation */}
+      {/* Mobile Drawer Menu */}
       {isMobileMenuOpen && (
-        <div className="md:hidden bg-white/95 backdrop-blur-md border-b border-[#E5E7EB] px-4 pt-3 pb-6 space-y-3 shadow-xl animate-drawer origin-top">
-          <div className="space-y-1">
+        <div className="md:hidden bg-white border-b border-[#E5E7EB] px-4 pt-3 pb-6 space-y-4 animate-drawer text-right">
+          <nav className="space-y-1">
             {navLinks.map((link) => {
-              const isActive = currentPath === link.path;
+              const isActive = currentPath === link.path || (link.path !== '/' && currentPath.startsWith(link.path));
               return (
                 <button
                   key={link.path}
                   onClick={() => handleLinkClick(link.path)}
-                  className={`w-full text-right px-4 py-3 rounded-xl text-base font-bold transition-all cursor-pointer active:scale-[0.98] ${
+                  className={`w-full text-right px-4 py-3 rounded-xl text-sm font-bold transition-all ${
                     isActive
-                      ? 'bg-[#EFF6FF] text-[#2563EB]'
+                      ? 'text-[#2563EB] bg-[#EFF6FF]'
                       : 'text-[#1F2937] hover:bg-gray-50'
                   }`}
                 >
@@ -177,45 +183,47 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
                 </button>
               );
             })}
-          </div>
+          </nav>
 
           <div className="pt-3 border-t border-gray-100 space-y-2">
-            <div className="text-xs font-bold text-[#6B7280] px-2 mb-1">لوحات التحكم السريعة:</div>
+            <div className="text-xs font-bold text-[#6B7280] px-2 mb-1">
+              الدخول المباشر للوحات التجريبية:
+            </div>
             <div className="grid grid-cols-3 gap-2">
               <button
                 onClick={() => handleLinkClick('/student/dashboard')}
-                className="p-2.5 text-center text-xs font-bold bg-[#EFF6FF] text-[#2563EB] rounded-xl border border-blue-200 hover:bg-blue-100 transition-all active:scale-95 cursor-pointer"
+                className="py-2 px-1 text-center bg-[#EFF6FF] text-[#2563EB] font-bold text-xs rounded-xl"
               >
-                الطالب
+                طالب
               </button>
               <button
                 onClick={() => handleLinkClick('/parent/dashboard')}
-                className="p-2.5 text-center text-xs font-bold bg-amber-50 text-amber-800 rounded-xl border border-amber-200 hover:bg-amber-100 transition-all active:scale-95 cursor-pointer"
+                className="py-2 px-1 text-center bg-amber-50 text-amber-800 font-bold text-xs rounded-xl"
               >
-                ولي الأمر
+                ولي أمر
               </button>
               <button
                 onClick={() => handleLinkClick('/teacher/dashboard')}
-                className="p-2.5 text-center text-xs font-bold bg-emerald-50 text-emerald-800 rounded-xl border border-emerald-200 hover:bg-emerald-100 transition-all active:scale-95 cursor-pointer"
+                className="py-2 px-1 text-center bg-emerald-50 text-emerald-800 font-bold text-xs rounded-xl"
               >
-                المعلم
+                مدرس
               </button>
             </div>
-          </div>
 
-          <div className="pt-2 grid grid-cols-2 gap-2">
-            <button
-              onClick={() => handleLinkClick('/login')}
-              className="w-full py-3 text-center text-sm font-bold text-[#1E3A8A] bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl transition-all active:scale-95 cursor-pointer"
-            >
-              تسجيل الدخول
-            </button>
-            <button
-              onClick={() => handleLinkClick('/signup')}
-              className="btn-primary-shine w-full py-3 text-center text-sm font-bold text-white bg-[#2563EB] hover:bg-[#1D4ED8] rounded-xl shadow-md transition-all active:scale-95 cursor-pointer"
-            >
-              إنشاء حساب
-            </button>
+            <div className="grid grid-cols-2 gap-2 pt-2">
+              <button
+                onClick={handleLoginClick}
+                className="w-full py-2.5 text-center text-xs font-bold text-[#1E3A8A] border border-[#E5E7EB] rounded-xl"
+              >
+                تسجيل الدخول
+              </button>
+              <button
+                onClick={handleSignupClick}
+                className="w-full py-2.5 text-center text-xs font-bold text-white bg-[#2563EB] rounded-xl"
+              >
+                إنشاء حساب
+              </button>
+            </div>
           </div>
         </div>
       )}

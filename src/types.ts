@@ -8,6 +8,7 @@ export interface SubjectItem {
   isFeatured?: boolean;
   tag?: string;
   description: string;
+  stageCategory?: 'primary' | 'prep' | 'secondary' | 'all';
 }
 
 export interface ReviewItem {
@@ -16,6 +17,8 @@ export interface ReviewItem {
   studentAvatar?: string;
   rating: number;
   date: string;
+  createdAtTimestamp?: number;
+  canEditUntilTimestamp?: number; // 48h cool-off period
   comment: string;
   tutorReply?: string;
   subject?: string;
@@ -31,10 +34,13 @@ export interface AvailableSlot {
   id: string;
   day: string;
   time: string;
-  status: 'available' | 'booked' | 'unavailable';
+  status: 'available' | 'booked' | 'unavailable' | 'full';
   type: 'center' | 'online' | 'private';
   location?: string;
   bookedByStudentName?: string;
+  isRevisionSession?: boolean;
+  revisionPrice?: number;
+  waitlistCount?: number;
 }
 
 export interface TutorProfile {
@@ -59,8 +65,15 @@ export interface TutorProfile {
   phone?: string;
   email?: string;
   education?: string;
+  accountStatus?: 'active' | 'under_review' | 'paused';
   reviews?: ReviewItem[];
   availableSlots?: AvailableSlot[];
+  qualityMetrics?: {
+    retentionRate: number; // e.g. 96%
+    churnRate: number;     // e.g. 4%
+    attendanceAvg: number; // e.g. 94%
+    cancelRate: number;    // e.g. 1.2%
+  };
 }
 
 export interface TestimonialItem {
@@ -108,9 +121,14 @@ export interface LessonItem {
   time: string;
   location: string;
   type: 'center' | 'online' | 'private';
-  status: 'upcoming' | 'completed' | 'cancelled';
+  status: 'upcoming' | 'completed' | 'cancelled' | 'paused';
   price: number;
+  homework?: string;
+  teacherNotes?: string;
+  isRevision?: boolean;
 }
+
+export type TimeWindowStatus = 'on_time' | 'late_window' | 'absent_window' | 'late' | 'absent_cutoff';
 
 export interface AttendanceRecord {
   id: string;
@@ -122,11 +140,19 @@ export interface AttendanceRecord {
   subject: string;
   date: string;
   time: string;
+  sessionStartTime?: string;
+  scanTime?: string;
   status: 'present' | 'absent' | 'late';
+  timeWindowStatus?: TimeWindowStatus;
   groupName: string;
   location?: string;
   center?: string;
   qrVerifiedAt?: string;
+  sessionNotes?: string; // Educational follow-up (e.g. "شرح الباب الثالث")
+  teacherNotes?: string; // Teacher feedback & homework note
+  homeworkAssigned?: string; // (e.g. "واجب صـ 45 إلى 48")
+  isMakeup?: boolean;
+  hasDispute?: boolean;
 }
 
 export interface PaymentRecord {
@@ -143,6 +169,16 @@ export interface PaymentRecord {
   invoiceNumber: string;
 }
 
+export interface GroupScheduleSlot {
+  id: string;
+  day: 'Saturday' | 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | string;
+  dayArabic: string;
+  startTime: string; // e.g. "14:00"
+  endTime: string;   // e.g. "16:00"
+}
+
+export type PricingBillingType = 'per_session' | 'monthly';
+
 export interface StudentGroup {
   id: string;
   name: string;
@@ -150,11 +186,18 @@ export interface StudentGroup {
   level?: string;
   grade?: string;
   schedule: string;
+  scheduleSlots?: GroupScheduleSlot[];
   location: string;
   studentCount?: number;
-  currentStudents?: number;
+  currentStudents: number;
   maxCapacity: number;
   studentIds?: string[];
+  waitlist?: string[];
+  isPaused?: boolean;
+  // New billing & pricing capabilities
+  billingType: PricingBillingType; // 'per_session' (2% fixed) | 'monthly' (tiered rate)
+  priceAmount: number; // e.g. 120 EGP per session or 480 EGP per month
+  commissionRate: number; // e.g. 2 for 2%, or tiered (e.g. 1% - 1.5%)
 }
 
 export interface TeacherGroupItem {
@@ -162,9 +205,15 @@ export interface TeacherGroupItem {
   name: string;
   grade: string;
   schedule: string;
+  scheduleSlots?: GroupScheduleSlot[];
   location: string;
   currentStudents: number;
   maxCapacity: number;
+  waitlistCount?: number;
+  isPaused?: boolean;
+  billingType?: PricingBillingType;
+  priceAmount?: number;
+  commissionRate?: number;
 }
 
 export interface TeacherStudentItem {
@@ -181,6 +230,7 @@ export interface TeacherStudentItem {
   attendedSessions: number;
   paymentStatus: 'paid' | 'pending' | 'overdue';
   joinedDate: string;
+  status?: 'active' | 'paused' | 'transferred';
 }
 
 export interface StudentProfile {
@@ -194,19 +244,23 @@ export interface StudentProfile {
   grade?: string;
   age?: number;
   studentIdNumber?: string;
-  qrCode?: string;
+  qrCode: string;
   qrCodeValue?: string;
   parentPhone: string;
+  emergencyParentPhone?: string;
   joinedTutorIds?: string[];
   avatarUrl: string;
+  isSubscriptionPaused?: boolean;
 }
 
 export interface ParentSettings {
   notifyOnAttendance: boolean;
   notifyOnAbsence: boolean;
+  notifyOnLateArrival: boolean; // 10 min late WhatsApp alert
   remindPayments: boolean;
   remindUpcomingLessons: boolean;
   whatsappPhone: string;
+  emergencyPhone?: string; // Optional backup emergency number
 }
 
 export interface CommissionTier {
@@ -218,4 +272,118 @@ export interface CommissionTier {
   rate?: string;
   example?: string;
   benefit?: string;
+}
+
+// 1. Booking Approval Requests
+export interface BookingRequest {
+  id: string;
+  studentId: string;
+  studentName: string;
+  studentPhone: string;
+  parentPhone: string;
+  studentGrade: string;
+  tutorId: string;
+  tutorName: string;
+  subject: string;
+  day: string;
+  time: string;
+  sessionType: 'center' | 'online' | 'private';
+  location: string;
+  price: number;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+  notes?: string;
+}
+
+// 2. Multi-child Parent Link
+export interface ParentLinkedChild {
+  id: string;
+  studentId: string;
+  studentName: string;
+  grade: string;
+  avatarUrl: string;
+  qrCode: string;
+  governorate: string;
+  area: string;
+  status: 'linked' | 'pending_student_approval';
+  verificationCode?: string;
+  linkedAt: string;
+  attendanceRate: number;
+  upcomingLessonCount: number;
+}
+
+// 3. Compensatory Session Request (حصة تعويضية)
+export interface MakeupSessionRequest {
+  id: string;
+  studentId: string;
+  studentName: string;
+  tutorId: string;
+  subject: string;
+  missedDate: string;
+  missedSessionTopic: string;
+  excuseReason: string;
+  medicalProofAttached?: boolean;
+  requestedSlotId?: string;
+  requestedSlotText?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+}
+
+// 4. Safety and Misconduct Reporting (إبلاغ عن تصرف غير لائق)
+export interface SafetyReport {
+  id: string;
+  reporterRole: 'student' | 'parent';
+  reporterName: string;
+  reporterPhone: string;
+  targetTeacherId: string;
+  targetTeacherName: string;
+  category: 'inappropriate_conduct' | 'external_payment_demand' | 'absence_no_notice' | 'verbal_abuse' | 'other';
+  description: string;
+  createdAt: string;
+  status: 'under_investigation' | 'resolved';
+}
+
+// 5. Attendance Dispute Ticket (تظلم تقني أو اعتذار)
+export interface AttendanceDisputeTicket {
+  id: string;
+  studentId: string;
+  studentName: string;
+  attendanceRecordId: string;
+  sessionDate: string;
+  subject: string;
+  teacherName: string;
+  disputeReason: string;
+  status: 'under_review' | 'resolved_present' | 'rejected';
+  createdAt: string;
+}
+
+// 6. Teacher Cancellation Record (إلغاء المعلم للحصة مع تأثير التقييم)
+export interface TeacherCancellationLog {
+  id: string;
+  tutorId: string;
+  sessionId: string;
+  groupName: string;
+  scheduledTime: string;
+  cancelledAt: string;
+  noticeHoursBefore: number; // e.g. 5 hours vs 0.5 hours
+  isPenaltyApplied: boolean; // true if cancelled < 3 hours before
+  reason: string;
+  whatsappNoticeSent: boolean;
+}
+
+// 7. Teacher Revision Session
+export interface RevisionSessionItem {
+  id: string;
+  title: string;
+  tutorId: string;
+  tutorName: string;
+  subject: string;
+  grade: string;
+  date: string;
+  time: string;
+  location: string;
+  pricePerStudent: number;
+  totalSeats: number;
+  bookedSeats: number;
+  isExamNight: boolean;
 }
