@@ -375,7 +375,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           )}
 
           {/* Switch to Register */}
-          <div className="pt-4 border-t border-gray-100 text-center">
+          <div className="pt-4 border-t border-gray-100 text-center space-y-2">
             <p className="text-xs text-[#6B7280]">
               ليس لديك حساب بعد؟{' '}
               <button
@@ -385,6 +385,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 إنشاء حساب جديد
               </button>
             </p>
+            <div>
+              <button
+                onClick={() => onNavigate('/admin')}
+                className="text-[11px] text-[#1E3A8A] font-bold hover:underline inline-flex items-center gap-1 cursor-pointer bg-blue-50 px-3 py-1 rounded-lg border border-blue-100"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-[#2563EB]" />
+                <span>تسجيل دخول المسؤولين والإدارة (/admin)</span>
+              </button>
+            </div>
           </div>
 
         </div>
