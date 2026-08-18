@@ -52,8 +52,14 @@ import { TeacherReviewsPage } from './pages/teacher/TeacherReviewsPage';
 export default function App() {
   const { user, logout } = useAuth();
 
-  // Navigation & session state
-  const [currentPath, setCurrentPath] = useState<string>('/');
+  // Navigation & session state - initialize from window.location.pathname
+  const [currentPath, setCurrentPath] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const pathname = window.location.pathname || '/';
+      return pathname.length > 0 ? pathname : '/';
+    }
+    return '/';
+  });
   const isLoggedIn = !!user;
   const currentRole: AccountRole = user?.role || 'student';
   const [selectedTutorId, setSelectedTutorId] = useState<string>(SAMPLE_TUTORS[0].id);
@@ -61,9 +67,21 @@ export default function App() {
   const [searchGovernorate, setSearchGovernorate] = useState<string>('');
   const [searchCity, setSearchCity] = useState<string>('');
 
-  // Scroll to top on navigation
+  // Listen to browser forward/back buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname || '/');
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Scroll to top on navigation & push state if different
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (typeof window !== 'undefined' && window.location.pathname !== currentPath) {
+      window.history.pushState({}, '', currentPath);
+    }
   }, [currentPath]);
 
   // Route dispatcher
