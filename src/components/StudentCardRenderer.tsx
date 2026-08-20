@@ -237,7 +237,7 @@ export const StudentCardRenderer: React.FC<StudentCardRendererProps> = ({
           style={{
             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.08)',
             fontFamily: "'Tajawal', 'Cairo', system-ui, sans-serif",
-            direction: 'rtl',
+            direction: 'ltr',
           }}
         >
           {/* Realistic Card Glare Overlay */}
@@ -250,14 +250,17 @@ export const StudentCardRenderer: React.FC<StudentCardRendererProps> = ({
 
           {!showBackSide ? (
             /* ========================================================================= */
-            /* FRONT SIDE (MATCHES USER REFERENCE CARD WITH HASSTY IDENTITY)             */
+            /* FRONT SIDE (PERFECT SPLIT: LEFT WHITE + RIGHT EMERALD WAVE)               */
             /* ========================================================================= */
-            <div className="w-full h-full flex flex-row relative">
+            <div className="w-full h-full flex flex-row relative" style={{ direction: 'ltr' }}>
               
               {/* --------------------------------------------------------------------- */}
               {/* LEFT SIDE: White Section (~42% Width = 268px)                         */}
               {/* --------------------------------------------------------------------- */}
-              <div className="w-[268px] h-full bg-white p-5 pr-2 flex flex-col justify-between items-start text-right relative z-10 shrink-0">
+              <div
+                className="w-[268px] h-full bg-white p-5 pr-4 flex flex-col justify-between items-stretch text-right relative z-10 shrink-0"
+                style={{ direction: 'rtl' }}
+              >
                 
                 {/* 1. Header: كارت طالب + عام دراسي */}
                 <div className="space-y-1 pt-1 z-10">
@@ -272,8 +275,8 @@ export const StudentCardRenderer: React.FC<StudentCardRendererProps> = ({
                 {/* 2. Real Barcode & Spaced Code Numbers */}
                 {config.showBarcode && (
                   <div className="w-full flex flex-col items-center justify-center my-auto px-1 z-10">
-                    <div className="w-full flex justify-center items-center py-1">
-                      <svg ref={barcodeRef} className="max-w-[210px] h-[48px] w-full" />
+                    <div className="w-full flex justify-center items-center py-0.5">
+                      <svg ref={barcodeRef} className="max-w-[215px] h-[52px] w-full" />
                     </div>
                     <div className="text-center mt-1">
                       <span className="text-[15px] font-black text-gray-900 font-mono tracking-[0.24em] inline-block">
@@ -284,11 +287,11 @@ export const StudentCardRenderer: React.FC<StudentCardRendererProps> = ({
                 )}
 
                 {/* 3. Left Footer: Hassty Platform Brand & Mini QR Code */}
-                <div className="w-full flex items-end justify-between pt-2 border-t border-gray-100/90 z-10">
+                <div className="w-full flex items-center justify-between pt-2 border-t border-gray-100/90 z-10">
                   
                   {/* Brand & URL */}
                   <div className="space-y-0.5 text-right">
-                    <p className="text-[10.5px] font-black tracking-wider text-gray-700 uppercase">
+                    <p className="text-[11px] font-black tracking-wider text-gray-700 uppercase">
                       {config.footerText || 'POWERED BY HASSTY'}
                     </p>
                     <p className="text-[9.5px] font-bold text-gray-400">
@@ -299,11 +302,11 @@ export const StudentCardRenderer: React.FC<StudentCardRendererProps> = ({
                   {/* QR Code */}
                   {config.showQR && (
                     <div className="shrink-0 flex items-center justify-center">
-                      <div className="w-12 h-12 bg-white p-0.5 rounded-lg border border-teal-800/30 shadow-2xs flex items-center justify-center overflow-hidden">
+                      <div className="w-13 h-13 bg-white p-0.5 rounded-lg border border-teal-800/30 shadow-2xs flex items-center justify-center overflow-hidden">
                         {qrDataUrl ? (
                           <img src={qrDataUrl} alt="QR Code" className="w-full h-full object-contain" />
                         ) : (
-                          <QrIcon className="w-6 h-6 text-teal-700" />
+                          <QrIcon className="w-8 h-8 text-teal-700" />
                         )}
                       </div>
                     </div>
@@ -314,7 +317,7 @@ export const StudentCardRenderer: React.FC<StudentCardRendererProps> = ({
               </div>
 
               {/* --------------------------------------------------------------------- */}
-              {/* SVG ORGANIC CURVED WAVE SEPARATOR                                     */}
+              {/* SVG ORGANIC CURVED WAVE SEPARATOR (from X=268 to X=640)              */}
               {/* --------------------------------------------------------------------- */}
               <div className="absolute inset-0 pointer-events-none z-20">
                 <svg
@@ -324,9 +327,9 @@ export const StudentCardRenderer: React.FC<StudentCardRendererProps> = ({
                   className="w-full h-full"
                   preserveAspectRatio="none"
                 >
-                  {/* Organic wave shape */}
+                  {/* Organic wave shape spanning the right portion */}
                   <path
-                    d="M 285,0 C 265,95 320,185 275,275 C 255,315 270,360 280,380 L 640,380 L 640,0 Z"
+                    d="M 268,0 C 248,95 305,185 260,275 C 242,315 255,360 268,380 L 640,380 L 640,0 Z"
                     fill={`url(#hasstyGradient-${config.themeColor})`}
                   />
                   <defs>
@@ -342,13 +345,26 @@ export const StudentCardRenderer: React.FC<StudentCardRendererProps> = ({
               {/* --------------------------------------------------------------------- */}
               {/* RIGHT SIDE: Luxury Colored Wave Section (~58% Width = 372px)          */}
               {/* --------------------------------------------------------------------- */}
-              <div className={`w-[372px] h-full bg-gradient-to-bl ${activeTheme.bgGradient} text-white p-6 pl-7 flex flex-col justify-between relative z-30 mr-auto text-right shrink-0`}>
+              <div
+                className={`w-[372px] h-full bg-gradient-to-bl ${activeTheme.bgGradient} text-white p-6 pl-7 flex flex-col justify-between relative z-30 ml-auto text-right shrink-0`}
+                style={{ direction: 'rtl' }}
+              >
                 
+                {/* Background ambient lighting and Graduation Cap Watermark */}
+                <div className="absolute top-0 right-0 w-44 h-44 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+                <div className="absolute bottom-0 left-0 w-36 h-36 bg-black/20 rounded-full blur-xl pointer-events-none" />
+                <div className="absolute -left-4 -bottom-4 opacity-10 pointer-events-none">
+                  <GraduationCap className="w-48 h-48 text-white" />
+                </div>
+
                 {/* 1. TOP HEADER: HASSTY / BRANDING */}
                 <div className="flex flex-col items-start z-10 pb-0.5 text-right">
-                  <h2 className="text-2xl font-black tracking-wide text-white leading-tight">
-                    {config.centerName || 'HASSTY'}
-                  </h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-2xl font-black tracking-wide text-white leading-tight">
+                      {config.centerName || 'HASSTY'}
+                    </h2>
+                    <GraduationCap className="w-5 h-5 text-teal-300 opacity-90 inline-block" />
+                  </div>
                   <span className="text-[11.5px] font-semibold text-teal-100/90 block">
                     إدارة الحضور والتعليم الذكي
                   </span>
@@ -358,9 +374,9 @@ export const StudentCardRenderer: React.FC<StudentCardRendererProps> = ({
                 <div className="space-y-2 z-10 my-auto py-0.5">
                   
                   {/* Field 1: اسم الطالب */}
-                  <div className="space-y-0.5">
+                  <div className="space-y-0.5 text-right">
                     <span className="text-teal-200/90 text-xs font-bold block">
-                      :اسم الطالب
+                      اسم الطالب:
                     </span>
                     <h3 className="text-2xl font-black text-white leading-tight drop-shadow-xs truncate max-w-[290px]">
                       {student.name || 'زياد أحمد عبد الله'}
@@ -370,11 +386,11 @@ export const StudentCardRenderer: React.FC<StudentCardRendererProps> = ({
                   {/* Field 2: المجموعة */}
                   {config.showGroup && (
                     <div className="flex items-center justify-between text-[13px] font-bold">
+                      <span className="text-teal-200/90 font-bold text-xs">
+                        المجموعة:
+                      </span>
                       <span className="text-white font-black text-[14px]">
                         {config.groupNameText || student.groupName || 'فردي'}
-                      </span>
-                      <span className="text-teal-200/90 font-bold text-xs">
-                        :المجموعة
                       </span>
                     </div>
                   )}
@@ -382,11 +398,11 @@ export const StudentCardRenderer: React.FC<StudentCardRendererProps> = ({
                   {/* Field 3: رقم الهاتف */}
                   {config.showPhone && (
                     <div className="flex items-center justify-between text-[13px] font-bold">
-                      <span className="font-mono font-black text-white text-[14.5px] tracking-wider dir-ltr">
-                        {student.phone || '01012345678'}
-                      </span>
                       <span className="text-teal-200/90 font-bold text-xs">
-                        :رقم الهاتف
+                        رقم الهاتف:
+                      </span>
+                      <span className="font-mono font-black text-white text-[14.5px] tracking-wider" style={{ direction: 'ltr' }}>
+                        {student.phone || '01012345678'}
                       </span>
                     </div>
                   )}
@@ -394,11 +410,11 @@ export const StudentCardRenderer: React.FC<StudentCardRendererProps> = ({
                   {/* Field 4: تاريخ الإصدار */}
                   {config.showIssueDate && (
                     <div className="flex items-center justify-between text-[12.5px] font-bold">
-                      <span className="font-mono font-black text-white/95 dir-ltr text-[13px]">
-                        {config.issueDateText || '2026 / 08 / 18'}
-                      </span>
                       <span className="text-teal-200/90 font-bold text-xs">
-                        :تاريخ الإصدار
+                        تاريخ الإصدار:
+                      </span>
+                      <span className="font-mono font-black text-white/95 text-[13px]" style={{ direction: 'ltr' }}>
+                        {config.issueDateText || '2026 / 08 / 18'}
                       </span>
                     </div>
                   )}
@@ -406,11 +422,11 @@ export const StudentCardRenderer: React.FC<StudentCardRendererProps> = ({
                   {/* Field 5: المدينة / المحافظة */}
                   {config.showCity && (
                     <div className="flex items-center justify-between text-[12.5px] font-bold">
+                      <span className="text-teal-200/90 font-bold text-xs">
+                        المدينة:
+                      </span>
                       <span className="font-bold text-white/95 truncate max-w-[180px] text-[13px]">
                         {student.governorate || 'القاهرة'} {student.area ? `– ${student.area}` : '– حي السفارات'}
-                      </span>
-                      <span className="text-teal-200/90 font-bold text-xs">
-                        :المدينة
                       </span>
                     </div>
                   )}

@@ -162,27 +162,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           تسجيل الدخول إلى حسابك
         </h2>
         <p className="mt-1 text-xs text-[#6B7280]">
-          الدخول السريع والآمن عبر رقم الهاتف وكود التحقق الفوري على واتساب
+          الدخول السريع والآمن برقم الهاتف وكود التحقق التجريبي المباشر (1234)
         </p>
 
-        {/* WhatsApp Gateway Connectivity Badge */}
+        {/* Quick Demo Mode Badge */}
         <div className="mt-3 flex items-center justify-center">
-          {isGatewayConnected === true ? (
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-              <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
-              <span>خادم واتساب متصل وجاهز (Baileys API) ✓</span>
-            </div>
-          ) : isGatewayConnected === false ? (
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-900 border border-amber-200">
-              <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
-              <span>واتساب غير مقترن بالسيرفر حالياً (يمكنك تسجيل الدخول بالكود المباشر)</span>
-            </div>
-          ) : (
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-gray-50 text-gray-600 border border-gray-200">
-              <RefreshCw className="w-3 h-3 animate-spin text-gray-400" />
-              <span>جاري التحقق من اتصال الواتساب...</span>
-            </div>
-          )}
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-blue-800 border border-blue-200">
+            <KeyRound className="w-3.5 h-3.5 text-blue-600" />
+            <span>نظام تسجيل الدخول المباشر مفعّل (كود التحقق التلقائي: 1234)</span>
+          </div>
         </div>
       </div>
 
