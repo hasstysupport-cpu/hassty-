@@ -242,6 +242,7 @@ export interface StudentProfile {
   area?: string;
   stage?: string;
   grade?: string;
+  groupName?: string;
   age?: number;
   studentIdNumber?: string;
   qrCode: string;
@@ -251,6 +252,26 @@ export interface StudentProfile {
   joinedTutorIds?: string[];
   avatarUrl: string;
   isSubscriptionPaused?: boolean;
+}
+
+export interface StudentCardCustomization {
+  themeColor: 'emerald' | 'blue' | 'purple' | 'gold' | 'crimson' | 'slate';
+  centerName: string;
+  academicYear: string;
+  cardTitle: string;
+  footerText: string;
+  disclaimerText: string;
+  logoUrl?: string;
+  showPhone: boolean;
+  showCity: boolean;
+  showGroup: boolean;
+  showIssueDate: boolean;
+  showBarcode: boolean;
+  showQR: boolean;
+  showAvatar: boolean;
+  groupNameText?: string;
+  issueDateText?: string;
+  cardOrientation?: 'horizontal' | 'vertical';
 }
 
 export interface ParentSettings {

@@ -529,9 +529,19 @@ export const SignupPage: React.FC<SignupPageProps> = ({
 
             <form onSubmit={handleVerifyOtp} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-[#1F2937] mb-2 text-center">
-                  أدخل رمز التحقق (OTP)
-                </label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-bold text-[#1F2937]">
+                    أدخل رمز التحقق (OTP)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setOtp(['1', '2', '3', '4'])}
+                    className="text-[11px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-lg border border-blue-200 hover:bg-blue-100 transition-colors font-black cursor-pointer flex items-center gap-1"
+                  >
+                    <Sparkles className="w-3 h-3 text-amber-500" />
+                    <span>ملء كود الاختبار (1234)</span>
+                  </button>
+                </div>
                 <div className="flex justify-center gap-2.5" dir="ltr">
                   {otp.map((digit, idx) => (
                     <input

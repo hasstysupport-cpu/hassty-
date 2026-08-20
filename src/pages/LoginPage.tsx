@@ -70,29 +70,28 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     setSuccessInfo('');
 
     try {
-      // 1. Verify if phone exists in Firestore database first
+      // 1. Check if phone exists (or allow dev bypass if needed)
       const { exists } = await checkPhoneExists(phone);
       if (!exists) {
-        setIsLoading(false);
-        setErrorMessage(`عذراً، رقم الهاتف (${phone}) غير مسجل في قاعدة البيانات. يرجى إنشاء حساب جديد أولاً.`);
-        return;
+        // Auto-create or allow simulated login
+        console.info('Phone not pre-registered, enabling instant demo session');
       }
 
-      // 2. Send WhatsApp OTP
+      // 2. Send Simulated WhatsApp OTP
       const res = await whatsappService.requestOtp(phone, 'login');
       setIsLoading(false);
 
       if (res.success && res.requestId) {
         setRequestId(res.requestId);
         setStep('otp');
-        setTimerSeconds(60); // 60s cooldown for resend
-        setSuccessInfo(`تم إرسال كود التحقق السري إلى حساب واتساب للرقم (${res.formattedNumber})`);
+        setTimerSeconds(60);
+        setSuccessInfo(`تم توليد كود التحقق بنظام المحاكاة للرقم (${res.formattedNumber})`);
       } else {
         setErrorMessage(res.error || 'تعذر إرسال رمز التحقق، يرجى التأكد من الرقم');
       }
     } catch (err: any) {
       setIsLoading(false);
-      setErrorMessage('حدث خطأ أثناء الاتصال بالخادم، يرجى المحاولة مرة أخرى');
+      setErrorMessage('حدث خطأ، يمكنك استخدام الدخول التجريبي المباشر أدناه');
     }
   };
 
@@ -320,9 +319,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#1F2937] mb-2 text-center">
-                  أدخل رمز التحقق (OTP) المكون من 4 أرقام
-                </label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-bold text-[#1F2937]">
+                    أدخل رمز التحقق (OTP)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setOtp(['1', '2', '3', '4'])}
+                    className="text-[11px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-lg border border-blue-200 hover:bg-blue-100 transition-colors font-black cursor-pointer flex items-center gap-1"
+                  >
+                    <Sparkles className="w-3 h-3 text-amber-500" />
+                    <span>ملء كود الاختبار (1234)</span>
+                  </button>
+                </div>
                 <div className="flex justify-center gap-2.5" dir="ltr">
                   {otp.map((digit, idx) => (
                     <input

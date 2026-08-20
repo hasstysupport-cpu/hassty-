@@ -13,6 +13,7 @@ import { PublicNavbar } from './components/common/PublicNavbar';
 import { LoggedInNavbar } from './components/common/LoggedInNavbar';
 import { DashboardSidebar } from './components/common/DashboardSidebar';
 import { Footer } from './components/Footer';
+import { DevDisclaimerFloatingPill } from './components/common/DevDisclaimerFloatingPill';
 
 // Public & Auth Pages
 import { HomePage } from './pages/HomePage';
@@ -260,6 +261,9 @@ export default function App() {
       {!isDashboardRoute && (
         <Footer onNavigate={handleNavigate} />
       )}
+
+      {/* 4. FLOATING DEV DISCLAIMER PILL (Shown on all pages) */}
+      <DevDisclaimerFloatingPill />
 
     </div>
   );
