@@ -16,10 +16,12 @@ import {
   AlertCircle,
   CreditCard,
   Check,
-  GraduationCap
+  GraduationCap,
+  UserCog
 } from 'lucide-react';
 import { Badge } from '../../components/common/Badge';
 import { useAuth } from '../../lib/AuthContext';
+import { getCleanAvatarUrl } from '../../lib/avatarHelper';
 
 interface StudentDashboardPageProps {
   onNavigate: (path: string) => void;
@@ -34,17 +36,17 @@ export const StudentDashboardPage: React.FC<StudentDashboardPageProps> = ({
   const student = {
     name: user?.name || 'طالب منصة حصتي',
     grade: user?.profileData?.grade || 'المرحلة الثانوية',
-    qrCode: user?.profileData?.qrCode || (user?.id ? `STU-${user.id.substring(0, 8).toUpperCase()}` : 'STU-NEW'),
+    qrCode: user?.profileData?.qrCode || (user?.uid ? `HASSTY-${user.uid.substring(0, 8).toUpperCase()}` : 'HASSTY-STU'),
     phone: user?.phone || '',
-    avatarUrl: user?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-    governorate: user?.governorate || 'القاهرة',
-    area: user?.area || '',
+    avatarUrl: getCleanAvatarUrl(user?.avatarUrl || user?.profileData?.avatarUrl, 'student', user?.name),
+    governorate: user?.governorate || user?.profileData?.governorate || 'القاهرة',
+    area: user?.area || user?.profileData?.area || '',
   };
   const upcomingLessons: any[] = [];
   const myTutors: any[] = [];
 
   return (
-    <div className="space-y-8 text-right">
+    <div className="space-y-8 text-right font-['Tajawal',sans-serif]">
       
       {/* 1. Welcome & ID Card Quick Banner */}
       <div className="bg-white border border-[#E5E7EB] rounded-3xl p-6 sm:p-8 shadow-xs flex flex-col md:flex-row items-center justify-between gap-6">
@@ -52,7 +54,7 @@ export const StudentDashboardPage: React.FC<StudentDashboardPageProps> = ({
           <img
             src={student.avatarUrl}
             alt={student.name}
-            className="w-18 h-18 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-white ring-2 ring-blue-100 shadow-sm"
+            className="w-18 h-18 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-white ring-2 ring-blue-100 shadow-sm bg-gray-50 shrink-0"
             referrerPolicy="no-referrer"
           />
           <div>
@@ -66,22 +68,38 @@ export const StudentDashboardPage: React.FC<StudentDashboardPageProps> = ({
               كود البطاقة الرقمية: <strong className="font-mono text-[#2563EB]">{student.qrCode}</strong>
             </p>
             <div className="flex items-center gap-3 mt-3 text-xs text-[#4B5563]">
-              <span className="flex items-center gap-1">
+              <span className="flex items-center gap-1 text-gray-500">
                 <MapPin className="w-3.5 h-3.5 text-gray-400" />
-                {student.governorate} — {student.area}
+                {student.governorate} {student.area ? `— ${student.area}` : ''}
               </span>
+              <button
+                onClick={() => onNavigate('/student/profile')}
+                className="text-[#2563EB] hover:underline font-bold flex items-center gap-1 cursor-pointer"
+              >
+                <UserCog className="w-3.5 h-3.5" />
+                <span>تعديل الملف الشخصي</span>
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Quick QR Card Button */}
-        <button
-          onClick={() => onNavigate('/student/qr-card')}
-          className="w-full md:w-auto px-5 py-3 bg-[#EFF6FF] hover:bg-blue-100 text-[#2563EB] border border-blue-200 rounded-2xl font-bold text-xs flex items-center justify-center gap-2.5 transition-all cursor-pointer shadow-xs active:scale-95"
-        >
-          <QrCode className="w-5 h-5" />
-          <span>فتح كارنيه الـ QR للطباعة والمسح</span>
-        </button>
+        {/* Quick Actions */}
+        <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full md:w-auto">
+          <button
+            onClick={() => onNavigate('/student/profile')}
+            className="w-full sm:w-auto px-4 py-3 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs active:scale-95"
+          >
+            <UserCog className="w-4 h-4 text-gray-500" />
+            <span>تعديل البروفايل</span>
+          </button>
+          <button
+            onClick={() => onNavigate('/student/qr-card')}
+            className="w-full sm:w-auto px-5 py-3 bg-[#EFF6FF] hover:bg-blue-100 text-[#2563EB] border border-blue-200 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs active:scale-95"
+          >
+            <QrCode className="w-5 h-5" />
+            <span>فتح كارنيه الـ QR</span>
+          </button>
+        </div>
       </div>
 
       {/* 2. Key Stats Row */}

@@ -32,6 +32,7 @@ import { StudentQRCardPage } from './pages/student/StudentQRCardPage';
 import { StudentTutorsPage } from './pages/student/StudentTutorsPage';
 import { StudentBookPage } from './pages/student/StudentBookPage';
 import { StudentPaymentsPage } from './pages/student/StudentPaymentsPage';
+import { StudentProfilePage } from './pages/student/StudentProfilePage';
 
 // Parent Pages
 import { ParentDashboardPage } from './pages/parent/ParentDashboardPage';
@@ -141,6 +142,7 @@ export default function App() {
           currentRole={currentRole}
           currentPath={currentPath}
           userName={user?.name}
+          userAvatar={user?.avatarUrl || user?.profileData?.avatarUrl}
           onNavigate={handleNavigate}
           onRoleChange={(newRole) => {
             if (newRole === 'student') setCurrentPath('/student/dashboard');
@@ -178,6 +180,7 @@ export default function App() {
               <StudentDashboardPage onNavigate={handleNavigate} onSelectTutor={handleSelectTutor} />
             )}
             {currentPath === '/student/qr-card' && <StudentQRCardPage />}
+            {currentPath === '/student/profile' && <StudentProfilePage />}
             {currentPath === '/student/tutors' && (
               <StudentTutorsPage onNavigate={handleNavigate} onSelectTutor={handleSelectTutor} />
             )}

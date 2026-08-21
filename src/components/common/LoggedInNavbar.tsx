@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Bell, ChevronDown, User, Settings, LogOut, Sparkles, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { AccountRole } from '../../types';
 import { BrandLogo } from './BrandLogo';
+import { getCleanAvatarUrl } from '../../lib/avatarHelper';
 
 interface LoggedInNavbarProps {
   currentPath: string;
@@ -31,33 +32,30 @@ export const LoggedInNavbar: React.FC<LoggedInNavbarProps> = ({
 
   const role: AccountRole = propRole || currentRole || 'student';
 
-  const roleLabels: Record<AccountRole, { title: string; badgeClass: string; defaultPath: string; defaultName: string; defaultAvatar: string }> = {
+  const roleLabels: Record<AccountRole, { title: string; badgeClass: string; defaultPath: string; defaultName: string }> = {
     student: {
       title: 'حساب طالب',
       badgeClass: 'bg-[#EFF6FF] text-[#2563EB] border-blue-200',
-      defaultPath: '/student/dashboard',
-      defaultName: 'زياد أحمد (3 ثانوي)',
-      defaultAvatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100&auto=format&fit=crop&q=80',
+      defaultPath: '/student/profile',
+      defaultName: 'طالب حِصّتي',
     },
     parent: {
       title: 'حساب ولي أمر',
       badgeClass: 'bg-amber-50 text-amber-800 border-amber-200',
-      defaultPath: '/parent/dashboard',
-      defaultName: 'أحمد عبد الله',
-      defaultAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
+      defaultPath: '/parent/settings',
+      defaultName: 'ولي أمر حِصّتي',
     },
     teacher: {
       title: 'حساب مدرس',
       badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-200',
-      defaultPath: '/teacher/dashboard',
-      defaultName: 'أ. حسام إبراهيم',
-      defaultAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
+      defaultPath: '/teacher/profile',
+      defaultName: 'معلم حِصّتي',
     },
   };
 
   const currentRoleMeta = roleLabels[role] || roleLabels.student;
   const userName = propUserName || currentRoleMeta.defaultName;
-  const userAvatar = propUserAvatar || currentRoleMeta.defaultAvatar;
+  const userAvatar = getCleanAvatarUrl(propUserAvatar, role, userName);
 
   // Derive dynamic page title if not provided
   const getDynamicTitle = () => {

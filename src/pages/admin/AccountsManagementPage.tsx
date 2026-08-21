@@ -17,16 +17,29 @@ import {
   Sparkles,
   UserCheck,
   UserX,
-  X
+  X,
+  Edit3,
+  Camera,
+  UploadCloud,
+  Save,
+  RefreshCw,
+  Mail,
+  GraduationCap,
+  MapPin,
+  BookOpen
 } from 'lucide-react';
 import { AdminUserAccount, AccountRole, AccountBadgeType } from '../../types';
 import { AccountBadge } from '../../components/admin/AccountBadge';
+import { getCleanAvatarUrl, optimizeProfileImage } from '../../lib/avatarHelper';
+import { LocationSelector } from '../../components/common/LocationSelector';
+import { dbUpdateAccountFullProfile } from '../../lib/adminFirestoreService';
 
 interface AccountsManagementPageProps {
   accounts: AdminUserAccount[];
   onUpdateAccountBadge: (accountId: string, newBadge: AccountBadgeType) => void;
   onToggleAccountStatus: (accountId: string) => void;
   onDeleteAccount: (accountId: string) => void;
+  onUpdateAccountFullProfile?: (accountId: string, updates: Partial<AdminUserAccount>) => Promise<void>;
 }
 
 export const AccountsManagementPage: React.FC<AccountsManagementPageProps> = ({
@@ -34,6 +47,7 @@ export const AccountsManagementPage: React.FC<AccountsManagementPageProps> = ({
   onUpdateAccountBadge,
   onToggleAccountStatus,
   onDeleteAccount,
+  onUpdateAccountFullProfile,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<'all' | AccountRole>('all');
@@ -44,6 +58,105 @@ export const AccountsManagementPage: React.FC<AccountsManagementPageProps> = ({
   const [selectedAccountForDetail, setSelectedAccountForDetail] = useState<AdminUserAccount | null>(null);
   const [badgeModalAccount, setBadgeModalAccount] = useState<AdminUserAccount | null>(null);
   const [deleteConfirmAccount, setDeleteConfirmAccount] = useState<AdminUserAccount | null>(null);
+  const [editModalAccount, setEditModalAccount] = useState<AdminUserAccount | null>(null);
+
+  // Edit form states
+  const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editRole, setEditRole] = useState<AccountRole | 'admin'>('student');
+  const [editGovernorate, setEditGovernorate] = useState('القاهرة');
+  const [editArea, setEditArea] = useState('مدينة نصر');
+  const [editGrade, setEditGrade] = useState('');
+  const [editSubject, setEditSubject] = useState('');
+  const [editBadge, setEditBadge] = useState<AccountBadgeType>('none');
+  const [editStatus, setEditStatus] = useState<'active' | 'suspended'>('active');
+  const [editAvatarUrl, setEditAvatarUrl] = useState('');
+  const [editParentPhone, setEditParentPhone] = useState('');
+  const [isUploadingEditPhoto, setIsUploadingEditPhoto] = useState(false);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [editMessage, setEditMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Open Edit Modal with initialized data
+  const handleOpenEditModal = (account: AdminUserAccount) => {
+    setEditModalAccount(account);
+    setEditName(account.name || '');
+    setEditPhone(account.phone || '');
+    setEditEmail(account.email || '');
+    setEditRole(account.role || 'student');
+    setEditGovernorate(account.governorate || 'القاهرة');
+    setEditArea(account.area || 'مدينة نصر');
+    setEditGrade(account.grade || '');
+    setEditSubject(account.subject || '');
+    setEditBadge(account.badge || 'none');
+    setEditStatus(account.status || 'active');
+    setEditAvatarUrl(account.avatarUrl || '');
+    setEditParentPhone(account.parentPhone || '');
+    setEditMessage(null);
+  };
+
+  // Upload Photo inside Admin Edit Modal
+  const handleEditPhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingEditPhoto(true);
+    setEditMessage(null);
+
+    try {
+      const compressed = await optimizeProfileImage(file, 400);
+      setEditAvatarUrl(compressed);
+      setIsUploadingEditPhoto(false);
+    } catch (err: any) {
+      setIsUploadingEditPhoto(false);
+      setEditMessage({ type: 'error', text: err.message || 'فشل معالجة الصورة.' });
+    }
+  };
+
+  // Save Comprehensive Edit
+  const handleSaveFullEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editModalAccount) return;
+
+    if (!editName.trim()) {
+      setEditMessage({ type: 'error', text: 'الاسم مطلوب.' });
+      return;
+    }
+
+    setIsSavingEdit(true);
+    setEditMessage(null);
+
+    const updates: Partial<AdminUserAccount> = {
+      name: editName.trim(),
+      phone: editPhone.trim(),
+      email: editEmail.trim(),
+      role: editRole,
+      governorate: editGovernorate,
+      area: editArea,
+      grade: editGrade.trim(),
+      subject: editSubject.trim(),
+      badge: editBadge,
+      status: editStatus,
+      avatarUrl: editAvatarUrl.trim(),
+      parentPhone: editParentPhone.trim(),
+    };
+
+    try {
+      if (onUpdateAccountFullProfile) {
+        await onUpdateAccountFullProfile(editModalAccount.id, updates);
+      } else {
+        await dbUpdateAccountFullProfile(editModalAccount.id, updates);
+      }
+
+      setIsSavingEdit(false);
+      setEditMessage({ type: 'success', text: 'تم تحديث بيانات الحساب بنجاح في قاعدة البيانات! ✅' });
+      setTimeout(() => {
+        setEditModalAccount(null);
+      }, 1500);
+    } catch (err: any) {
+      setIsSavingEdit(false);
+      setEditMessage({ type: 'error', text: err.message || 'فشل حفظ التعديلات.' });
+    }
+  };
 
   // Filter accounts
   const filteredAccounts = useMemo(() => {
@@ -69,15 +182,15 @@ export const AccountsManagementPage: React.FC<AccountsManagementPageProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-xl sm:text-2xl font-black text-[#1E3A8A]">
-            إدارة الحسابات والمستخدمين (Accounts Management) 👥
+            إدارة الحسابات وتعديل الملفات (Accounts Management) 👥
           </h2>
           <p className="text-xs text-gray-500 mt-0.5">
-            التحكم الشامل في حسابات الطلاب، أولياء الأمور، والمدرسين ومنح شارات الثقة (Verified/Scam Badges).
+            التحكم الشامل في حسابات الطلاب، أولياء الأمور، والمدرسين، وتعديل البروفايل والصور والشارات.
           </p>
         </div>
 
         <div className="flex items-center gap-2 text-xs font-bold text-gray-500 bg-white px-3.5 py-2 rounded-2xl border border-gray-200 shadow-xs">
-          <span>إجمالي الحسابات:</span>
+          <span>إجمالي الحسابات المسجلة:</span>
           <span className="text-[#2563EB] font-black">{accounts.length}</span>
         </div>
       </div>
@@ -99,83 +212,106 @@ export const AccountsManagementPage: React.FC<AccountsManagementPageProps> = ({
           </div>
 
           {/* Role Filter */}
-          <div>
+          <div className="relative">
             <select
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value as any)}
-              className="w-full text-right px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-xs font-bold text-gray-700 focus:outline-none focus:border-blue-500 focus:bg-white cursor-pointer"
+              className="w-full text-right px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-xs font-bold text-gray-700 focus:outline-none focus:border-blue-500 focus:bg-white transition-all appearance-none cursor-pointer"
             >
-              <option value="all">كل أنواع الحسابات</option>
-              <option value="teacher">مدرسين (Teachers)</option>
-              <option value="student">طلاب (Students)</option>
-              <option value="parent">أولياء أمور (Parents)</option>
+              <option value="all">كل الرتب (طالب / مدرس / ولي أمر)</option>
+              <option value="student">الطلاب فقط</option>
+              <option value="teacher">المدرسين فقط</option>
+              <option value="parent">أولياء الأمور فقط</option>
             </select>
+            <ChevronDown className="w-4 h-4 text-gray-400 absolute left-3 top-3 pointer-events-none" />
           </div>
 
           {/* Status Filter */}
-          <div>
+          <div className="relative">
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as any)}
-              className="w-full text-right px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-xs font-bold text-gray-700 focus:outline-none focus:border-blue-500 focus:bg-white cursor-pointer"
+              className="w-full text-right px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-xs font-bold text-gray-700 focus:outline-none focus:border-blue-500 focus:bg-white transition-all appearance-none cursor-pointer"
             >
-              <option value="all">كل الحالات (نشط/موقوف)</option>
+              <option value="all">كل الحالات (نشط / موقوف)</option>
               <option value="active">الحسابات النشطة فقط</option>
-              <option value="suspended">الحسابات الموقوفة</option>
+              <option value="suspended">الحسابات الموقوفة فقط</option>
             </select>
+            <ChevronDown className="w-4 h-4 text-gray-400 absolute left-3 top-3 pointer-events-none" />
           </div>
 
           {/* Badge Filter */}
-          <div>
+          <div className="relative">
             <select
               value={badgeFilter}
               onChange={(e) => setBadgeFilter(e.target.value as any)}
-              className="w-full text-right px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-xs font-bold text-gray-700 focus:outline-none focus:border-blue-500 focus:bg-white cursor-pointer"
+              className="w-full text-right px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-xs font-bold text-gray-700 focus:outline-none focus:border-blue-500 focus:bg-white transition-all appearance-none cursor-pointer"
             >
-              <option value="all">كل الشارات</option>
-              <option value="verified">موثّق ✅ (Verified)</option>
-              <option value="suspicious">مشتبه فيه ⚠️ (Suspicious)</option>
-              <option value="fraudulent">احتيالي ❌ (Fraudulent)</option>
+              <option value="all">كل الشارات (Badge)</option>
+              <option value="verified">موثّق رسمياً (Verified)</option>
+              <option value="suspicious">مشتبه فيه (Suspicious)</option>
+              <option value="fraudulent">محتال / خطر (Fraudulent)</option>
               <option value="none">بدون شارة</option>
             </select>
+            <ChevronDown className="w-4 h-4 text-gray-400 absolute left-3 top-3 pointer-events-none" />
           </div>
 
+        </div>
+
+        {/* Active Filters count summary */}
+        <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t border-gray-100">
+          <span>نتائج البحث والتصفية: <strong className="text-gray-900">{filteredAccounts.length}</strong> حساب</span>
+          {(searchTerm || roleFilter !== 'all' || statusFilter !== 'all' || badgeFilter !== 'all') && (
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                setRoleFilter('all');
+                setStatusFilter('all');
+                setBadgeFilter('all');
+              }}
+              className="text-blue-600 hover:underline font-bold cursor-pointer"
+            >
+              إلغاء جميع الفلاتر
+            </button>
+          )}
         </div>
       </div>
 
       {/* 3. Accounts Table */}
-      <div className="bg-white border border-gray-200 rounded-3xl overflow-hidden shadow-xs">
+      <div className="bg-white border border-gray-200 rounded-3xl shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-right text-xs">
-            <thead className="bg-gray-50/80 text-gray-500 font-bold border-b border-gray-200">
-              <tr>
-                <th className="py-3.5 px-4">الاسم والحساب</th>
-                <th className="py-3.5 px-4">النوع (Role)</th>
-                <th className="py-3.5 px-4">رقم الموبايل</th>
-                <th className="py-3.5 px-4">تاريخ التسجيل</th>
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200 text-gray-600 font-bold">
+                <th className="py-3.5 px-4">المستخدم</th>
+                <th className="py-3.5 px-4">النوع</th>
+                <th className="py-3.5 px-4">الموبايل</th>
+                <th className="py-3.5 px-4">تاريخ الانضمام</th>
                 <th className="py-3.5 px-4">الشارة (Badge)</th>
                 <th className="py-3.5 px-4">الحالة</th>
-                <th className="py-3.5 px-4 text-center">الإجراءات</th>
+                <th className="py-3.5 px-4 text-center">إجراءات التحكم</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredAccounts.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-10 text-gray-400">
-                    لا توجد حسابات تطابق خيارات البحث الحالية
+                  <td colSpan={7} className="py-12 text-center text-gray-400">
+                    <Users className="w-10 h-10 mx-auto text-gray-300 mb-2" />
+                    <p className="font-bold">لم يتم العثور على أي حسابات مطابقة للبحث</p>
                   </td>
                 </tr>
               ) : (
                 filteredAccounts.map((account) => (
-                  <tr key={account.id} className="hover:bg-blue-50/30 transition-colors">
+                  <tr key={account.id} className="hover:bg-gray-50/70 transition-colors">
                     
-                    {/* Name + Avatar */}
-                    <td className="py-3.5 px-4 font-bold text-[#1E3A8A]">
-                      <div className="flex items-center gap-2.5">
+                    {/* User info with Clean Avatar */}
+                    <td className="py-3.5 px-4 font-bold text-gray-900">
+                      <div className="flex items-center gap-3">
                         <img
-                          src={account.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'}
+                          src={getCleanAvatarUrl(account.avatarUrl, account.role, account.name)}
                           alt={account.name}
-                          className="w-8 h-8 rounded-xl object-cover border border-gray-200"
+                          className="w-10 h-10 rounded-2xl object-cover border border-gray-200 shrink-0 bg-gray-50"
+                          referrerPolicy="no-referrer"
                         />
                         <div>
                           <p className="hover:underline cursor-pointer" onClick={() => setSelectedAccountForDetail(account)}>
@@ -183,7 +319,7 @@ export const AccountsManagementPage: React.FC<AccountsManagementPageProps> = ({
                           </p>
                           {account.subject && (
                             <span className="text-[10px] text-gray-400 font-normal">
-                              {account.subject} • {account.governorate}
+                              {account.subject} • {account.governorate || 'القاهرة'}
                             </span>
                           )}
                           {account.grade && (
@@ -202,18 +338,18 @@ export const AccountsManagementPage: React.FC<AccountsManagementPageProps> = ({
                         account.role === 'student' ? 'bg-blue-50 text-blue-800 border border-blue-200' :
                         'bg-amber-50 text-amber-800 border border-amber-200'
                       }`}>
-                        {account.role === 'teacher' ? 'مدرس' : account.role === 'student' ? 'طالب' : 'ولي أمر'}
+                        {account.role === 'teacher' ? 'مدرس' : account.role === 'student' ? 'طالب' : account.role === 'parent' ? 'ولي أمر' : 'مشرف'}
                       </span>
                     </td>
 
                     {/* Phone */}
                     <td className="py-3.5 px-4 font-mono text-gray-700 font-medium dir-ltr text-right">
-                      {account.phone}
+                      {account.phone || '—'}
                     </td>
 
                     {/* Joined Date */}
                     <td className="py-3.5 px-4 text-gray-500 font-mono text-[11px]">
-                      {account.createdAt}
+                      {account.createdAt ? account.createdAt.substring(0, 10) : '—'}
                     </td>
 
                     {/* Badge Column with quick action */}
@@ -224,7 +360,7 @@ export const AccountsManagementPage: React.FC<AccountsManagementPageProps> = ({
                         title="انقر لتعديل الشارة"
                       >
                         <AccountBadge badge={account.badge} />
-                        <span className="text-[10px] text-blue-600 underline font-bold">تعديل</span>
+                        <span className="text-[10px] text-blue-600 underline font-bold">تغيير</span>
                       </button>
                     </td>
 
@@ -257,10 +393,19 @@ export const AccountsManagementPage: React.FC<AccountsManagementPageProps> = ({
                     <td className="py-3.5 px-4 text-center">
                       <div className="flex items-center justify-center gap-1.5">
                         
+                        {/* Edit Button (Comprehensive profile editor) */}
+                        <button
+                          onClick={() => handleOpenEditModal(account)}
+                          className="p-1.5 bg-blue-50 hover:bg-blue-100 text-[#2563EB] rounded-xl transition-colors cursor-pointer"
+                          title="تعديل شامل للبروفايل والبيانات"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+
                         <button
                           onClick={() => setSelectedAccountForDetail(account)}
                           className="p-1.5 bg-gray-100 hover:bg-blue-100 text-gray-700 hover:text-blue-700 rounded-xl transition-colors cursor-pointer"
-                          title="عرض التفاصيل"
+                          title="عرض بطاقة التفاصيل"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
@@ -276,7 +421,7 @@ export const AccountsManagementPage: React.FC<AccountsManagementPageProps> = ({
                         <button
                           onClick={() => setDeleteConfirmAccount(account)}
                           className="p-1.5 bg-gray-100 hover:bg-red-100 text-gray-700 hover:text-red-700 rounded-xl transition-colors cursor-pointer"
-                          title="حذف الحساب"
+                          title="حذف الحساب نهائياً"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -291,6 +436,249 @@ export const AccountsManagementPage: React.FC<AccountsManagementPageProps> = ({
           </table>
         </div>
       </div>
+
+      {/* =========================================================================
+          MODAL: Comprehensive Profile Editor for Admin
+         ========================================================================= */}
+      {editModalAccount && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-7 space-y-5 shadow-2xl border border-gray-200 text-right animate-scale-up my-8">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-2xl bg-blue-50 text-[#2563EB] flex items-center justify-center font-bold">
+                  <Edit3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-[#1E3A8A]">تعديل شامل لبروفايل الحساب</h3>
+                  <span className="text-[11px] text-gray-400 font-mono">UID: {editModalAccount.id}</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditModalAccount(null)}
+                className="p-1.5 rounded-xl text-gray-400 hover:text-gray-700 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {editMessage && (
+              <div className={`p-3.5 rounded-2xl text-xs font-bold flex items-center gap-2 ${
+                editMessage.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
+              }`}>
+                {editMessage.type === 'success' ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <AlertCircle className="w-4 h-4 text-red-600" />}
+                <span>{editMessage.text}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveFullEdit} className="space-y-4 text-xs">
+              
+              {/* Photo Upload & Preview */}
+              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 flex flex-col sm:flex-row items-center gap-4">
+                <img
+                  src={getCleanAvatarUrl(editAvatarUrl, editRole, editName)}
+                  alt="صورة المستخدم"
+                  className="w-20 h-20 rounded-2xl object-cover border-2 border-white ring-2 ring-blue-100 shadow-xs bg-white shrink-0"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="space-y-2 w-full text-center sm:text-right">
+                  <div className="flex items-center justify-center sm:justify-start gap-2">
+                    <span className="font-bold text-gray-800">صورة البروفايل</span>
+                    {!editAvatarUrl && <span className="text-[10px] text-gray-400 bg-gray-200 px-2 py-0.5 rounded-full">الصورة الثابتة الافتراضية مفعلة</span>}
+                  </div>
+                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                    <label className="px-3 py-1.5 bg-[#2563EB] hover:bg-blue-700 text-white rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5">
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>{isUploadingEditPhoto ? 'جاري المعالجة...' : 'تغيير الصورة'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleEditPhotoSelect}
+                        disabled={isUploadingEditPhoto}
+                        className="hidden"
+                      />
+                    </label>
+                    {editAvatarUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setEditAvatarUrl('')}
+                        className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-xl text-xs font-bold cursor-pointer"
+                      >
+                        إلغاء واستعادة الصورة الثابتة
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Main Fields Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                
+                {/* Name */}
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">الاسم بالكامل *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-right focus:bg-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                {/* Phone */}
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">رقم الموبايل *</label>
+                  <input
+                    type="tel"
+                    dir="ltr"
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl font-mono text-left focus:bg-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                {/* Email */}
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">البريد الإلكتروني</label>
+                  <input
+                    type="email"
+                    dir="ltr"
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-left focus:bg-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                {/* Role */}
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">نوع الرتبة / الحساب</label>
+                  <select
+                    value={editRole}
+                    onChange={(e) => setEditRole(e.target.value as any)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl font-bold focus:bg-white focus:outline-none focus:border-blue-500 cursor-pointer"
+                  >
+                    <option value="student">طالب (Student)</option>
+                    <option value="teacher">مدرس معتمد (Teacher)</option>
+                    <option value="parent">ولي أمر (Parent)</option>
+                    <option value="admin">مشرف إداري (Admin)</option>
+                  </select>
+                </div>
+
+                {/* Subject (for teacher) or Grade (for student) */}
+                {editRole === 'teacher' ? (
+                  <div>
+                    <label className="block font-bold text-gray-700 mb-1">مادة التدريس</label>
+                    <input
+                      type="text"
+                      placeholder="مثال: فيزياء، كيمياء"
+                      value={editSubject}
+                      onChange={(e) => setEditSubject(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-right focus:bg-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block font-bold text-gray-700 mb-1">الصف الدراسي</label>
+                    <input
+                      type="text"
+                      placeholder="مثال: الصف الثالث الثانوي"
+                      value={editGrade}
+                      onChange={(e) => setEditGrade(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-right focus:bg-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                )}
+
+                {/* Parent Phone for students */}
+                {editRole === 'student' && (
+                  <div>
+                    <label className="block font-bold text-gray-700 mb-1">رقم واتساب ولي الأمر</label>
+                    <input
+                      type="tel"
+                      dir="ltr"
+                      placeholder="010XXXXXXXX"
+                      value={editParentPhone}
+                      onChange={(e) => setEditParentPhone(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl font-mono text-left focus:bg-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                )}
+
+                {/* Badge */}
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">شارة الحساب (Badge)</label>
+                  <select
+                    value={editBadge}
+                    onChange={(e) => setEditBadge(e.target.value as AccountBadgeType)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl font-bold focus:bg-white focus:outline-none focus:border-blue-500 cursor-pointer"
+                  >
+                    <option value="none">بدون شارة (عادي)</option>
+                    <option value="verified">موثق رسمياً ✅ (Verified)</option>
+                    <option value="suspicious">مشتبه فيه ⚠️ (Suspicious)</option>
+                    <option value="fraudulent">محتال / خطر ⛔ (Fraudulent)</option>
+                  </select>
+                </div>
+
+                {/* Status */}
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">حالة الحساب</label>
+                  <select
+                    value={editStatus}
+                    onChange={(e) => setEditStatus(e.target.value as any)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl font-bold focus:bg-white focus:outline-none focus:border-blue-500 cursor-pointer"
+                  >
+                    <option value="active">نشط ويعمل (Active)</option>
+                    <option value="suspended">موقوف إدارياً (Suspended)</option>
+                  </select>
+                </div>
+
+              </div>
+
+              {/* Location Selector */}
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">المحافظة والمنطقة السكنية</label>
+                <LocationSelector
+                  selectedGovernorate={editGovernorate}
+                  selectedCity={editArea}
+                  onSelectGovernorate={(gov) => setEditGovernorate(gov || 'القاهرة')}
+                  onSelectCity={(city) => setEditArea(city)}
+                  showCitySelect={true}
+                  placeholder="اختر المحافظة والمدينة"
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setEditModalAccount(null)}
+                  className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold cursor-pointer"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingEdit}
+                  className="px-6 py-2.5 bg-[#2563EB] hover:bg-blue-700 text-white rounded-xl font-bold flex items-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
+                >
+                  {isSavingEdit ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>جاري الحفظ...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      <span>حفظ التعديلات في Firestore</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* =========================================================================
           MODAL 1: Account Detail View
@@ -316,9 +704,10 @@ export const AccountsManagementPage: React.FC<AccountsManagementPageProps> = ({
             <div className="space-y-4 text-xs">
               <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-2xl">
                 <img
-                  src={selectedAccountForDetail.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'}
+                  src={getCleanAvatarUrl(selectedAccountForDetail.avatarUrl, selectedAccountForDetail.role, selectedAccountForDetail.name)}
                   alt={selectedAccountForDetail.name}
-                  className="w-14 h-14 rounded-2xl object-cover border border-gray-300"
+                  className="w-14 h-14 rounded-2xl object-cover border border-gray-300 bg-white"
+                  referrerPolicy="no-referrer"
                 />
                 <div>
                   <h4 className="text-sm font-black text-[#1E3A8A]">{selectedAccountForDetail.name}</h4>
@@ -376,6 +765,17 @@ export const AccountsManagementPage: React.FC<AccountsManagementPageProps> = ({
             </div>
 
             <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+              <button
+                onClick={() => {
+                  const acc = selectedAccountForDetail;
+                  setSelectedAccountForDetail(null);
+                  handleOpenEditModal(acc);
+                }}
+                className="px-5 py-2.5 bg-[#2563EB] hover:bg-blue-700 text-white rounded-xl text-xs font-bold cursor-pointer flex items-center gap-1.5"
+              >
+                <Edit3 className="w-4 h-4" />
+                <span>تعديل هذا الحساب</span>
+              </button>
               <button
                 onClick={() => setSelectedAccountForDetail(null)}
                 className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold cursor-pointer"
@@ -465,8 +865,8 @@ export const AccountsManagementPage: React.FC<AccountsManagementPageProps> = ({
                     <XCircle className="w-4 h-4" />
                   </div>
                   <div>
-                    <h5 className="text-xs font-black text-red-900">احتيالي ومخالف ❌ (Scam/Fraudulent)</h5>
-                    <p className="text-[10px] text-red-700">حساب احتيالي مخالف لشروط وأمان الطلاب (تحذير علني)</p>
+                    <h5 className="text-xs font-black text-red-900">محتال / منتحل صفة ⛔ (Fraudulent)</h5>
+                    <p className="text-[10px] text-red-700">تم حظر الحساب ومنع استقبال الحجوزات نهائياً</p>
                   </div>
                 </div>
               </button>
@@ -477,17 +877,25 @@ export const AccountsManagementPage: React.FC<AccountsManagementPageProps> = ({
                   onUpdateAccountBadge(badgeModalAccount.id, 'none');
                   setBadgeModalAccount(null);
                 }}
-                className="w-full p-3 rounded-2xl border border-gray-200 bg-gray-50 hover:bg-gray-100 text-right transition-all flex items-center justify-between cursor-pointer text-xs font-bold text-gray-700"
+                className="w-full p-3.5 rounded-2xl border border-gray-200 bg-gray-50 hover:bg-gray-100 text-right transition-all flex items-center justify-between cursor-pointer"
               >
-                <span>بدون شارة (Standard Account)</span>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-gray-400 text-white flex items-center justify-center">
+                    <Users className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h5 className="text-xs font-black text-gray-800">حساب عادي (بدون شارة)</h5>
+                    <p className="text-[10px] text-gray-500">حساب افتراضي قيد الاستخدام اليومي</p>
+                  </div>
+                </div>
               </button>
 
             </div>
 
-            <div className="flex justify-end pt-2 border-t border-gray-100">
+            <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
               <button
                 onClick={() => setBadgeModalAccount(null)}
-                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold cursor-pointer"
+                className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold cursor-pointer"
               >
                 إلغاء
               </button>
@@ -506,29 +914,28 @@ export const AccountsManagementPage: React.FC<AccountsManagementPageProps> = ({
               <Trash2 className="w-6 h-6" />
             </div>
 
-            <div className="text-center space-y-1">
-              <h3 className="text-base font-black text-gray-900">تأكيد حذف الحساب نهائياً؟</h3>
-              <p className="text-xs text-gray-500">
-                أنت على وشك حذف حساب <strong className="text-red-600 font-bold">{deleteConfirmAccount.name}</strong> بشكل نهائي من قاعدة البيانات. هذا الإجراء لا يمكن التراجع عنه.
+            <div className="text-center">
+              <h4 className="text-base font-black text-gray-900">حذف الحساب نهائياً؟</h4>
+              <p className="text-xs text-gray-500 mt-1">
+                أنت على وشك حذف حساب <strong className="text-gray-900">{deleteConfirmAccount.name}</strong>. لن يتمكن المستخدم من تسجيل الدخول مرة أخرى.
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 pt-2">
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                onClick={() => setDeleteConfirmAccount(null)}
+                className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold cursor-pointer"
+              >
+                إلغاء
+              </button>
               <button
                 onClick={() => {
                   onDeleteAccount(deleteConfirmAccount.id);
                   setDeleteConfirmAccount(null);
                 }}
-                className="py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer"
+                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold cursor-pointer shadow-xs"
               >
-                نعم، احذف الحساب
-              </button>
-
-              <button
-                onClick={() => setDeleteConfirmAccount(null)}
-                className="py-2.5 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold cursor-pointer"
-              >
-                إلغاء
+                تأكيد الحذف
               </button>
             </div>
           </div>

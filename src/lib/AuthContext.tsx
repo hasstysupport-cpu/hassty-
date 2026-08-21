@@ -21,6 +21,7 @@ import {
 } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { AccountRole } from '../types';
+import { sendParentLinkRequest } from './parentStudentService';
 
 export interface UserSession {
   uid: string;
@@ -28,6 +29,9 @@ export interface UserSession {
   phone: string;
   role: AccountRole;
   name: string;
+  avatarUrl?: string;
+  governorate?: string;
+  area?: string;
   profileData?: any;
   emailVerified?: boolean;
 }
@@ -38,12 +42,14 @@ interface SignupData {
   role: AccountRole;
   name: string;
   phone: string;
+  avatarUrl?: string;
   governorate?: string;
   area?: string;
   grade?: string;
   subject?: string;
   experience?: string;
   parentPhone?: string;
+  studentJoinCode?: string;
 }
 
 interface AuthContextType {
@@ -95,6 +101,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             phone,
             role,
             name,
+            avatarUrl: profileData.avatarUrl || '',
+            governorate: profileData.governorate || 'القاهرة',
+            area: profileData.area || '',
             profileData,
             emailVerified: firebaseUser.emailVerified,
           };
@@ -156,6 +165,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       phone,
       role,
       name,
+      avatarUrl: profileData.avatarUrl || '',
+      governorate: profileData.governorate || 'القاهرة',
+      area: profileData.area || '',
       profileData,
       emailVerified: firebaseUser.emailVerified,
     };
@@ -172,14 +184,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const cleanEmail = data.email.trim().toLowerCase();
     const cleanName = data.name.trim();
     const cleanPhone = data.phone.trim();
+    const avatarUrl = data.avatarUrl || '';
 
     // 1. Create user in Firebase Authentication
     const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, data.password);
     const firebaseUser = userCredential.user;
 
-    // 2. Set Firebase Auth Display Name
+    // 2. Set Firebase Auth Display Name & Photo
     try {
-      await updateProfile(firebaseUser, { displayName: cleanName });
+      await updateProfile(firebaseUser, { 
+        displayName: cleanName,
+        photoURL: avatarUrl || undefined
+      });
     } catch (e) {
       console.warn('Update display name warning:', e);
     }
@@ -198,6 +214,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       phone: cleanPhone,
       role: data.role,
       name: cleanName,
+      avatarUrl: avatarUrl,
       governorate: data.governorate || 'القاهرة',
       area: data.area || '',
       createdAt: new Date().toISOString(),
@@ -223,6 +240,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // 5. Save to Firestore `users` collection
     await setDoc(doc(db, 'users', firebaseUser.uid), profileData, { merge: true });
 
+    // If Parent entered a student join code during signup, create the pending linking request immediately
+    if (data.role === 'parent' && data.studentJoinCode && data.studentJoinCode.trim()) {
+      try {
+        await sendParentLinkRequest(
+          {
+            uid: firebaseUser.uid,
+            name: cleanName,
+            phone: cleanPhone,
+            email: cleanEmail,
+            avatarUrl: avatarUrl,
+          },
+          data.studentJoinCode.trim()
+        );
+      } catch (linkErr) {
+        console.warn('Initial student link request warning:', linkErr);
+      }
+    }
+
     // 6. If Teacher, register into `tutors` directory for students to search & book
     if (data.role === 'teacher') {
       await setDoc(doc(db, 'tutors', firebaseUser.uid), {
@@ -239,7 +274,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isVerified: true,
         joinCode: Math.floor(100000 + Math.random() * 900000).toString(),
         levels: [data.grade || 'ثانوية عامة'],
-        avatarUrl: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(cleanName)}&backgroundColor=1e3a8a`,
+        avatarUrl: avatarUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(cleanName)}&backgroundColor=1e3a8a`,
         bio: `معلم متخصص في تدريس ${data.subject || 'المادة'}، معتمد على منصة حِصّتي.`,
         phone: cleanPhone,
         email: cleanEmail,
@@ -252,6 +287,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       phone: cleanPhone,
       role: data.role,
       name: cleanName,
+      avatarUrl: avatarUrl,
+      governorate: data.governorate || 'القاهرة',
+      area: data.area || '',
       profileData,
       emailVerified: false,
     };
@@ -276,12 +314,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user?.uid) return;
     try {
       await updateDoc(doc(db, 'users', user.uid), updates);
-      setUser((prev) => prev ? { ...prev, ...updates, profileData: { ...prev.profileData, ...updates } } : null);
+      
+      // If user is teacher, sync updates to tutors collection as well
+      if (user.role === 'teacher') {
+        const tutorUpdates: any = {};
+        if (updates.name) tutorUpdates.name = updates.name;
+        if (updates.avatarUrl !== undefined) tutorUpdates.avatarUrl = updates.avatarUrl;
+        if (updates.phone) tutorUpdates.phone = updates.phone;
+        if (updates.governorate) tutorUpdates.governorate = updates.governorate;
+        if (updates.area) tutorUpdates.area = updates.area;
+        if (updates.subject) tutorUpdates.subject = updates.subject;
+        if (Object.keys(tutorUpdates).length > 0) {
+          await setDoc(doc(db, 'tutors', user.uid), tutorUpdates, { merge: true });
+        }
+      }
+
+      // Update Firebase auth user if name or avatar changed
+      if (auth.currentUser && (updates.name || updates.avatarUrl)) {
+        await updateProfile(auth.currentUser, {
+          displayName: updates.name || auth.currentUser.displayName,
+          photoURL: updates.avatarUrl !== undefined ? updates.avatarUrl : auth.currentUser.photoURL
+        });
+      }
+
+      setUser((prev) => prev ? { 
+        ...prev, 
+        ...updates, 
+        profileData: { ...prev.profileData, ...updates } 
+      } : null);
+
       if (user) {
-        localStorage.setItem(LOCAL_STORAGE_SESSION_KEY, JSON.stringify({ ...user, ...updates }));
+        localStorage.setItem(LOCAL_STORAGE_SESSION_KEY, JSON.stringify({ 
+          ...user, 
+          ...updates, 
+          profileData: { ...(user.profileData || {}), ...updates } 
+        }));
       }
     } catch (err) {
       console.error('Update profile error:', err);
+      throw err;
     }
   };
 

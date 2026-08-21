@@ -17,12 +17,18 @@ import {
   EyeOff,
   AlertCircle,
   Send,
-  ExternalLink
+  ExternalLink,
+  Camera,
+  UploadCloud,
+  X as CloseIcon,
+  Trash2
 } from 'lucide-react';
 import { AccountRole } from '../types';
 import { SUBJECTS_DATA } from '../data/mockData';
 import { LocationSelector } from '../components/common/LocationSelector';
 import { useAuth } from '../lib/AuthContext';
+import { getCleanAvatarUrl, optimizeProfileImage } from '../lib/avatarHelper';
+import { findStudentByCodeOrPhone } from '../lib/parentStudentService';
 
 interface SignupPageProps {
   initialRole?: AccountRole;
@@ -45,6 +51,8 @@ export const SignupPage: React.FC<SignupPageProps> = ({
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [phone, setPhone] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState('');
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [governorate, setGovernorate] = useState('القاهرة');
   const [area, setArea] = useState('مدينة نصر');
   
@@ -65,6 +73,31 @@ export const SignupPage: React.FC<SignupPageProps> = ({
   const handleStep1Select = (selected: AccountRole) => {
     setRole(selected);
     setStep(2);
+  };
+
+  /**
+   * Handle Photo Upload during Signup
+   */
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setErrorMessage('يرجى اختيار ملف صورة صالح (JPEG أو PNG).');
+      return;
+    }
+
+    setIsUploadingPhoto(true);
+    setErrorMessage('');
+
+    try {
+      const compressed = await optimizeProfileImage(file, 400);
+      setAvatarUrl(compressed);
+      setIsUploadingPhoto(false);
+    } catch (err: any) {
+      setIsUploadingPhoto(false);
+      setErrorMessage(err.message || 'حدث خطأ أثناء معالجة الصورة.');
+    }
   };
 
   /**
@@ -92,6 +125,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({
         role,
         name: name.trim(),
         phone: phone.trim(),
+        avatarUrl: avatarUrl.trim(),
         governorate,
         area,
         grade: role === 'student' ? grade : undefined,
@@ -280,6 +314,51 @@ export const SignupPage: React.FC<SignupPageProps> = ({
 
             <form onSubmit={handleSubmitRegistration} className="space-y-4">
               
+              {/* Profile Photo Upload (Optional with live preview and default fallback) */}
+              <div className="p-4 bg-gray-50/80 border border-gray-200 rounded-2xl flex flex-col sm:flex-row items-center gap-4">
+                <div className="relative shrink-0">
+                  <img
+                    src={getCleanAvatarUrl(avatarUrl, role, name)}
+                    alt="معاينة الصورة"
+                    className="w-16 h-16 sm:w-18 sm:h-18 rounded-2xl object-cover border-2 border-white ring-2 ring-blue-100 shadow-xs bg-white"
+                  />
+                  {avatarUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setAvatarUrl('')}
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center cursor-pointer shadow-xs"
+                      title="إزالة الصورة"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex-1 text-center sm:text-right space-y-1">
+                  <div className="flex items-center justify-center sm:justify-start gap-2">
+                    <span className="text-xs font-bold text-gray-800">الصورة الشخصية</span>
+                    <span className="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full font-bold">اختياري</span>
+                  </div>
+                  <p className="text-[11px] text-gray-500">
+                    يمكنك رفع صورتك الآن أو تركها لتطبيق الصورة الرمزية التلقائية.
+                  </p>
+                  
+                  <div className="pt-1">
+                    <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-blue-50 text-[#2563EB] border border-blue-200 rounded-xl text-xs font-bold cursor-pointer transition-all shadow-2xs active:scale-95">
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>{isUploadingPhoto ? 'جاري التحميل...' : avatarUrl ? 'تغيير الصورة' : 'رفع صورة من جهازك'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePhotoSelect}
+                        disabled={isUploadingPhoto}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
+
               {/* Full Name */}
               <div>
                 <label className="block text-xs font-bold text-[#1F2937] mb-1.5">

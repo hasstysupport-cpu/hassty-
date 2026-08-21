@@ -88,12 +88,39 @@
         "lastPaymentDate": { "type": "string" }
       },
       "required": ["id", "teacherId", "teacherName", "grossRevenueEGP", "commissionDueEGP", "paymentStatus"]
+    },
+    "ParentLinkRequest": {
+      "title": "ParentLinkRequest",
+      "description": "Linking request between a parent account and student with approval workflow",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "parentId": { "type": "string" },
+        "parentName": { "type": "string" },
+        "parentPhone": { "type": "string" },
+        "parentEmail": { "type": "string" },
+        "parentAvatarUrl": { "type": "string" },
+        "studentId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "studentCode": { "type": "string" },
+        "studentGrade": { "type": "string" },
+        "studentAvatarUrl": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "string" },
+        "respondedAt": { "type": "string" },
+        "declineReason": { "type": "string" }
+      },
+      "required": ["id", "parentId", "parentName", "studentId", "studentCode", "status", "createdAt"]
     }
   },
   "firestore": {
     "users": {
       "schema": "User",
       "description": "Collection of all student, teacher, parent, and admin accounts"
+    },
+    "parent_link_requests": {
+      "schema": "ParentLinkRequest",
+      "description": "Requests from parents to link their accounts with student profiles"
     },
     "tutors": {
       "schema": "User",

@@ -15,9 +15,12 @@ import {
   LogOut,
   ChevronLeft,
   Home,
-  Sparkles
+  Sparkles,
+  User
 } from 'lucide-react';
 import { AccountRole } from '../../types';
+import { useAuth } from '../../lib/AuthContext';
+import { getCleanAvatarUrl } from '../../lib/avatarHelper';
 
 interface SidebarLinkItem {
   name: string;
@@ -40,10 +43,13 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
   onNavigate,
   onLogout,
 }) => {
+  const { user } = useAuth();
+
   // Navigation lists per role
   const studentLinks: SidebarLinkItem[] = [
     { name: 'الرئيسية', path: '/student/dashboard', icon: LayoutDashboard },
     { name: 'كارنيه الـ QR', path: '/student/qr-card', icon: QrCode, badge: 'رقمي' },
+    { name: 'الملف الشخصي', path: '/student/profile', icon: UserCog, badge: 'تعديل' },
     { name: 'مدرسيني', path: '/student/tutors', icon: Users },
     { name: 'حجز حصة', path: '/student/book', icon: Calendar },
     { name: 'المدفوعات', path: '/student/payments', icon: Receipt },
@@ -70,6 +76,9 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
   const currentLinks =
     currentRole === 'student' ? studentLinks : currentRole === 'parent' ? parentLinks : teacherLinks;
 
+  const displayName = user?.name || (currentRole === 'student' ? 'طالب حِصّتي' : currentRole === 'parent' ? 'ولي أمر حِصّتي' : 'معلم حِصّتي');
+  const avatarSrc = getCleanAvatarUrl(user?.avatarUrl || user?.profileData?.avatarUrl, currentRole, displayName);
+
   return (
     <>
       {/* Desktop Sidebar */}
@@ -78,26 +87,15 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
         {/* Navigation list */}
         <div className="space-y-6">
           
-          {/* Role Header Banner */}
+          {/* Role Header Banner with Avatar */}
           <div className="p-3.5 bg-[#F8FAFF] border border-[#E5E7EB] rounded-2xl flex items-center gap-3">
-            <div
-              className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 ${
-                currentRole === 'student'
-                  ? 'bg-[#2563EB]'
-                  : currentRole === 'parent'
-                  ? 'bg-[#1E3A8A]'
-                  : 'bg-emerald-600'
-              }`}
-            >
-              {currentRole === 'student' ? (
-                <QrCode className="w-5 h-5" />
-              ) : currentRole === 'parent' ? (
-                <ShieldCheck className="w-5 h-5" />
-              ) : (
-                <Users className="w-5 h-5" />
-              )}
-            </div>
-            <div>
+            <img
+              src={avatarSrc}
+              alt={displayName}
+              className="w-11 h-11 rounded-xl object-cover border border-white ring-2 ring-blue-100 shadow-2xs shrink-0 bg-white"
+              referrerPolicy="no-referrer"
+            />
+            <div className="min-w-0 flex-1">
               <span className="text-[11px] font-bold text-[#6B7280] block">
                 {currentRole === 'student'
                   ? 'حساب طالب'
@@ -105,12 +103,8 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                   ? 'حساب ولي أمر'
                   : 'حساب معلم معتمد'}
               </span>
-              <h3 className="text-xs font-black text-[#1E3A8A]">
-                {currentRole === 'student'
-                  ? 'زياد أحمد (3 ثانوي)'
-                  : currentRole === 'parent'
-                  ? 'أحمد عبد الله'
-                  : 'أ. حسام إبراهيم'}
+              <h3 className="text-xs font-black text-[#1E3A8A] truncate">
+                {displayName}
               </h3>
             </div>
           </div>

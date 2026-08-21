@@ -73,7 +73,7 @@ export function subscribeToUsers(callback: (users: AdminUserAccount[]) => void) 
     callback(accounts);
   }, (err) => {
     console.error('Firestore subscribeToUsers error:', err);
-    callback(INITIAL_ADMIN_ACCOUNTS);
+    callback([]);
   });
 }
 
@@ -150,6 +150,27 @@ export async function dbUpdateAccountBadge(accountId: string, newBadge: AccountB
     badge: newBadge,
     isVerified: newBadge === 'verified'
   });
+}
+
+export async function dbUpdateAccountFullProfile(accountId: string, updates: Partial<AdminUserAccount>) {
+  const ref = doc(db, USERS_COLLECTION, accountId);
+  await updateDoc(ref, updates);
+
+  // If role is teacher, also mirror relevant fields in tutors collection
+  if (updates.role === 'teacher' || updates.subject || updates.name || updates.avatarUrl) {
+    const tutorRef = doc(db, 'tutors', accountId);
+    const tutorUpdates: any = {};
+    if (updates.name) tutorUpdates.name = updates.name;
+    if (updates.phone) tutorUpdates.phone = updates.phone;
+    if (updates.subject) tutorUpdates.subject = updates.subject;
+    if (updates.governorate) tutorUpdates.governorate = updates.governorate;
+    if (updates.area) tutorUpdates.area = updates.area;
+    if (updates.avatarUrl !== undefined) tutorUpdates.avatarUrl = updates.avatarUrl;
+    if (updates.badge) tutorUpdates.isVerified = updates.badge === 'verified';
+    if (Object.keys(tutorUpdates).length > 0) {
+      await setDoc(tutorRef, tutorUpdates, { merge: true });
+    }
+  }
 }
 
 export async function dbToggleAccountStatus(accountId: string, currentStatus: 'active' | 'suspended') {
