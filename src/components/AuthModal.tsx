@@ -1,14 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, GraduationCap, ShieldAlert, Presentation, CheckCircle2, User, Lock, Phone, MapPin, BookOpen, ArrowLeft } from 'lucide-react';
+import {
+  X,
+  GraduationCap,
+  ShieldAlert,
+  Presentation,
+  CheckCircle2,
+  User,
+  Lock,
+  Phone,
+  MapPin,
+  BookOpen,
+  ArrowLeft,
+  Mail,
+  AlertCircle,
+  Eye,
+  EyeOff
+} from 'lucide-react';
 import { AccountRole } from '../types';
 import { EGYPT_GOVERNORATES, SUBJECTS_DATA } from '../data/mockData';
+import { useAuth } from '../lib/AuthContext';
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialMode?: 'login' | 'register';
   initialRole?: AccountRole;
+  onSuccess?: (role: AccountRole) => void;
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({
@@ -16,14 +34,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onClose,
   initialMode = 'register',
   initialRole = 'student',
+  onSuccess,
 }) => {
+  const { loginUser, signupUser } = useAuth();
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
   const [role, setRole] = useState<AccountRole>(initialRole);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   // Form State
   const [formData, setFormData] = useState({
     fullName: '',
+    email: '',
     phone: '',
     password: '',
     governorate: 'القاهرة',
@@ -31,20 +55,62 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     subject: 'الرياضيات', // for teacher
   });
 
-  React.useEffect(() => {
+  useEffect(() => {
     setMode(initialMode);
     if (initialRole) setRole(initialRole);
     setIsSuccess(false);
+    setErrorMessage('');
+    setIsLoading(false);
   }, [initialMode, initialRole, isOpen]);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSuccess(true);
-    setTimeout(() => {
-      // simulate auto-close or redirect
-    }, 2000);
+    setErrorMessage('');
+    setIsLoading(true);
+
+    try {
+      if (mode === 'login') {
+        const session = await loginUser(formData.email, formData.password);
+        setIsLoading(false);
+        setIsSuccess(true);
+        if (onSuccess) onSuccess(session.role);
+        setTimeout(() => {
+          onClose();
+        }, 1500);
+      } else {
+        const session = await signupUser({
+          email: formData.email,
+          password: formData.password,
+          role,
+          name: formData.fullName,
+          phone: formData.phone,
+          governorate: formData.governorate,
+          subject: role === 'teacher' ? formData.subject : undefined,
+        });
+        setIsLoading(false);
+        setIsSuccess(true);
+        if (onSuccess) onSuccess(session.role);
+        setTimeout(() => {
+          onClose();
+        }, 1500);
+      }
+    } catch (err: any) {
+      setIsLoading(false);
+      const code = err?.code || '';
+      if (code === 'auth/email-already-in-use') {
+        setErrorMessage('هذا البريد الإلكتروني مسجل بالفعل. يرجى تسجيل الدخول.');
+      } else if (code === 'auth/invalid-credential' || code === 'auth/user-not-found' || code === 'auth/wrong-password') {
+        setErrorMessage('البريد الإلكتروني أو كلمة المرور غير صحيحة.');
+      } else if (code === 'auth/weak-password') {
+        setErrorMessage('كلمة المرور يجب ألا تقل عن 6 أحرف أو أرقام.');
+      } else if (code === 'auth/invalid-email') {
+        setErrorMessage('صيغة البريد الإلكتروني غير صالحة.');
+      } else {
+        setErrorMessage(err.message || 'حدث خطأ. يرجى التأكد من البيانات والمحاولة مجدداً.');
+      }
+    }
   };
 
   return createPortal(
@@ -58,7 +124,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               {mode === 'login' ? 'تسجيل الدخول إلى حصتي' : 'إنشاء حساب جديد'}
             </h2>
             <p className="text-xs text-[#6B7280]">
-              {mode === 'login' ? 'أدخل رقم هاتفك وكلمة المرور' : 'اختر نوع الحساب وأكمل بياناتك في دقيقة'}
+              {mode === 'login' ? 'أدخل بريدك الإلكتروني وكلمة المرور' : 'اختر نوع الحساب وأكمل بياناتك للبدء'}
             </p>
           </div>
 
@@ -128,18 +194,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         {/* Form Body */}
         <div className="p-6">
+          {errorMessage && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-xs font-bold text-red-700 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
           {isSuccess ? (
             <div className="py-8 text-center space-y-3">
               <div className="w-14 h-14 rounded-full bg-emerald-100 text-[#10B981] mx-auto flex items-center justify-center">
                 <CheckCircle2 className="w-8 h-8" />
               </div>
               <h3 className="text-lg font-bold text-[#1E3A8A]">
-                {mode === 'login' ? 'تم تسجيل الدخول بنجاح!' : 'تم إنشاء الحساب بنجاح!'}
+                {mode === 'login' ? 'تم تسجيل الدخول بنجاح!' : 'تم إنشاء الحساب وإرسال رابط التحقق!'}
               </h3>
               <p className="text-xs text-[#6B7280]">
                 {role === 'student' && 'تم تجهيز كود الـ QR الرقمي الخاص بك للحصص.'}
-                {role === 'parent' && 'تم ربط الحساب برقم هاتف وتفعيل إشعارات الواتساب.'}
-                {role === 'teacher' && 'تم تفعيل حسابك ويمكنك الآن إضافة المجموعات والمواعيد.'}
+                {role === 'parent' && 'تم تفعيل حساب ولي الأمر بنجاح.'}
+                {role === 'teacher' && 'تم تفعيل حسابك كمعلم في منصة حِصّتي.'}
               </p>
               <button
                 onClick={onClose}
@@ -177,27 +250,45 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
               )}
 
-              {/* Phone number */}
+              {/* Email Address */}
               <div>
                 <label className="block text-xs font-semibold text-[#1F2937] mb-1.5">
-                  رقم الهاتف (واتساب في مصر)
+                  البريد الإلكتروني
                 </label>
                 <div className="relative">
-                  <Phone className="w-4 h-4 text-gray-400 absolute right-3 top-3 pointer-events-none" />
+                  <Mail className="w-4 h-4 text-gray-400 absolute right-3 top-3 pointer-events-none" />
                   <input
-                    type="tel"
+                    type="email"
                     required
-                    placeholder="01012345678"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    placeholder="name@example.com"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     className="w-full pr-9 pl-3 py-2 text-xs sm:text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:outline-none focus:border-[#2563EB] text-left font-mono"
                     dir="ltr"
                   />
                 </div>
-                <span className="text-[10px] text-gray-400 mt-1 block">
-                  يستخدم لتأكيد الحساب وإرسال إشعارات الحضور
-                </span>
               </div>
+
+              {/* Phone number (Register only) */}
+              {mode === 'register' && (
+                <div>
+                  <label className="block text-xs font-semibold text-[#1F2937] mb-1.5">
+                    رقم الهاتف المحمول
+                  </label>
+                  <div className="relative">
+                    <Phone className="w-4 h-4 text-gray-400 absolute right-3 top-3 pointer-events-none" />
+                    <input
+                      type="tel"
+                      required
+                      placeholder="01012345678"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      className="w-full pr-9 pl-3 py-2 text-xs sm:text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:outline-none focus:border-[#2563EB] text-left font-mono"
+                      dir="ltr"
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Governorate (Register only) */}
               {mode === 'register' && (
@@ -219,25 +310,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       ))}
                     </select>
                   </div>
-                </div>
-              )}
-
-              {/* Role specific inputs */}
-              {mode === 'register' && role === 'parent' && (
-                <div>
-                  <label className="block text-xs font-semibold text-[#1F2937] mb-1.5">
-                    كود الابن للربط (اختياري الآن)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="مثال: HST-8921"
-                    value={formData.childCode}
-                    onChange={(e) => setFormData({ ...formData, childCode: e.target.value })}
-                    className="w-full px-3 py-2 text-xs sm:text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:outline-none focus:border-[#2563EB] font-mono"
-                  />
-                  <span className="text-[10px] text-gray-400 mt-1 block">
-                    يمكنك ربطه لاحقاً من داخل لوحة التحكم
-                  </span>
                 </div>
               )}
 
@@ -271,24 +343,38 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 <div className="relative">
                   <Lock className="w-4 h-4 text-gray-400 absolute right-3 top-3 pointer-events-none" />
                   <input
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     required
                     placeholder="••••••••"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="w-full pr-9 pl-3 py-2 text-xs sm:text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:outline-none focus:border-[#2563EB] text-left"
+                    className="w-full pr-9 pl-10 py-2 text-xs sm:text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:outline-none focus:border-[#2563EB] text-left"
                     dir="ltr"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute left-3 top-2.5 text-gray-400 hover:text-gray-600"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
 
               {/* Submit Button */}
               <button
                 type="submit"
-                className="w-full py-3 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-sm rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer mt-2"
+                disabled={isLoading}
+                className="w-full py-3 bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-50 text-white font-bold text-sm rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer mt-2"
                 id="btn-auth-submit"
               >
-                <span>{mode === 'login' ? 'تسجيل الدخول' : 'تأكيد وإنشاء الحساب'}</span>
+                <span>
+                  {isLoading
+                    ? 'جاري التحقق والتنفيذ...'
+                    : mode === 'login'
+                    ? 'تسجيل الدخول'
+                    : 'تأكيد وإنشاء الحساب'}
+                </span>
                 <ArrowLeft className="w-4 h-4" />
               </button>
 
@@ -299,7 +385,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     ليس لديك حساب؟{' '}
                     <button
                       type="button"
-                      onClick={() => setMode('register')}
+                      onClick={() => {
+                        setMode('register');
+                        setErrorMessage('');
+                      }}
                       className="font-bold text-[#2563EB] hover:underline cursor-pointer"
                     >
                       أنشئ حساباً جديداً
@@ -310,7 +399,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     لديك حساب بالفعل؟{' '}
                     <button
                       type="button"
-                      onClick={() => setMode('login')}
+                      onClick={() => {
+                        setMode('login');
+                        setErrorMessage('');
+                      }}
                       className="font-bold text-[#2563EB] hover:underline cursor-pointer"
                     >
                       تسجيل الدخول

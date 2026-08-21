@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSEO } from '../lib/useSEO';
 import {
   Star,
@@ -19,10 +19,11 @@ import {
   Mail,
   GraduationCap
 } from 'lucide-react';
-import { SAMPLE_TUTORS } from '../data/mockData';
 import { TutorProfile } from '../types';
 import { Badge } from '../components/common/Badge';
 import { BookingModal } from '../components/BookingModal';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 interface TeacherProfilePageProps {
   tutorId: string;
@@ -42,9 +43,73 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
   const [activeTab, setActiveTab] = useState<'bio' | 'reviews' | 'slots'>('bio');
   const [copiedCode, setCopiedCode] = useState(false);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [tutor, setTutor] = useState<TutorProfile>({
+    id: tutorId || 'tutor-1',
+    name: 'معلم معتمد',
+    title: 'معلم أول معتمد بالمنصة',
+    subject: 'عام',
+    governorate: 'القاهرة',
+    area: 'مدينة نصر',
+    rating: 5.0,
+    reviewsCount: 0,
+    studentsCount: 0,
+    pricePerSession: 100,
+    isVerified: true,
+    joinCode: (tutorId || 'TUTOR').substring(0, 6).toUpperCase(),
+    levels: ['المرحلة الثانوية', 'المرحلة الإعدادية'],
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
+    bio: 'معلم معتمد يقدم شرحاً تفاعلياً ومتابعة دورية للواجبات والدرجات.',
+    experienceYears: 5,
+    centers: ['السنتر الرئيسي'],
+    phone: '',
+    email: '',
+    education: 'مؤهل تربوي معتمد',
+    accountStatus: 'active',
+    reviews: [],
+    availableSlots: [],
+  });
 
-  // Find tutor by id, or default to first tutor
-  const tutor = SAMPLE_TUTORS.find((t) => t.id === tutorId) || SAMPLE_TUTORS[0];
+  useEffect(() => {
+    async function fetchTutor() {
+      if (!tutorId) return;
+      try {
+        const userDocRef = doc(db, 'users', tutorId);
+        const userSnap = await getDoc(userDocRef);
+        if (userSnap.exists()) {
+          const data = userSnap.data();
+          setTutor({
+            id: userSnap.id,
+            name: data.name || 'معلم معتمد',
+            title: data.profileData?.title || `معلم ${data.profileData?.subject || ''}`,
+            subject: data.profileData?.subject || 'عام',
+            governorate: data.governorate || 'القاهرة',
+            area: data.area || '',
+            rating: data.profileData?.rating || 5.0,
+            reviewsCount: data.profileData?.reviewsCount || 0,
+            studentsCount: data.profileData?.studentsCount || 0,
+            pricePerSession: data.profileData?.pricePerSession || 100,
+            isVerified: data.profileData?.isVerified ?? true,
+            joinCode: data.profileData?.joinCode || userSnap.id.substring(0, 6).toUpperCase(),
+            levels: data.profileData?.levels || ['المرحلة الثانوية', 'المرحلة الإعدادية'],
+            avatarUrl: data.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
+            bio: data.profileData?.bio || `معلم معتمد لمادة ${data.profileData?.subject || ''}`,
+            experienceYears: data.profileData?.experienceYears || 5,
+            centers: data.profileData?.centers || [],
+            phone: data.phone || '',
+            email: data.email || '',
+            education: data.profileData?.education || 'مؤهل تربوي معتمد',
+            accountStatus: 'active',
+            reviews: [],
+            availableSlots: [],
+          });
+        }
+      } catch (err) {
+        console.error('Error loading tutor profile:', err);
+      }
+    }
+
+    fetchTutor();
+  }, [tutorId]);
 
   useSEO({
     title: `${tutor.name} - مدرس ${tutor.subject} في ${tutor.governorate}`,
@@ -54,7 +119,7 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({
   });
 
   // Related tutors
-  const relatedTutors = SAMPLE_TUTORS.filter((t) => t.id !== tutor.id).slice(0, 3);
+  const [relatedTutors, setRelatedTutors] = useState<TutorProfile[]>([]);
 
   const handleCopyCode = () => {
     navigator.clipboard?.writeText(tutor.joinCode);

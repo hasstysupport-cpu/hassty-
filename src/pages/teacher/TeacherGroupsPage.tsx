@@ -18,13 +18,21 @@ import {
   Percent,
   Check
 } from 'lucide-react';
-import { MOCK_TEACHER_GROUPS, MOCK_TEACHER_STUDENTS, ALL_EGYPT_GRADES } from '../../data/mockData';
 import { StudentGroup, GroupScheduleSlot, PricingBillingType, TeacherStudentItem } from '../../types';
 import { Badge } from '../../components/common/Badge';
 import { Modal } from '../../components/common/Modal';
+import { calculateTeacherCommission, formatTimeArabic } from '../../lib/scheduleSync';
 import { dbService } from '../../lib/supabaseService';
 import { isSupabaseConfigured } from '../../lib/supabase';
-import { calculateTeacherCommission, formatTimeArabic } from '../../lib/scheduleSync';
+
+const ALL_EGYPT_GRADES = [
+  'الصف الأول الإعدادي',
+  'الصف الثاني الإعدادي',
+  'الصف الثالث الإعدادي',
+  'الصف الأول الثانوي',
+  'الصف الثاني الثانوي',
+  'الصف الثالث الثانوي',
+];
 
 const DAYS_OF_WEEK = [
   { eng: 'Saturday', ar: 'السبت' },
@@ -37,8 +45,8 @@ const DAYS_OF_WEEK = [
 ];
 
 export const TeacherGroupsPage: React.FC = () => {
-  const [groups, setGroups] = useState<StudentGroup[]>(MOCK_TEACHER_GROUPS);
-  const [allStudents, setAllStudents] = useState<TeacherStudentItem[]>(MOCK_TEACHER_STUDENTS);
+  const [groups, setGroups] = useState<StudentGroup[]>([]);
+  const [allStudents, setAllStudents] = useState<TeacherStudentItem[]>([]);
   
   // Selected roster modal & transfer state
   const [selectedGroupRoster, setSelectedGroupRoster] = useState<StudentGroup | null>(null);

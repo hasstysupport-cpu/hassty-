@@ -16,17 +16,21 @@ import {
   HelpCircle,
   Database
 } from 'lucide-react';
-import { MOCK_ATTENDANCE_RECORDS, MOCK_PARENT_CHILDREN } from '../../data/mockData';
 import { Badge } from '../../components/common/Badge';
 import { Modal } from '../../components/common/Modal';
-import { dbService } from '../../lib/supabaseService';
-import { isSupabaseConfigured } from '../../lib/supabase';
+import { useAuth } from '../../lib/AuthContext';
 
 export const ParentAttendancePage: React.FC = () => {
-  const [selectedChildId, setSelectedChildId] = useState(MOCK_PARENT_CHILDREN[0].id);
+  const { user } = useAuth();
+  const [children, setChildren] = useState<any[]>(() => {
+    return user?.profileData?.children || [
+      { id: 'c1', name: 'أحمد', grade: 'الصف الثاني الثانوي', attendanceRate: 100, presentOnTime: 0, presentLate: 0, absentCount: 0 }
+    ];
+  });
+  const [selectedChildId, setSelectedChildId] = useState(children[0]?.id || 'c1');
   const [filterSubject, setFilterSubject] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
-  const [realRecords, setRealRecords] = useState<any[]>(MOCK_ATTENDANCE_RECORDS);
+  const [records, setRecords] = useState<any[]>([]);
   
   // Modals for Dispute & Makeup Session
   const [disputeRecord, setDisputeRecord] = useState<any | null>(null);
@@ -38,29 +42,19 @@ export const ParentAttendancePage: React.FC = () => {
   const [makeupGroup, setMakeupGroup] = useState('مجموعة الأحد والأربعاء 04:30 م');
   const [makeupSuccess, setMakeupSuccess] = useState(false);
 
-  const currentChild = MOCK_PARENT_CHILDREN.find((c) => c.id === selectedChildId) || MOCK_PARENT_CHILDREN[0];
+  const currentChild = children.find((c) => c.id === selectedChildId) || children[0] || {
+    name: 'الطالب',
+    attendanceRate: 100,
+    presentOnTime: 0,
+    presentLate: 0,
+    absentCount: 0
+  };
 
-  // Fetch real records from Supabase if configured
-  useEffect(() => {
-    async function loadRealData() {
-      if (isSupabaseConfigured) {
-        const liveData = await dbService.getAttendanceRecords();
-        if (liveData && liveData.length > 0) {
-          setRealRecords([...liveData, ...MOCK_ATTENDANCE_RECORDS]);
-        }
-      }
-    }
-    loadRealData();
-  }, [selectedChildId]);
-
-  const filteredRecords = realRecords.filter((rec) => {
+  const filteredRecords = records.filter((rec) => {
     if (filterSubject !== 'all' && rec.subject !== filterSubject) return false;
     if (filterStatus !== 'all' && rec.status !== filterStatus) return false;
     return true;
   });
-
-  const presentCount = MOCK_ATTENDANCE_RECORDS.filter((r) => r.status === 'present').length;
-  const absentCount = MOCK_ATTENDANCE_RECORDS.filter((r) => r.status === 'absent').length;
 
   const handleDisputeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,48 +93,50 @@ export const ParentAttendancePage: React.FC = () => {
         </div>
 
         {/* Child Switcher */}
-        <div className="flex items-center gap-2">
-          {MOCK_PARENT_CHILDREN.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => setSelectedChildId(c.id)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                c.id === currentChild.id
-                  ? 'bg-[#2563EB] text-white shadow-xs'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              {c.name}
-            </button>
-          ))}
-        </div>
+        {children.length > 1 && (
+          <div className="flex items-center gap-2">
+            {children.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => setSelectedChildId(c.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  c.id === currentChild.id
+                    ? 'bg-[#2563EB] text-white shadow-xs'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {c.name}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Attendance Stats Cards with Time Window */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="bg-white border border-gray-200 rounded-3xl p-5 space-y-1">
           <span className="text-xs font-bold text-[#6B7280]">نسبة الالتزام الكلية</span>
-          <p className="text-2xl font-black text-[#10B981]">{currentChild.attendanceRate}%</p>
+          <p className="text-2xl font-black text-[#10B981]">{currentChild.attendanceRate || 100}%</p>
           <div className="w-full bg-gray-100 h-2 rounded-full mt-2 overflow-hidden">
-            <div className="bg-[#10B981] h-full rounded-full" style={{ width: `${currentChild.attendanceRate}%` }} />
+            <div className="bg-[#10B981] h-full rounded-full" style={{ width: `${currentChild.attendanceRate || 100}%` }} />
           </div>
         </div>
 
         <div className="bg-white border border-gray-200 rounded-3xl p-5 space-y-1">
           <span className="text-xs font-bold text-[#6B7280]">حاضر بالموعد (0-15 د)</span>
-          <p className="text-2xl font-black text-[#10B981]">{currentChild.presentOnTime} حصة</p>
+          <p className="text-2xl font-black text-[#10B981]">{currentChild.presentOnTime || 0} حصة</p>
           <span className="text-[11px] text-emerald-700 font-bold">أخضر ✅</span>
         </div>
 
         <div className="bg-white border border-gray-200 rounded-3xl p-5 space-y-1">
           <span className="text-xs font-bold text-[#6B7280]">حاضر متأخر (15-50%)</span>
-          <p className="text-2xl font-black text-amber-600">{currentChild.presentLate} حصص</p>
+          <p className="text-2xl font-black text-amber-600">{currentChild.presentLate || 0} حصص</p>
           <span className="text-[11px] text-amber-700 font-bold">برتقالي ⏰</span>
         </div>
 
         <div className="bg-white border border-gray-200 rounded-3xl p-5 space-y-1">
           <span className="text-xs font-bold text-[#6B7280]">مرات الغياب المسجلة</span>
-          <p className="text-2xl font-black text-[#EF4444]">{currentChild.absentCount} حصة</p>
+          <p className="text-2xl font-black text-[#EF4444]">{currentChild.absentCount || 0} حصة</p>
           <span className="text-[11px] text-red-600 font-bold">متاح طلب تعويض</span>
         </div>
       </div>
@@ -175,76 +171,86 @@ export const ParentAttendancePage: React.FC = () => {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-right border-collapse text-xs">
-            <thead>
-              <tr className="border-b border-gray-200 text-[#6B7280] font-bold">
-                <th className="py-3 px-3">التاريخ والوقت</th>
-                <th className="py-3 px-3">المادة والمعلم</th>
-                <th className="py-3 px-3">السنتر / المقر</th>
-                <th className="py-3 px-3">حالة الحضور والنافذة</th>
-                <th className="py-3 px-3">ملاحظات وواجب المعلم</th>
-                <th className="py-3 px-3 text-center">إجراءات</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filteredRecords.map((rec) => (
-                <tr key={rec.id} className="hover:bg-gray-50/70 transition-colors">
-                  <td className="py-3.5 px-3">
-                    <div className="font-bold text-[#1F2937]">{rec.date}</div>
-                    <div className="text-[11px] text-gray-500 font-mono">{rec.time}</div>
-                  </td>
-                  <td className="py-3.5 px-3">
-                    <div className="font-bold text-[#1E3A8A]">{rec.subject}</div>
-                    <div className="text-[11px] text-[#6B7280]">{rec.tutorName}</div>
-                  </td>
-                  <td className="py-3.5 px-3 text-[#4B5563]">
-                    {rec.center}
-                  </td>
-                  <td className="py-3.5 px-3">
-                    {rec.status === 'present' ? (
-                      rec.timeWindowStatus === 'late' ? (
-                        <Badge variant="warning" size="sm">حاضر متأخر ⏰</Badge>
-                      ) : (
-                        <Badge variant="success" size="sm">حاضر في الموعد ✅</Badge>
-                      )
-                    ) : (
-                      <Badge variant="danger" size="sm">غائب ❌</Badge>
-                    )}
-                  </td>
-                  <td className="py-3.5 px-3 max-w-xs">
-                    {rec.teacherNotes ? (
-                      <span className="text-[11px] text-[#1E3A8A] bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-100 block">
-                        {rec.teacherNotes}
-                      </span>
-                    ) : (
-                      <span className="text-[11px] text-gray-400">—</span>
-                    )}
-                  </td>
-                  <td className="py-3.5 px-3 text-center">
-                    <div className="flex items-center justify-center gap-1.5">
-                      {rec.status === 'absent' ? (
-                        <button
-                          onClick={() => setMakeupRecord(rec)}
-                          className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-[11px] font-bold cursor-pointer transition-colors"
-                        >
-                          طلب تعويض
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => setDisputeRecord(rec)}
-                          className="px-2.5 py-1 bg-gray-50 hover:bg-gray-100 text-gray-600 border border-gray-200 rounded-lg text-[11px] font-bold cursor-pointer transition-colors"
-                        >
-                          تظلم حضور
-                        </button>
-                      )}
-                    </div>
-                  </td>
+        {filteredRecords.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-right border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-gray-200 text-[#6B7280] font-bold">
+                  <th className="py-3 px-3">التاريخ والوقت</th>
+                  <th className="py-3 px-3">المادة والمعلم</th>
+                  <th className="py-3 px-3">السنتر / المقر</th>
+                  <th className="py-3 px-3">حالة الحضور والنافذة</th>
+                  <th className="py-3 px-3">ملاحظات وواجب المعلم</th>
+                  <th className="py-3 px-3 text-center">إجراءات</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredRecords.map((rec) => (
+                  <tr key={rec.id} className="hover:bg-gray-50/70 transition-colors">
+                    <td className="py-3.5 px-3">
+                      <div className="font-bold text-[#1F2937]">{rec.date}</div>
+                      <div className="text-[11px] text-gray-500 font-mono">{rec.time}</div>
+                    </td>
+                    <td className="py-3.5 px-3">
+                      <div className="font-bold text-[#1E3A8A]">{rec.subject}</div>
+                      <div className="text-[11px] text-[#6B7280]">{rec.tutorName}</div>
+                    </td>
+                    <td className="py-3.5 px-3 text-[#4B5563]">
+                      {rec.center}
+                    </td>
+                    <td className="py-3.5 px-3">
+                      {rec.status === 'present' ? (
+                        rec.timeWindowStatus === 'late' ? (
+                          <Badge variant="warning" size="sm">حاضر متأخر ⏰</Badge>
+                        ) : (
+                          <Badge variant="success" size="sm">حاضر في الموعد ✅</Badge>
+                        )
+                      ) : (
+                        <Badge variant="danger" size="sm">غائب ❌</Badge>
+                      )}
+                    </td>
+                    <td className="py-3.5 px-3 max-w-xs">
+                      {rec.teacherNotes ? (
+                        <span className="text-[11px] text-[#1E3A8A] bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-100 block">
+                          {rec.teacherNotes}
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-gray-400">—</span>
+                      )}
+                    </td>
+                    <td className="py-3.5 px-3 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        {rec.status === 'absent' ? (
+                          <button
+                            onClick={() => setMakeupRecord(rec)}
+                            className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-[11px] font-bold cursor-pointer transition-colors"
+                          >
+                            طلب تعويض
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => setDisputeRecord(rec)}
+                            className="px-2.5 py-1 bg-gray-50 hover:bg-gray-100 text-gray-600 border border-gray-200 rounded-lg text-[11px] font-bold cursor-pointer transition-colors"
+                          >
+                            تظلم حضور
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="text-center py-12 space-y-2">
+            <div className="w-12 h-12 rounded-2xl bg-gray-100 text-gray-400 mx-auto flex items-center justify-center">
+              <ClipboardCheck className="w-6 h-6" />
+            </div>
+            <p className="text-xs font-bold text-gray-600">لا توجد حصص مسجلة في هذا السجل حالياً</p>
+            <p className="text-[11px] text-gray-400">سيتم تسجيل الحضور تلقائياً فور مسح كود الطالب بالسنتر</p>
+          </div>
+        )}
 
       </div>
 

@@ -10,21 +10,22 @@ import {
   Sparkles,
   Camera
 } from 'lucide-react';
-import { SAMPLE_TUTORS } from '../../data/mockData';
 import { Badge } from '../../components/common/Badge';
+import { useAuth } from '../../lib/AuthContext';
 
 export const TeacherProfileEditPage: React.FC = () => {
-  const defaultTutor = SAMPLE_TUTORS[0];
+  const { user } = useAuth();
 
-  const [name, setName] = useState(defaultTutor.name);
-  const [subject, setSubject] = useState(defaultTutor.subject);
-  const [headline, setHeadline] = useState(defaultTutor.headline);
-  const [bio, setBio] = useState(defaultTutor.bio);
-  const [governorate, setGovernorate] = useState(defaultTutor.governorate);
-  const [area, setArea] = useState(defaultTutor.area);
-  const [experienceYears, setExperienceYears] = useState(defaultTutor.experienceYears);
-  const [pricePerSession, setPricePerSession] = useState(defaultTutor.pricePerSession);
+  const [name, setName] = useState(user?.name || 'أستاذ المادة');
+  const [subject, setSubject] = useState(user?.profileData?.subject || 'الرياضيات');
+  const [headline, setHeadline] = useState(user?.profileData?.headline || 'معلم خبير ومعد للمناهج');
+  const [bio, setBio] = useState(user?.profileData?.bio || 'خبرة أكثر من 10 سنوات في تدريس المنهج المصري والمراجعات النهائية.');
+  const [governorate, setGovernorate] = useState(user?.profileData?.governorate || 'القاهرة');
+  const [area, setArea] = useState(user?.profileData?.area || 'مدينة نصر / مصر الجديدة');
+  const [pricePerSession, setPricePerSession] = useState(user?.profileData?.pricePerSession || 120);
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  const joinCode = user?.profileData?.joinCode || `TCH-${user?.uid?.slice(0, 5) || '101'}`;
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,7 +65,7 @@ export const TeacherProfileEditPage: React.FC = () => {
           <div className="flex flex-col sm:flex-row items-center gap-6 pb-6 border-b border-gray-100">
             <div className="relative">
               <img
-                src={defaultTutor.avatarUrl}
+                src={user?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80'}
                 alt={name}
                 className="w-24 h-24 rounded-3xl object-cover border-2 border-white ring-2 ring-blue-200 shadow-md"
                 referrerPolicy="no-referrer"
@@ -80,7 +81,7 @@ export const TeacherProfileEditPage: React.FC = () => {
 
             <div className="text-center sm:text-right space-y-1 flex-1">
               <h3 className="text-lg font-bold text-[#1E3A8A]">{name}</h3>
-              <p className="text-xs text-[#6B7280]">كود الانضمام المباشر لطلابك: <strong className="font-mono text-[#2563EB]">{defaultTutor.joinCode}</strong></p>
+              <p className="text-xs text-[#6B7280]">كود الانضمام المباشر لطلابك: <strong className="font-mono text-[#2563EB]">{joinCode}</strong></p>
               <Badge variant="success" size="sm" className="mt-1">معلم معتمد وموثق ✓</Badge>
             </div>
           </div>

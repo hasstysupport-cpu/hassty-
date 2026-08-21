@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useSEO } from '../lib/useSEO';
 import {
   Search,
@@ -14,12 +14,15 @@ import {
   QrCode,
   Sparkles,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  GraduationCap
 } from 'lucide-react';
-import { SAMPLE_TUTORS, EGYPT_GOVERNORATES, CITIES_BY_GOVERNORATE, SUBJECTS_DATA } from '../data/mockData';
+import { EGYPT_GOVERNORATES, CITIES_BY_GOVERNORATE, SUBJECTS_DATA } from '../data/mockData';
 import { TutorProfile } from '../types';
 import { Badge } from '../components/common/Badge';
 import { LocationSelector } from '../components/common/LocationSelector';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 interface SearchResultsPageProps {
   initialSubject?: string;
@@ -43,7 +46,59 @@ export const SearchResultsPage: React.FC<SearchResultsPageProps> = ({
   const [selectedType, setSelectedType] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 4;
+  const [tutors, setTutors] = useState<TutorProfile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const itemsPerPage = 6;
+
+  // Fetch real teachers from Firestore
+  useEffect(() => {
+    async function loadTeachers() {
+      setLoading(true);
+      try {
+        const teachersQuery = query(collection(db, 'users'), where('role', '==', 'teacher'));
+        const querySnapshot = await getDocs(teachersQuery);
+        const realTeachers: TutorProfile[] = [];
+
+        querySnapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          realTeachers.push({
+            id: docSnap.id,
+            name: data.name || 'معلم معتمد',
+            title: data.profileData?.title || `معلم ${data.profileData?.subject || ''}`,
+            subject: data.profileData?.subject || 'عام',
+            governorate: data.governorate || 'القاهرة',
+            area: data.area || '',
+            rating: data.profileData?.rating || 5.0,
+            reviewsCount: data.profileData?.reviewsCount || 0,
+            studentsCount: data.profileData?.studentsCount || 0,
+            pricePerSession: data.profileData?.pricePerSession || 100,
+            isVerified: data.profileData?.isVerified ?? true,
+            joinCode: data.profileData?.joinCode || docSnap.id.substring(0, 6).toUpperCase(),
+            levels: data.profileData?.levels || ['المرحلة الثانوية', 'المرحلة الإعدادية'],
+            avatarUrl: data.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
+            bio: data.profileData?.bio || `معلم معتمد لمادة ${data.profileData?.subject || ''} على منصة حِصّتي.`,
+            experienceYears: data.profileData?.experienceYears || 5,
+            centers: data.profileData?.centers || [],
+            phone: data.phone || '',
+            email: data.email || '',
+            education: data.profileData?.education || 'مؤهل تربوي معتمد',
+            accountStatus: 'active',
+            reviews: [],
+            availableSlots: [],
+          });
+        });
+
+        setTutors(realTeachers);
+      } catch (err) {
+        console.error('Error fetching teachers from firestore:', err);
+        setTutors([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadTeachers();
+  }, []);
 
   useSEO({
     title: selectedSubject ? `مدرسين ${selectedSubject} المعتمدين في مصر` : 'البحث عن المدرسين الخصوصيين المعتمدين',
@@ -68,7 +123,7 @@ export const SearchResultsPage: React.FC<SearchResultsPageProps> = ({
 
   // Filtered tutors
   const filteredTutors = useMemo(() => {
-    return SAMPLE_TUTORS.filter((tutor) => {
+    return tutors.filter((tutor) => {
       // Query filter
       if (
         searchQuery &&
@@ -102,7 +157,7 @@ export const SearchResultsPage: React.FC<SearchResultsPageProps> = ({
 
       return true;
     });
-  }, [searchQuery, selectedSubject, selectedGovernorate, selectedCity, selectedStage, selectedType]);
+  }, [tutors, searchQuery, selectedSubject, selectedGovernorate, selectedCity, selectedStage, selectedType]);
 
   const totalPages = Math.ceil(filteredTutors.length / itemsPerPage) || 1;
   const displayedTutors = filteredTutors.slice(
@@ -273,7 +328,12 @@ export const SearchResultsPage: React.FC<SearchResultsPageProps> = ({
         </div>
 
         {/* 3. Tutors Grid / List */}
-        {displayedTutors.length > 0 ? (
+        {loading ? (
+          <div className="bg-white border border-[#E5E7EB] rounded-2xl p-12 text-center max-w-xl mx-auto my-6 space-y-3">
+            <div className="w-8 h-8 border-3 border-[#2563EB] border-t-transparent rounded-full animate-spin mx-auto" />
+            <p className="text-xs text-gray-500 font-bold">جاري تحميل قائمة المعلمين من قاعدة البيانات...</p>
+          </div>
+        ) : displayedTutors.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {displayedTutors.map((tutor) => (
               <div
@@ -375,19 +435,27 @@ export const SearchResultsPage: React.FC<SearchResultsPageProps> = ({
         ) : (
           /* Empty State */
           <div className="bg-white border border-[#E5E7EB] rounded-2xl p-12 text-center max-w-xl mx-auto my-6 space-y-4">
-            <div className="w-16 h-16 rounded-2xl bg-gray-100 text-gray-400 mx-auto flex items-center justify-center">
-              <Search className="w-8 h-8" />
+            <div className="w-16 h-16 rounded-2xl bg-blue-50 text-[#2563EB] mx-auto flex items-center justify-center">
+              <GraduationCap className="w-8 h-8" />
             </div>
-            <h3 className="text-lg font-bold text-[#1E3A8A]">لم نتمكن من العثور على مدرسين مطابقين لبحثك</h3>
+            <h3 className="text-lg font-bold text-[#1E3A8A]">لا يوجد معلمون مسجلون مطابقون لبحثك حالياً</h3>
             <p className="text-xs text-[#6B7280] max-w-md mx-auto leading-relaxed">
-              جرّب توسيع نطاق البحث باختيار كل المحافظات، أو إزالة بعض الفلاتر مثل المرحلة أو نوع الحصة لتظهر لك كافة الخيارات المتاحة.
+              يمكنك البحث بدون فلاتر محددة، أو إذا كنت معلماً يمكنك الانضمام فوراً وإنشاء حسابك الحقيقي وإدراج حصصك!
             </p>
-            <button
-              onClick={handleResetFilters}
-              className="px-6 py-2.5 bg-[#2563EB] text-white text-xs font-bold rounded-xl hover:bg-[#1D4ED8] transition-all cursor-pointer"
-            >
-              عرض جميع المدرسين المتاحين
-            </button>
+            <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+              <button
+                onClick={handleResetFilters}
+                className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold rounded-xl transition-all cursor-pointer"
+              >
+                إعادة ضبط الفلاتر
+              </button>
+              <button
+                onClick={() => onNavigate('/signup')}
+                className="px-5 py-2.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-xs"
+              >
+                سجل كمعلم جديد الآن
+              </button>
+            </div>
           </div>
         )}
 

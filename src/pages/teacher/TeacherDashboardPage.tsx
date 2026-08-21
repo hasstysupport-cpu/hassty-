@@ -22,7 +22,6 @@ import {
   ShieldCheck,
   Award
 } from 'lucide-react';
-import { MOCK_TEACHER_STUDENTS, MOCK_TEACHER_GROUPS, MOCK_BOOKING_REQUESTS, MOCK_ATTENDANCE_TIME_WINDOW_STATS } from '../../data/mockData';
 import { BookingRequest } from '../../types';
 import { Badge } from '../../components/common/Badge';
 import { TeacherAttendanceChart } from '../../components/teacher/TeacherAttendanceChart';
@@ -39,7 +38,7 @@ export const TeacherDashboardPage: React.FC<TeacherDashboardPageProps> = ({
   const { user } = useAuth();
   const teacherName = user?.name || 'المعلم';
   const teacherSubject = user?.profileData?.subject || 'المادة الأكاديمية';
-  const [bookingRequests, setBookingRequests] = useState<BookingRequest[]>(MOCK_BOOKING_REQUESTS);
+  const [bookingRequests, setBookingRequests] = useState<BookingRequest[]>([]);
   const [activeSessionNotes, setActiveSessionNotes] = useState('');
   const [notesSuccess, setNotesSuccess] = useState(false);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
@@ -227,63 +226,71 @@ export const TeacherDashboardPage: React.FC<TeacherDashboardPageProps> = ({
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-          {bookingRequests.map((req) => (
-            <div
-              key={req.id}
-              className={`p-4 rounded-2xl border transition-all text-xs space-y-3 ${
-                req.status === 'approved'
-                  ? 'bg-emerald-50/50 border-emerald-200'
-                  : req.status === 'rejected'
-                  ? 'bg-gray-50 border-gray-200 opacity-70'
-                  : 'bg-[#F8FAFF] border-blue-200 shadow-xs'
-              }`}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="space-y-0.5">
-                  <div className="flex items-center gap-1.5">
-                    <strong className="text-sm font-bold text-[#1E3A8A]">{req.studentName}</strong>
-                    <Badge variant={req.status === 'approved' ? 'success' : req.status === 'rejected' ? 'danger' : 'warning'} size="sm">
-                      {req.status === 'approved' ? 'تمت الموافقة ✓' : req.status === 'rejected' ? 'تم الاعتذار ✕' : 'قيد الموافقة'}
-                    </Badge>
+        {bookingRequests.length === 0 ? (
+          <div className="bg-gray-50/70 border border-gray-100 rounded-2xl p-8 text-center space-y-2">
+            <Clock className="w-8 h-8 text-gray-400 mx-auto" />
+            <p className="text-xs font-bold text-gray-600">لا توجد طلبات حجز معلقة حالياً</p>
+            <p className="text-[11px] text-gray-400">ستظهر هنا طلبات الطلاب وأولياء الأمور فور تقديمها لتتمكن من اعتمادها أو الاعتذار عنها بنقرة واحدة.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+            {bookingRequests.map((req) => (
+              <div
+                key={req.id}
+                className={`p-4 rounded-2xl border transition-all text-xs space-y-3 ${
+                  req.status === 'approved'
+                    ? 'bg-emerald-50/50 border-emerald-200'
+                    : req.status === 'rejected'
+                    ? 'bg-gray-50 border-gray-200 opacity-70'
+                    : 'bg-[#F8FAFF] border-blue-200 shadow-xs'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <strong className="text-sm font-bold text-[#1E3A8A]">{req.studentName}</strong>
+                      <Badge variant={req.status === 'approved' ? 'success' : req.status === 'rejected' ? 'danger' : 'warning'} size="sm">
+                        {req.status === 'approved' ? 'تمت الموافقة ✓' : req.status === 'rejected' ? 'تم الاعتذار ✕' : 'قيد الموافقة'}
+                      </Badge>
+                    </div>
+                    <p className="text-[11px] text-[#6B7280]">{req.grade} — {req.groupName}</p>
                   </div>
-                  <p className="text-[11px] text-[#6B7280]">{req.grade} — {req.groupName}</p>
+                  <span className="text-[11px] font-mono text-gray-500">{req.date}</span>
                 </div>
-                <span className="text-[11px] font-mono text-gray-500">{req.date}</span>
-              </div>
 
-              <div className="grid grid-cols-2 gap-2 text-[11px] bg-white p-2.5 rounded-xl border border-gray-100">
-                <div>
-                  <span className="text-gray-500 block">الموعد المطلوب:</span>
-                  <strong className="text-[#1F2937]">{req.slotTime}</strong>
+                <div className="grid grid-cols-2 gap-2 text-[11px] bg-white p-2.5 rounded-xl border border-gray-100">
+                  <div>
+                    <span className="text-gray-500 block">الموعد المطلوب:</span>
+                    <strong className="text-[#1F2937]">{req.slotTime}</strong>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 block">واتساب ولي الأمر:</span>
+                    <strong className="text-[#2563EB] font-mono" dir="ltr">{req.parentPhone}</strong>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-gray-500 block">واتساب ولي الأمر:</span>
-                  <strong className="text-[#2563EB] font-mono" dir="ltr">{req.parentPhone}</strong>
-                </div>
-              </div>
 
-              {req.status === 'pending' && (
-                <div className="flex items-center gap-2 pt-1">
-                  <button
-                    onClick={() => handleApproveRequest(req.id, req.studentName)}
-                    className="flex-1 py-2 bg-[#10B981] hover:bg-emerald-600 text-white font-bold rounded-xl flex items-center justify-center gap-1 cursor-pointer transition-colors shadow-xs"
-                  >
-                    <Check className="w-4 h-4" />
-                    <span>قبول واعتماد الحجز</span>
-                  </button>
-                  <button
-                    onClick={() => handleRejectRequest(req.id, req.studentName)}
-                    className="py-2 px-3 bg-red-50 hover:bg-red-100 text-[#EF4444] border border-red-200 font-bold rounded-xl flex items-center justify-center gap-1 cursor-pointer transition-colors"
-                  >
-                    <X className="w-4 h-4" />
-                    <span>اعتذار</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+                {req.status === 'pending' && (
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      onClick={() => handleApproveRequest(req.id, req.studentName)}
+                      className="flex-1 py-2 bg-[#10B981] hover:bg-emerald-600 text-white font-bold rounded-xl flex items-center justify-center gap-1 cursor-pointer transition-colors shadow-xs"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>قبول واعتماد الحجز</span>
+                    </button>
+                    <button
+                      onClick={() => handleRejectRequest(req.id, req.studentName)}
+                      className="py-2 px-3 bg-red-50 hover:bg-red-100 text-[#EF4444] border border-red-200 font-bold rounded-xl flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                      <span>اعتذار</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 4. Attendance Window Rule & Quick Session Notes */}

@@ -26,27 +26,47 @@ import {
   VolumeX,
   UserCheck
 } from 'lucide-react';
-import { MOCK_TEACHER_STUDENTS, MOCK_TEACHER_GROUPS } from '../../data/mockData';
 import { Badge } from '../../components/common/Badge';
 import { RealQRCameraScanner } from '../../components/RealQRCameraScanner';
 import { dbService } from '../../lib/supabaseService';
 import { isSupabaseConfigured } from '../../lib/supabase';
 import { detectActiveLiveGroup, formatTimeArabic } from '../../lib/scheduleSync';
 import { PLAY_AUDIO_SOUND } from '../../lib/soundUtils';
-import { whatsappService } from '../../lib/whatsappService';
 import { StudentGroup, TeacherStudentItem } from '../../types';
 
 type ScanMode = 'attendance' | 'add_student' | 'collect_fee';
 type TimeWindowStatus = 'on_time' | 'late' | 'absent_cutoff';
 
+const DEFAULT_GROUP: StudentGroup = {
+  id: 'grp-default',
+  name: 'المجموعة العامة (الصف الثالث الثانوي)',
+  grade: 'الصف الثالث الثانوي',
+  location: 'السنتر الرئيسي',
+  currentStudents: 0,
+  maxCapacity: 30,
+  priceAmount: 100,
+  commissionRate: 2,
+  maxStudents: 30,
+  studentsCount: 0,
+  level: 'المرحلة الثانوية',
+  schedule: 'الأحد والثلاثاء',
+  timing: '04:30 م',
+  centerName: 'السنتر الرئيسي',
+  billingType: 'per_session',
+  sessionPrice: 100,
+  monthlyPrice: 400,
+  days: ['Sunday', 'Tuesday'],
+  timeSlot: '04:30 م'
+};
+
 export const TeacherScanPage: React.FC = () => {
   const [activeMode, setActiveMode] = useState<ScanMode>('attendance');
   const [manualCode, setManualCode] = useState('');
-  const [groups, setGroups] = useState<StudentGroup[]>(MOCK_TEACHER_GROUPS);
-  const [students, setStudents] = useState<TeacherStudentItem[]>(MOCK_TEACHER_STUDENTS);
+  const [groups, setGroups] = useState<StudentGroup[]>([DEFAULT_GROUP]);
+  const [students, setStudents] = useState<TeacherStudentItem[]>([]);
   
   // Active synchronized group state
-  const [selectedGroup, setSelectedGroup] = useState<StudentGroup>(MOCK_TEACHER_GROUPS[0]);
+  const [selectedGroup, setSelectedGroup] = useState<StudentGroup>(DEFAULT_GROUP);
   const [isAutoSyncActive, setIsAutoSyncActive] = useState(true);
   const [currentTimeStr, setCurrentTimeStr] = useState('');
   
@@ -68,28 +88,7 @@ export const TeacherScanPage: React.FC = () => {
   const [isSuccessFlashing, setIsSuccessFlashing] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
 
-  const [scanHistory, setScanHistory] = useState<any[]>([
-    {
-      id: 'sc-1',
-      mode: 'attendance',
-      name: 'زياد أحمد محمود',
-      time: '04:32:15 م (تأخير 4 د)',
-      group: 'مجموعة الأحد والثلاثاء - 3 ثانوي',
-      code: 'HST-2026-09812',
-      badgeText: 'حاضر في الموعد ✅',
-      badgeType: 'success'
-    },
-    {
-      id: 'sc-2',
-      mode: 'attendance',
-      name: 'سارة محمد حسن',
-      time: '04:50:40 م (تأخير 22 د)',
-      group: 'مجموعة الأحد والثلاثاء - 3 ثانوي',
-      code: 'HST-2026-11420',
-      badgeText: 'حاضر متأخر ⏰',
-      badgeType: 'warning'
-    },
-  ]);
+  const [scanHistory, setScanHistory] = useState<any[]>([]);
 
   const [useRealCamera, setUseRealCamera] = useState(true);
 
@@ -225,26 +224,12 @@ export const TeacherScanPage: React.FC = () => {
       soundToPlay = 'success';
     }
 
-    // Trigger Real WhatsApp Notification Dispatch
+    // Simulated attendance log record
     if (activeMode === 'attendance') {
-      whatsappService.sendAttendanceNotice({
-        parentPhone: student.parentPhone || '01080158828',
-        studentName: student.name,
-        groupName: selectedGroup.name,
-        status: attendanceStatus,
-        offsetMinutes: simulatedOffsetMinutes,
-        timeString: nowTimeStr,
-      }).catch((e) => console.warn('WhatsApp notice error:', e));
+      console.log('Attendance logged successfully:', student.name, selectedGroup.name, nowTimeStr);
     } else if (activeMode === 'collect_fee') {
       const price = selectedGroup.priceAmount || Number(feeAmount) || 120;
-      whatsappService.sendPaymentReceipt({
-        parentPhone: student.parentPhone || '01080158828',
-        studentName: student.name,
-        groupName: selectedGroup.name,
-        amount: price,
-        invoiceNumber: `INV-${Date.now().toString().slice(-4)}`,
-        billingType: selectedGroup.billingType || 'per_session',
-      }).catch((e) => console.warn('WhatsApp receipt error:', e));
+      console.log('Payment collected:', student.name, price);
     }
 
     // Play Instant Audio Tone

@@ -1,8 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Search, MapPin, Star, ShieldCheck, Check, QrCode, Calendar, Users, Phone, ArrowLeft } from 'lucide-react';
-import { SAMPLE_TUTORS, EGYPT_GOVERNORATES, SUBJECTS_DATA } from '../data/mockData';
+import { X, Search, MapPin, Star, ShieldCheck, Check, QrCode, Calendar, Users, Phone, ArrowLeft, Loader2 } from 'lucide-react';
+import { EGYPT_GOVERNORATES, SUBJECTS_DATA } from '../data/mockData';
 import { TutorProfile } from '../types';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 interface TutorDiscoveryModalProps {
   isOpen: boolean;
@@ -26,15 +28,68 @@ export const TutorDiscoveryModal: React.FC<TutorDiscoveryModalProps> = ({
   const [selectedGovernorate, setSelectedGovernorate] = useState(initialGovernorate);
   const [joinedTutors, setJoinedTutors] = useState<string[]>([]);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [tutorsList, setTutorsList] = useState<TutorProfile[]>([]);
+  const [loading, setLoading] = useState(false);
 
   // Sync initial props when modal opens
-  React.useEffect(() => {
+  useEffect(() => {
     if (initialSubject) setSelectedSubject(initialSubject);
     if (initialGovernorate) setSelectedGovernorate(initialGovernorate);
   }, [initialSubject, initialGovernorate]);
 
+  // Load teachers from Firestore
+  useEffect(() => {
+    if (!isOpen) return;
+    async function loadTeachers() {
+      setLoading(true);
+      try {
+        const teachersQuery = query(collection(db, 'users'), where('role', '==', 'teacher'));
+        const querySnapshot = await getDocs(teachersQuery);
+        const realTeachers: TutorProfile[] = [];
+
+        querySnapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          realTeachers.push({
+            id: docSnap.id,
+            name: data.name || 'معلم معتمد',
+            title: data.profileData?.title || `معلم ${data.profileData?.subject || ''}`,
+            subject: data.profileData?.subject || 'عام',
+            governorate: data.governorate || 'القاهرة',
+            area: data.area || '',
+            rating: data.profileData?.rating || 5.0,
+            reviewsCount: data.profileData?.reviewsCount || 0,
+            studentsCount: data.profileData?.studentsCount || 0,
+            pricePerSession: data.profileData?.pricePerSession || 100,
+            isVerified: data.profileData?.isVerified ?? true,
+            joinCode: data.profileData?.joinCode || docSnap.id.substring(0, 6).toUpperCase(),
+            levels: data.profileData?.levels || ['المرحلة الثانوية'],
+            avatarUrl: data.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
+            bio: data.profileData?.bio || `معلم معتمد لمادة ${data.profileData?.subject || ''} على منصة حِصّتي.`,
+            experienceYears: data.profileData?.experienceYears || 5,
+            centers: data.profileData?.centers || [],
+            phone: data.phone || '',
+            email: data.email || '',
+            education: data.profileData?.education || 'مؤهل تربوي معتمد',
+            accountStatus: 'active',
+            gender: data.profileData?.gender || 'male',
+            monthlySubscriptionPrice: data.profileData?.monthlySubscriptionPrice,
+            paymentPlans: data.profileData?.paymentPlans,
+            schedule: data.profileData?.schedule || []
+          });
+        });
+
+        setTutorsList(realTeachers);
+      } catch (err) {
+        console.error('Error fetching teachers in modal:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadTeachers();
+  }, [isOpen]);
+
   const filteredTutors = useMemo(() => {
-    return SAMPLE_TUTORS.filter((tutor) => {
+    return tutorsList.filter((tutor) => {
       const matchSubject = !selectedSubject || tutor.subject === selectedSubject;
       const matchGov = !selectedGovernorate || tutor.governorate === selectedGovernorate;
       const matchQuery =
@@ -45,7 +100,7 @@ export const TutorDiscoveryModal: React.FC<TutorDiscoveryModalProps> = ({
         tutor.subject.toLowerCase().includes(searchQuery.toLowerCase());
       return matchSubject && matchGov && matchQuery;
     });
-  }, [selectedSubject, selectedGovernorate, searchQuery]);
+  }, [tutorsList, selectedSubject, selectedGovernorate, searchQuery]);
 
   const handleJoin = (tutorId: string) => {
     if (!joinedTutors.includes(tutorId)) {
@@ -137,7 +192,12 @@ export const TutorDiscoveryModal: React.FC<TutorDiscoveryModalProps> = ({
 
         {/* Modal Results List */}
         <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
-          {filteredTutors.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-16">
+              <Loader2 className="w-8 h-8 text-[#2563EB] animate-spin mx-auto mb-3" />
+              <p className="text-xs text-gray-500">جاري تحميل قائمة المدرسين المعتمدين...</p>
+            </div>
+          ) : filteredTutors.length === 0 ? (
             <div className="text-center py-12">
               <div className="w-14 h-14 rounded-full bg-gray-100 text-gray-400 mx-auto flex items-center justify-center mb-3">
                 <Search className="w-6 h-6" />

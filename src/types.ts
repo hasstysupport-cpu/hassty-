@@ -74,6 +74,10 @@ export interface TutorProfile {
     attendanceAvg: number; // e.g. 94%
     cancelRate: number;    // e.g. 1.2%
   };
+  gender?: 'male' | 'female' | string;
+  monthlySubscriptionPrice?: number;
+  paymentPlans?: any;
+  schedule?: any;
 }
 
 export interface TestimonialItem {
@@ -198,6 +202,14 @@ export interface StudentGroup {
   billingType: PricingBillingType; // 'per_session' (2% fixed) | 'monthly' (tiered rate)
   priceAmount: number; // e.g. 120 EGP per session or 480 EGP per month
   commissionRate: number; // e.g. 2 for 2%, or tiered (e.g. 1% - 1.5%)
+  maxStudents?: number;
+  studentsCount?: number;
+  timing?: string;
+  centerName?: string;
+  sessionPrice?: number;
+  monthlyPrice?: number;
+  days?: string[];
+  timeSlot?: string;
 }
 
 export interface TeacherGroupItem {

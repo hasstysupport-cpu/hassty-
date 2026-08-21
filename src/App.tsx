@@ -5,7 +5,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { AccountRole } from './types';
-import { SAMPLE_TUTORS } from './data/mockData';
 import { useAuth } from './lib/AuthContext';
 
 // Common Components
@@ -63,7 +62,7 @@ export default function App() {
   });
   const isLoggedIn = !!user;
   const currentRole: AccountRole = user?.role || 'student';
-  const [selectedTutorId, setSelectedTutorId] = useState<string>(SAMPLE_TUTORS[0].id);
+  const [selectedTutorId, setSelectedTutorId] = useState<string>('');
   const [searchSubject, setSearchSubject] = useState<string>('');
   const [searchGovernorate, setSearchGovernorate] = useState<string>('');
   const [searchCity, setSearchCity] = useState<string>('');

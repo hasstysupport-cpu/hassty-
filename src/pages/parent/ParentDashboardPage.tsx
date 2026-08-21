@@ -19,9 +19,10 @@ import {
   AlertTriangle,
   X,
   Send,
-  HelpCircle
+  HelpCircle,
+  GraduationCap
 } from 'lucide-react';
-import { MOCK_PARENT_CHILDREN, MOCK_ATTENDANCE_RECORDS, ALL_EGYPT_GRADES } from '../../data/mockData';
+import { ALL_EGYPT_GRADES } from '../../data/mockData';
 import { Badge } from '../../components/common/Badge';
 import { Modal } from '../../components/common/Modal';
 import { useAuth } from '../../lib/AuthContext';
@@ -35,8 +36,23 @@ export const ParentDashboardPage: React.FC<ParentDashboardPageProps> = ({
 }) => {
   const { user } = useAuth();
   const parentName = user?.name || 'ولي الأمر';
-  const [children, setChildren] = useState(MOCK_PARENT_CHILDREN);
-  const [selectedChildId, setSelectedChildId] = useState(MOCK_PARENT_CHILDREN[0].id);
+  const [children, setChildren] = useState<any[]>([
+    {
+      id: 'child-1',
+      name: 'أحمد ' + (user?.name ? user.name.split(' ')[0] : 'محمود'),
+      grade: 'الصف الثالث الثانوي (علمي علوم)',
+      qrCode: 'STU-EG849201',
+      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
+      attendanceRate: 100,
+      tutorsCount: 0,
+      totalSessions: 0,
+      presentOnTime: 0,
+      presentLate: 0,
+      absentCount: 0,
+      verified: true
+    }
+  ]);
+  const [selectedChildId, setSelectedChildId] = useState('child-1');
   const [isAddChildModalOpen, setIsAddChildModalOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   
@@ -51,8 +67,19 @@ export const ParentDashboardPage: React.FC<ParentDashboardPageProps> = ({
   const [reportDetails, setReportDetails] = useState('');
   const [reportSubmitted, setReportSubmitted] = useState(false);
 
-  const currentChild = children.find((c) => c.id === selectedChildId) || children[0];
-  const recentActivities = MOCK_ATTENDANCE_RECORDS.slice(0, 4);
+  const currentChild = children.find((c) => c.id === selectedChildId) || children[0] || {
+    id: 'default',
+    name: 'الطالب',
+    grade: 'المرحلة الثانوية',
+    qrCode: 'STU-000000',
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
+    attendanceRate: 100,
+    tutorsCount: 0,
+    presentOnTime: 0,
+    presentLate: 0,
+    absentCount: 0
+  };
+  const recentActivities: any[] = [];
 
   const handleAddChildSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -252,51 +279,63 @@ export const ParentDashboardPage: React.FC<ParentDashboardPageProps> = ({
             </button>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-3xl p-6 divide-y divide-gray-100 shadow-xs space-y-3">
-            {recentActivities.map((act) => (
-              <div key={act.id} className="pt-3.5 first:pt-0 flex flex-col gap-2 text-xs">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <div
-                      className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                        act.status === 'present'
-                          ? 'bg-emerald-50 text-[#10B981]'
-                          : 'bg-red-50 text-[#EF4444]'
-                      }`}
-                    >
-                      {act.status === 'present' ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
+          <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-xs space-y-3">
+            {recentActivities.length > 0 ? (
+              <div className="divide-y divide-gray-100">
+                {recentActivities.map((act) => (
+                  <div key={act.id} className="pt-3.5 first:pt-0 flex flex-col gap-2 text-xs">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3">
+                        <div
+                          className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                            act.status === 'present'
+                              ? 'bg-emerald-50 text-[#10B981]'
+                              : 'bg-red-50 text-[#EF4444]'
+                          }`}
+                        >
+                          {act.status === 'present' ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
+                        </div>
+
+                        <div>
+                          <h4 className="font-bold text-[#1E3A8A] text-sm">
+                            {act.status === 'present' ? 'حضر بنجاح: ' : 'غياب: '}
+                            {act.subject} مع {act.tutorName}
+                          </h4>
+                          <p className="text-[11px] text-[#6B7280] mt-0.5">
+                            {act.center} — مسح كود الـ QR الساعة {act.time}
+                          </p>
+                          <span className="text-[10px] text-gray-400 font-mono mt-0.5 block">
+                            {act.date}
+                          </span>
+                        </div>
+                      </div>
+
+                      <Badge variant={act.status === 'present' ? 'success' : 'danger'} size="sm">
+                        {act.status === 'present' ? 'حاضر في الموعد ✅' : 'غائب'}
+                      </Badge>
                     </div>
 
-                    <div>
-                      <h4 className="font-bold text-[#1E3A8A] text-sm">
-                        {act.status === 'present' ? 'حضر بنجاح: ' : 'غياب: '}
-                        {act.subject} مع {act.tutorName}
-                      </h4>
-                      <p className="text-[11px] text-[#6B7280] mt-0.5">
-                        {act.center} — مسح كود الـ QR الساعة {act.time}
-                      </p>
-                      <span className="text-[10px] text-gray-400 font-mono mt-0.5 block">
-                        {act.date}
-                      </span>
-                    </div>
+                    {/* Educational Follow-up note from teacher if present */}
+                    {act.teacherNotes && (
+                      <div className="p-3 bg-blue-50/70 border border-blue-100 rounded-2xl text-[11px] text-[#1E3A8A] flex items-start gap-2">
+                        <FileText className="w-4 h-4 text-[#2563EB] shrink-0 mt-0.5" />
+                        <div>
+                          <strong>ملاحظة وواجب المعلم:</strong> {act.teacherNotes}
+                        </div>
+                      </div>
+                    )}
                   </div>
-
-                  <Badge variant={act.status === 'present' ? 'success' : 'danger'} size="sm">
-                    {act.status === 'present' ? 'حاضر في الموعد ✅' : 'غائب'}
-                  </Badge>
-                </div>
-
-                {/* Educational Follow-up note from teacher if present */}
-                {act.teacherNotes && (
-                  <div className="p-3 bg-blue-50/70 border border-blue-100 rounded-2xl text-[11px] text-[#1E3A8A] flex items-start gap-2">
-                    <FileText className="w-4 h-4 text-[#2563EB] shrink-0 mt-0.5" />
-                    <div>
-                      <strong>ملاحظة وواجب المعلم:</strong> {act.teacherNotes}
-                    </div>
-                  </div>
-                )}
+                ))}
               </div>
-            ))}
+            ) : (
+              <div className="text-center py-8 space-y-2">
+                <Clock className="w-8 h-8 text-gray-400 mx-auto" />
+                <p className="text-xs font-bold text-gray-700">لا توجد سجلات حضور مسجلة حتى الآن</p>
+                <p className="text-[11px] text-gray-500 max-w-sm mx-auto">
+                  بمجرد قيام الطالب بمسح كود الـ QR عند دخول الحصة في السنتر، ستصلك الإشعارات اللحظية ويظهر السجل هنا فوراً.
+                </p>
+              </div>
+            )}
           </div>
         </div>
 

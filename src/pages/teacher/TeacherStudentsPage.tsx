@@ -10,9 +10,9 @@ import {
   Phone,
   Filter,
   Layers,
-  ArrowLeft
+  ArrowLeft,
+  GraduationCap
 } from 'lucide-react';
-import { MOCK_TEACHER_STUDENTS, MOCK_TEACHER_GROUPS } from '../../data/mockData';
 import { TeacherStudentItem } from '../../types';
 import { Badge } from '../../components/common/Badge';
 import { Modal } from '../../components/common/Modal';
@@ -22,14 +22,14 @@ interface TeacherStudentsPageProps {
 }
 
 export const TeacherStudentsPage: React.FC<TeacherStudentsPageProps> = ({ onNavigate }) => {
-  const [students, setStudents] = useState<TeacherStudentItem[]>(MOCK_TEACHER_STUDENTS);
+  const [students, setStudents] = useState<TeacherStudentItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGroup, setSelectedGroup] = useState('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newStudentCode, setNewStudentCode] = useState('');
   const [newStudentName, setNewStudentName] = useState('');
   const [newStudentPhone, setNewStudentPhone] = useState('');
-  const [newStudentGroup, setNewStudentGroup] = useState(MOCK_TEACHER_GROUPS[0].name);
+  const [newStudentGroup, setNewStudentGroup] = useState('المجموعة العامة');
   const [addSuccess, setAddSuccess] = useState(false);
 
   const filteredStudents = students.filter((s) => {
@@ -51,15 +51,15 @@ export const TeacherStudentsPage: React.FC<TeacherStudentsPageProps> = ({ onNavi
       name: newStudentName,
       avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
       grade: 'الصف الثالث الثانوي',
-      phone: newStudentPhone || '01012345678',
-      parentPhone: '01234567890',
+      phone: newStudentPhone || '010XXXXXXXX',
+      parentPhone: '012XXXXXXXX',
       qrCode: newStudentCode || `HST-2026-${Math.floor(1000 + Math.random() * 9000)}`,
       groupName: newStudentGroup,
       attendanceRate: 100,
       totalSessions: 1,
       attendedSessions: 1,
       paymentStatus: 'paid',
-      joinedDate: '2026-08-14',
+      joinedDate: new Date().toISOString().split('T')[0],
     };
 
     setStudents([newStudent, ...students]);
@@ -126,75 +126,71 @@ export const TeacherStudentsPage: React.FC<TeacherStudentsPageProps> = ({ onNavi
             <Search className="w-4 h-4 text-gray-400 absolute right-3.5 top-3" />
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-[#6B7280]">المجموعة:</span>
-            <select
-              value={selectedGroup}
-              onChange={(e) => setSelectedGroup(e.target.value)}
-              className="px-3 py-2 bg-gray-50 border border-[#E5E7EB] rounded-xl text-xs font-bold text-[#1F2937] focus:outline-none focus:border-[#2563EB] cursor-pointer"
-            >
-              <option value="all">كل المجموعات</option>
-              {MOCK_TEACHER_GROUPS.map((g) => (
-                <option key={g.id} value={g.name}>{g.name}</option>
-              ))}
-            </select>
-          </div>
-
         </div>
 
         {/* Students Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-right border-collapse">
-            <thead>
-              <tr className="border-b border-gray-200 bg-gray-50/70 text-xs font-bold text-[#1E3A8A]">
-                <th className="py-3 px-4 rounded-r-xl">الطالب</th>
-                <th className="py-3 px-4">كود الـ QR</th>
-                <th className="py-3 px-4">المجموعة المقيد بها</th>
-                <th className="py-3 px-4">هاتف ولي الأمر</th>
-                <th className="py-3 px-4">نسبة الحضور</th>
-                <th className="py-3 px-4 rounded-l-xl">الاشتراك الشهري</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 text-xs text-[#1F2937]">
-              {filteredStudents.map((std) => (
-                <tr key={std.id} className="hover:bg-[#F8FAFF] transition-colors">
-                  <td className="py-3.5 px-4">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={std.avatarUrl}
-                        alt={std.name}
-                        className="w-9 h-9 rounded-xl object-cover border border-gray-200"
-                        referrerPolicy="no-referrer"
-                      />
-                      <div>
-                        <div className="font-bold text-[#1E3A8A]">{std.name}</div>
-                        <span className="text-[11px] text-[#6B7280] font-mono">{std.phone}</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="py-3.5 px-4 font-mono font-bold text-[#2563EB]">
-                    {std.qrCode}
-                  </td>
-                  <td className="py-3.5 px-4 font-bold text-[#4B5563]">
-                    {std.groupName}
-                  </td>
-                  <td className="py-3.5 px-4 font-mono text-[#6B7280]">
-                    {std.parentPhone}
-                  </td>
-                  <td className="py-3.5 px-4">
-                    <span className="font-bold text-[#10B981]">{std.attendanceRate}%</span>
-                    <span className="text-[10px] text-gray-400 block">({std.attendedSessions}/{std.totalSessions} حصة)</span>
-                  </td>
-                  <td className="py-3.5 px-4">
-                    <Badge variant={std.paymentStatus === 'paid' ? 'success' : 'danger'} size="sm">
-                      {std.paymentStatus === 'paid' ? 'مسدد ✓' : 'متأخر ✗'}
-                    </Badge>
-                  </td>
+        {filteredStudents.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-right border-collapse">
+              <thead>
+                <tr className="border-b border-gray-200 bg-gray-50/70 text-xs font-bold text-[#1E3A8A]">
+                  <th className="py-3 px-4 rounded-r-xl">الطالب</th>
+                  <th className="py-3 px-4">كود الـ QR</th>
+                  <th className="py-3 px-4">المجموعة المقيد بها</th>
+                  <th className="py-3 px-4">هاتف ولي الأمر</th>
+                  <th className="py-3 px-4">نسبة الحضور</th>
+                  <th className="py-3 px-4 rounded-l-xl">الاشتراك الشهري</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-gray-100 text-xs text-[#1F2937]">
+                {filteredStudents.map((std) => (
+                  <tr key={std.id} className="hover:bg-[#F8FAFF] transition-colors">
+                    <td className="py-3.5 px-4">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={std.avatarUrl}
+                          alt={std.name}
+                          className="w-9 h-9 rounded-xl object-cover border border-gray-200"
+                          referrerPolicy="no-referrer"
+                        />
+                        <div>
+                          <div className="font-bold text-[#1E3A8A]">{std.name}</div>
+                          <span className="text-[11px] text-[#6B7280] font-mono">{std.phone}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4 font-mono font-bold text-[#2563EB]">
+                      {std.qrCode}
+                    </td>
+                    <td className="py-3.5 px-4 font-bold text-[#4B5563]">
+                      {std.groupName}
+                    </td>
+                    <td className="py-3.5 px-4 font-mono text-[#6B7280]">
+                      {std.parentPhone}
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span className="font-bold text-[#10B981]">{std.attendanceRate}%</span>
+                      <span className="text-[10px] text-gray-400 block">({std.attendedSessions}/{std.totalSessions} حصة)</span>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <Badge variant={std.paymentStatus === 'paid' ? 'success' : 'danger'} size="sm">
+                        {std.paymentStatus === 'paid' ? 'مسدد ✓' : 'متأخر ✗'}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="text-center py-12 space-y-2">
+            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-[#2563EB] mx-auto flex items-center justify-center">
+              <GraduationCap className="w-6 h-6" />
+            </div>
+            <p className="text-xs font-bold text-gray-700">لا يوجد طلاب مسجلون بعد</p>
+            <p className="text-[11px] text-gray-400">يمكنك قيد الطلاب عبر مسح بطاقة الـ QR أو الإضافة المباشرة أعلاه</p>
+          </div>
+        )}
 
       </div>
 
@@ -262,15 +258,12 @@ export const TeacherStudentsPage: React.FC<TeacherStudentsPageProps> = ({ onNavi
                 <label className="block text-xs font-bold text-[#1F2937] mb-1">
                   المجموعة
                 </label>
-                <select
+                <input
+                  type="text"
                   value={newStudentGroup}
                   onChange={(e) => setNewStudentGroup(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-[#E5E7EB] rounded-xl text-xs text-right focus:bg-white focus:outline-none focus:border-[#2563EB] cursor-pointer"
-                >
-                  {MOCK_TEACHER_GROUPS.map((g) => (
-                    <option key={g.id} value={g.name}>{g.name}</option>
-                  ))}
-                </select>
+                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-[#E5E7EB] rounded-xl text-xs text-right focus:bg-white focus:outline-none focus:border-[#2563EB]"
+                />
               </div>
             </div>
 

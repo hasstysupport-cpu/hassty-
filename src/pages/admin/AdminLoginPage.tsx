@@ -1,4 +1,4 @@
-import { verifyAdminCredentialsSecurely, HASSTY_DOMAINS } from '../../lib/securityConfig';
+import { verifyAdminCredentialsSecurely, HASSTY_DOMAINS, TEMP_ADMIN_CREDENTIALS } from '../../lib/securityConfig';
 import React, { useState } from 'react';
 import {
   Lock,
@@ -8,7 +8,10 @@ import {
   CheckCircle2,
   ArrowLeft,
   Eye,
-  EyeOff
+  EyeOff,
+  Sparkles,
+  Copy,
+  Check
 } from 'lucide-react';
 
 interface AdminLoginPageProps {
@@ -25,6 +28,19 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const handleFillDemoCredentials = () => {
+    setEmailOrUsername(TEMP_ADMIN_CREDENTIALS.username);
+    setPassword(TEMP_ADMIN_CREDENTIALS.password);
+    setErrorMessage('');
+  };
+
+  const copyToClipboard = (text: string, field: string) => {
+    navigator.clipboard?.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 1800);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,19 +78,68 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
       <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
         
         {/* Brand Header */}
-        <div className="text-center space-y-2 mb-8">
+        <div className="text-center space-y-2 mb-6">
           <div className="w-16 h-16 rounded-3xl bg-blue-600 text-white flex items-center justify-center font-black text-2xl mx-auto shadow-xl shadow-blue-500/20 border-2 border-white/20">
             حِ
           </div>
           <div className="flex items-center justify-center gap-2">
             <h1 className="text-2xl font-black text-white tracking-tight">حِصّتي</h1>
             <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30">
-              Admin Portal
+              لوحة التحكم المركزية
             </span>
           </div>
           <p className="text-xs text-slate-400 font-mono">
-            {HASSTY_DOMAINS.PUBLIC_URL}/admin — بوابة التحكم المركزية
+            {HASSTY_DOMAINS.PUBLIC_URL}/admin — Admin Portal
           </p>
+        </div>
+
+        {/* Temporary Credentials Notice Box */}
+        <div className="mb-4 bg-gradient-to-r from-blue-900/40 via-indigo-900/40 to-blue-950/50 border border-blue-500/30 rounded-2xl p-4 text-xs space-y-3 backdrop-blur-md shadow-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-blue-300 font-bold">
+              <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
+              <span>بيانات الدخول المؤقتة للوحة الأدمن</span>
+            </div>
+            <button
+              type="button"
+              onClick={handleFillDemoCredentials}
+              className="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+            >
+              <span>ملء تلقائي</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 text-[11px]">
+            <div
+              onClick={() => copyToClipboard(TEMP_ADMIN_CREDENTIALS.username, 'user')}
+              className="bg-slate-900/80 border border-slate-700/60 p-2.5 rounded-xl flex items-center justify-between cursor-pointer hover:border-blue-500 transition-colors"
+            >
+              <div>
+                <span className="text-slate-400 block text-[10px]">اليوزر:</span>
+                <strong className="text-white font-mono">{TEMP_ADMIN_CREDENTIALS.username}</strong>
+              </div>
+              {copiedField === 'user' ? (
+                <Check className="w-3.5 h-3.5 text-emerald-400" />
+              ) : (
+                <Copy className="w-3.5 h-3.5 text-slate-500" />
+              )}
+            </div>
+
+            <div
+              onClick={() => copyToClipboard(TEMP_ADMIN_CREDENTIALS.password, 'pass')}
+              className="bg-slate-900/80 border border-slate-700/60 p-2.5 rounded-xl flex items-center justify-between cursor-pointer hover:border-blue-500 transition-colors"
+            >
+              <div>
+                <span className="text-slate-400 block text-[10px]">الباسوورد:</span>
+                <strong className="text-emerald-400 font-mono">{TEMP_ADMIN_CREDENTIALS.password}</strong>
+              </div>
+              {copiedField === 'pass' ? (
+                <Check className="w-3.5 h-3.5 text-emerald-400" />
+              ) : (
+                <Copy className="w-3.5 h-3.5 text-slate-500" />
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Login Card */}
@@ -87,7 +152,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
               <span>نظام داخلي محمي (Internal Admin Only)</span>
             </div>
             <p className="text-[11px] text-slate-300 leading-relaxed">
-              هذه البوابة مخصصة حصرياً لفريق إدارة وتشغيل منصة حِصّتي. الحسابات تنشأ يدوياً في قاعدة البيانات ولا يوجد تسجيل حسابات جديد عام هنا.
+              هذه البوابة مخصصة حصرياً لفريق إدارة وتشغيل منصة حِصّتي للتحكم في الحسابات وتوثيق المدرسين.
             </p>
           </div>
 
@@ -110,7 +175,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
                   type="text"
                   value={emailOrUsername}
                   onChange={(e) => setEmailOrUsername(e.target.value)}
-                  placeholder="admin@hassty.com"
+                  placeholder="admin أو admin@hassty.com"
                   autoComplete="username"
                   className="w-full text-right px-4 py-3 bg-[#0F172A] border border-slate-700 rounded-2xl text-white text-xs font-mono placeholder:text-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
                   required
@@ -191,3 +256,4 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
     </div>
   );
 };
+

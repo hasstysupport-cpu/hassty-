@@ -1,10 +1,30 @@
 import React from 'react';
-import { MOCK_CURRENT_STUDENT } from '../../data/mockData';
 import { StudentCardDesigner } from '../../components/StudentCardDesigner';
 import { Smartphone, Info, ShieldCheck } from 'lucide-react';
+import { useAuth } from '../../lib/AuthContext';
+import { StudentProfile } from '../../types';
 
 export const StudentQRCardPage: React.FC = () => {
-  const student = MOCK_CURRENT_STUDENT;
+  const { user } = useAuth();
+
+  const student: StudentProfile = {
+    id: user?.id || 'std-current',
+    name: user?.name || 'الطالب',
+    phone: user?.phone || '010XXXXXXXX',
+    governorate: user?.governorate || 'القاهرة',
+    city: user?.area || 'مدينة نصر',
+    area: user?.area || '',
+    stage: 'المرحلة الثانوية',
+    grade: user?.profileData?.grade || 'الصف الثالث الثانوي',
+    studentIdNumber: user?.id?.substring(0, 8).toUpperCase() || 'HST2026',
+    qrCode: user?.id?.substring(0, 10).toUpperCase() || 'HST2026',
+    qrCodeValue: `HASSTY-STUDENT-${user?.id || '2026'}-${user?.name || 'STUDENT'}`,
+    parentPhone: user?.profileData?.parentPhone || '',
+    emergencyParentPhone: user?.profileData?.parentPhone || '',
+    joinedTutorIds: [],
+    avatarUrl: user?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
+    isSubscriptionPaused: false,
+  };
 
   return (
     <div className="space-y-8 text-right max-w-6xl mx-auto py-2" dir="rtl">
@@ -30,7 +50,7 @@ export const StudentQRCardPage: React.FC = () => {
 
         <div className="flex items-center gap-2 text-xs font-bold text-teal-800 bg-white/80 px-3.5 py-2 rounded-xl border border-teal-200 shrink-0">
           <ShieldCheck className="w-4 h-4 text-teal-600" />
-          <span>كارت معتمد من السنتر لعام 2026/2027</span>
+          <span>كارت معتمد لعام 2026/2027</span>
         </div>
       </div>
 
@@ -54,7 +74,7 @@ export const StudentQRCardPage: React.FC = () => {
 
           <div className="p-4 bg-gray-50 rounded-2xl space-y-1.5 border border-gray-100">
             <span className="font-bold text-teal-700 block text-sm">3. إشعار فوري لولي الأمر</span>
-            <p>يصل إشعار واتساب تلقائي وفوري لولي الأمر لتأكيد الحضور ووقت الدخول بأمان.</p>
+            <p>يصل إشعار تلقائي وفوري لولي الأمر لتأكيد الحضور ووقت الدخول بأمان.</p>
           </div>
         </div>
       </div>
@@ -62,3 +82,4 @@ export const StudentQRCardPage: React.FC = () => {
     </div>
   );
 };
+
