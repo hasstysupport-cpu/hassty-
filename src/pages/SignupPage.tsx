@@ -62,6 +62,9 @@ export const SignupPage: React.FC<SignupPageProps> = ({
 
   // Parent specific
   const [studentJoinCode, setStudentJoinCode] = useState('');
+  const [isVerifyingStudent, setIsVerifyingStudent] = useState(false);
+  const [verifiedStudentPreview, setVerifiedStudentPreview] = useState<any | null>(null);
+  const [studentSearchError, setStudentSearchError] = useState('');
 
   // Teacher specific
   const [subject, setSubject] = useState('كيمياء');
@@ -101,6 +104,33 @@ export const SignupPage: React.FC<SignupPageProps> = ({
   };
 
   /**
+   * Quick check student code during parent signup
+   */
+  const handleVerifyStudentCode = async () => {
+    if (!studentJoinCode.trim()) {
+      setStudentSearchError('يرجى كتابة كود الطالب أو رقم هاتفه أولاً.');
+      setVerifiedStudentPreview(null);
+      return;
+    }
+    setIsVerifyingStudent(true);
+    setStudentSearchError('');
+    try {
+      const student = await findStudentByCodeOrPhone(studentJoinCode.trim());
+      if (student) {
+        setVerifiedStudentPreview(student);
+        setStudentSearchError('');
+      } else {
+        setVerifiedStudentPreview(null);
+        setStudentSearchError(`لم يتم العثور على طالب مسجل بهذا الكود (${studentJoinCode.trim()}). تأكد من كود الطالب أو رقم هاتفه.`);
+      }
+    } catch (err: any) {
+      setStudentSearchError('حدث خطأ أثناء البحث عن كود الطالب.');
+    } finally {
+      setIsVerifyingStudent(false);
+    }
+  };
+
+  /**
    * Submit Real Firebase Email/Password & Profile Registration
    */
   const handleSubmitRegistration = async (e: React.FormEvent) => {
@@ -132,6 +162,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({
         subject: role === 'teacher' ? subject : undefined,
         experience: role === 'teacher' ? experience : undefined,
         parentPhone: role === 'student' ? parentPhone.trim() : undefined,
+        studentJoinCode: role === 'parent' && studentJoinCode.trim() ? studentJoinCode.trim() : undefined,
       });
 
       setIsLoading(false);
@@ -146,8 +177,15 @@ export const SignupPage: React.FC<SignupPageProps> = ({
         setErrorMessage('كلمة المرور ضعيفة. يرجى كتابة 6 خانات على الأقل.');
       } else if (code === 'auth/invalid-email') {
         setErrorMessage('صيغة البريد الإلكتروني غير صالحة.');
+      } else if (code === 'auth/network-request-failed') {
+        setErrorMessage('تعذر الاتصال بالخادم، يرجى التأكد من اتصال الإنترنت والمحاولة ثانية.');
       } else {
-        setErrorMessage(err.message || 'حدث خطأ أثناء إنشاء الحساب. يرجى المحاولة مرة أخرى.');
+        const msg = String(err?.message || '');
+        if (msg.includes('auth/email-already-in-use')) {
+          setErrorMessage('هذا البريد الإلكتروني مسجل به حساب بالفعل. يرجى تسجيل الدخول.');
+        } else {
+          setErrorMessage('حدث خطأ أثناء إنشاء الحساب. يرجى التأكد من صحة البيانات والمحاولة مرة أخرى.');
+        }
       }
     }
   };
@@ -506,19 +544,82 @@ export const SignupPage: React.FC<SignupPageProps> = ({
               {/* Parent Specific Fields */}
               {role === 'parent' && (
                 <div className="space-y-4 pt-2 border-t border-gray-100">
-                  <div>
-                    <label className="block text-xs font-bold text-[#1F2937] mb-1.5">
-                      كود ربط حساب الابن (اختياري)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="مثال: HASSTY-09812"
-                      value={studentJoinCode}
-                      onChange={(e) => setStudentJoinCode(e.target.value)}
-                      className="w-full px-3.5 py-3 bg-gray-50 border border-[#E5E7EB] rounded-xl text-sm font-mono text-left focus:bg-white focus:outline-none focus:border-[#2563EB]"
-                    />
-                    <p className="text-[11px] text-[#6B7280] mt-1">
-                      يمكنك أيضاً ربط أبنائك من خلال لوحة التحكم بعد تسجيل الدخول.
+                  <div className="bg-blue-50/70 border border-blue-100 rounded-2xl p-4 text-right">
+                    <div className="flex items-center gap-2 mb-2 text-blue-900 font-bold text-xs">
+                      <ShieldCheck className="w-4 h-4 text-[#2563EB]" />
+                      <span>ربط حساب الابن / الطالب (اختياري عند التسجيل)</span>
+                    </div>
+                    <p className="text-xs text-blue-800/80 mb-3 leading-relaxed">
+                      أدخل كود بطاقة الطالب (الـ QR أو الكود التعريفي للطالب) وسيقوم النظام فور إتمام تسجيلك بإرسال طلب ربط رسمي إلى حساب الطالب، حيث يصله إشعار للموافقة أو الرفض.
+                    </p>
+
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <div className="relative flex-1">
+                        <input
+                          type="text"
+                          placeholder="مثال: HASSTY-ABC12345 أو رقم الهاتف"
+                          value={studentJoinCode}
+                          onChange={(e) => {
+                            setStudentJoinCode(e.target.value);
+                            if (verifiedStudentPreview) setVerifiedStudentPreview(null);
+                            if (studentSearchError) setStudentSearchError('');
+                          }}
+                          className="w-full pl-3 pr-3.5 py-2.5 bg-white border border-blue-200 rounded-xl text-sm font-mono text-left uppercase focus:outline-none focus:border-[#2563EB] shadow-2xs"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleVerifyStudentCode}
+                        disabled={isVerifyingStudent || !studentJoinCode.trim()}
+                        className="px-4 py-2.5 bg-[#2563EB] hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+                      >
+                        {isVerifyingStudent ? (
+                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                        )}
+                        <span>تحقق من الكود</span>
+                      </button>
+                    </div>
+
+                    {/* Verification Result */}
+                    {verifiedStudentPreview && (
+                      <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-3 animate-in fade-in duration-200">
+                        <img
+                          src={getCleanAvatarUrl(verifiedStudentPreview.avatarUrl, 'student', verifiedStudentPreview.name)}
+                          alt={verifiedStudentPreview.name}
+                          className="w-10 h-10 rounded-lg object-cover border border-emerald-300 shrink-0 bg-white"
+                          referrerPolicy="no-referrer"
+                        />
+                        <div className="min-w-0 flex-1 text-right">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-black text-emerald-900 truncate">
+                              {verifiedStudentPreview.name}
+                            </span>
+                            <span className="text-[10px] font-bold bg-emerald-200/60 text-emerald-800 px-2 py-0.5 rounded-full">
+                              طالب معتمد
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-emerald-700 font-medium">
+                            {verifiedStudentPreview.grade || 'المرحلة الثانوية'} — كود:{' '}
+                            <span className="font-mono font-bold">{verifiedStudentPreview.qrCode || studentJoinCode}</span>
+                          </p>
+                          <p className="text-[10px] text-emerald-800 font-bold mt-0.5">
+                            ✓ سيتم إرسال طلب ربط فوري للابن للموافقة عليه بمجرد إنهاء التسجيل.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {studentSearchError && (
+                      <p className="text-xs text-red-600 font-medium mt-2 flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                        <span>{studentSearchError}</span>
+                      </p>
+                    )}
+
+                    <p className="text-[11px] text-gray-500 mt-2">
+                      💡 ملاحظة: يمكنك تخطي هذه الخطوة الآن وإضافة أو ربط أبنائك في أي وقت بعد تسجيل الدخول من لوحة تحكم ولي الأمر.
                     </p>
                   </div>
                 </div>
@@ -609,6 +710,25 @@ export const SignupPage: React.FC<SignupPageProps> = ({
 
                 <p className="text-xs text-gray-600 leading-relaxed">
                   يمكنك الآن إضافة مجموعاتك وجداول الحصص وتوليد باركود الحضور للطلاب مباشرة.
+                </p>
+              </div>
+            )}
+
+            {/* Parent Child Link Notice */}
+            {role === 'parent' && studentJoinCode.trim() && (
+              <div className="p-5 bg-gradient-to-br from-emerald-50 to-blue-50/60 border border-emerald-200 rounded-2xl text-right space-y-2 shadow-xs">
+                <div className="flex items-center gap-2.5 text-emerald-900">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                    <ShieldCheck className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold">تم إرسال طلب ربط الطالب 👨‍👦</h4>
+                    <p className="text-[11px] text-emerald-700">تم إشعار حساب الطالب بالطلب بنجاح</p>
+                  </div>
+                </div>
+
+                <p className="text-xs text-gray-700 leading-relaxed">
+                  أرسلنا إشعاراً واضحاً إلى حساب الطالب للموافقة على طلب الربط. بمجرد قيام الطالب بالضغط على <strong>موافقة</strong> من حسابه، ستظهر لك بياناته وحصصه في لوحة تحكمك تلقائياً.
                 </p>
               </div>
             )}

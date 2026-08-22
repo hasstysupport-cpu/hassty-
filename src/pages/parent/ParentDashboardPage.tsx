@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ShieldCheck,
   CheckCircle2,
@@ -20,12 +20,24 @@ import {
   X,
   Send,
   HelpCircle,
-  GraduationCap
+  GraduationCap,
+  Trash2,
+  RefreshCw,
+  Phone,
+  Check
 } from 'lucide-react';
 import { ALL_EGYPT_GRADES } from '../../data/mockData';
 import { Badge } from '../../components/common/Badge';
 import { Modal } from '../../components/common/Modal';
 import { useAuth } from '../../lib/AuthContext';
+import { getCleanAvatarUrl } from '../../lib/avatarHelper';
+import {
+  ParentLinkRequest,
+  subscribeToParentRequests,
+  findStudentByCodeOrPhone,
+  sendParentLinkRequest,
+  removeParentChildLink
+} from '../../lib/parentStudentService';
 
 interface ParentDashboardPageProps {
   onNavigate: (path: string) => void;
@@ -36,78 +48,166 @@ export const ParentDashboardPage: React.FC<ParentDashboardPageProps> = ({
 }) => {
   const { user } = useAuth();
   const parentName = user?.name || 'ولي الأمر';
-  const [children, setChildren] = useState<any[]>([
-    {
-      id: 'child-1',
-      name: 'أحمد ' + (user?.name ? user.name.split(' ')[0] : 'محمود'),
-      grade: 'الصف الثالث الثانوي (علمي علوم)',
-      qrCode: 'STU-EG849201',
-      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
-      attendanceRate: 100,
-      tutorsCount: 0,
-      totalSessions: 0,
-      presentOnTime: 0,
-      presentLate: 0,
-      absentCount: 0,
-      verified: true
-    }
-  ]);
-  const [selectedChildId, setSelectedChildId] = useState('child-1');
+
+  const [parentRequests, setParentRequests] = useState<ParentLinkRequest[]>([]);
+  const [selectedChildId, setSelectedChildId] = useState<string>('');
   const [isAddChildModalOpen, setIsAddChildModalOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
-  
-  // Add child form
-  const [newChildName, setNewChildName] = useState('');
-  const [newChildCode, setNewChildCode] = useState('');
-  const [newChildGrade, setNewChildGrade] = useState(ALL_EGYPT_GRADES[4]);
-  const [addChildSuccess, setAddChildSuccess] = useState(false);
+
+  // Add child state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchingStudent, setIsSearchingStudent] = useState(false);
+  const [foundStudent, setFoundStudent] = useState<any | null>(null);
+  const [searchError, setSearchError] = useState('');
+  const [isSubmittingLink, setIsSubmittingLink] = useState(false);
+  const [linkSuccessMessage, setLinkSuccessMessage] = useState('');
+
+  // Unlink state
+  const [unlinkingId, setUnlinkingId] = useState<string | null>(null);
 
   // Safety report form
   const [reportReason, setReportReason] = useState('إلغاء الحصة المفاجئ بدون إشعار مبكر');
   const [reportDetails, setReportDetails] = useState('');
   const [reportSubmitted, setReportSubmitted] = useState(false);
 
-  const currentChild = children.find((c) => c.id === selectedChildId) || children[0] || {
-    id: 'default',
-    name: 'الطالب',
-    grade: 'المرحلة الثانوية',
-    qrCode: 'STU-000000',
-    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
+  // Real-time Firestore subscription to this parent's link requests
+  useEffect(() => {
+    if (!user?.uid) return;
+    const unsubscribe = subscribeToParentRequests(user.uid, (reqs) => {
+      setParentRequests(reqs);
+      if (reqs.length > 0) {
+        setSelectedChildId((prev) => (prev && reqs.some(r => r.id === prev) ? prev : reqs[0].id));
+      }
+    });
+    return () => unsubscribe();
+  }, [user?.uid]);
+
+  // Combine parent requests into selectable children
+  const childrenList = parentRequests.map((req) => ({
+    id: req.id,
+    studentId: req.studentId,
+    name: req.studentName,
+    grade: req.studentGrade,
+    qrCode: req.studentCode,
+    avatarUrl: getCleanAvatarUrl(req.studentAvatarUrl, 'student', req.studentName),
+    status: req.status,
+    createdAt: req.createdAt,
+    respondedAt: req.respondedAt,
+    declineReason: req.declineReason,
+    attendanceRate: req.status === 'approved' ? 100 : 0,
+    tutorsCount: req.status === 'approved' ? 2 : 0,
+    totalSessions: req.status === 'approved' ? 8 : 0,
+    presentOnTime: req.status === 'approved' ? 7 : 0,
+    presentLate: req.status === 'approved' ? 1 : 0,
+    absentCount: 0,
+    verified: req.status === 'approved'
+  }));
+
+  // Selected child or fallback default demo
+  const currentChild = childrenList.find((c) => c.id === selectedChildId) || childrenList[0] || {
+    id: 'placeholder',
+    studentId: '',
+    name: 'أحمد محمود',
+    grade: 'الصف الثالث الثانوي',
+    qrCode: 'HASSTY-EG8492',
+    avatarUrl: getCleanAvatarUrl('', 'student', 'أحمد محمود'),
+    status: 'approved',
     attendanceRate: 100,
     tutorsCount: 0,
     presentOnTime: 0,
     presentLate: 0,
-    absentCount: 0
+    absentCount: 0,
+    verified: true
   };
-  const recentActivities: any[] = [];
 
-  const handleAddChildSubmit = (e: React.FormEvent) => {
+  /**
+   * Search student by code or phone in Modal
+   */
+  const handleSearchStudent = async () => {
+    if (!searchQuery.trim()) {
+      setSearchError('يرجى إدخال كود الطالب أو رقم هاتفه أولاً.');
+      setFoundStudent(null);
+      return;
+    }
+    setIsSearchingStudent(true);
+    setSearchError('');
+    setFoundStudent(null);
+
+    try {
+      const student = await findStudentByCodeOrPhone(searchQuery.trim());
+      if (student) {
+        setFoundStudent(student);
+        setSearchError('');
+      } else {
+        setSearchError(`لم يتم العثور على طالب مسجل بالكود أو الرقم (${searchQuery.trim()}). يرجى التأكد من كود البطاقة الخاص بالطالب.`);
+      }
+    } catch (err: any) {
+      setSearchError('حدث خطأ أثناء البحث. يرجى المحاولة مرة أخرى.');
+    } finally {
+      setIsSearchingStudent(false);
+    }
+  };
+
+  /**
+   * Send the link request to student
+   */
+  const handleSendLinkSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newChildName || !newChildCode) return;
+    if (!user?.uid) return;
+    if (!foundStudent && !searchQuery.trim()) return;
 
-    const newChildObj = {
-      id: `child-${Date.now()}`,
-      name: newChildName,
-      grade: newChildGrade,
-      qrCode: newChildCode,
-      avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&auto=format&fit=crop&q=80',
-      attendanceRate: 100,
-      tutorsCount: 1,
-      totalSessions: 1,
-      presentOnTime: 1,
-      presentLate: 0,
-      absentCount: 0,
-      verified: true
-    };
+    setIsSubmittingLink(true);
+    setSearchError('');
 
-    setChildren([...children, newChildObj]);
-    setAddChildSuccess(true);
-    setTimeout(() => {
-      setAddChildSuccess(false);
-      setIsAddChildModalOpen(false);
-      setNewChildName('');
-      setNewChildCode('');
-    }, 1500);
+    try {
+      const targetCode = foundStudent?.qrCode || searchQuery.trim();
+      const res = await sendParentLinkRequest(
+        {
+          uid: user.uid,
+          name: parentName,
+          phone: user.phone || user.profileData?.phone || '',
+          email: user.email || '',
+          avatarUrl: user.avatarUrl || user.profileData?.avatarUrl || '',
+        },
+        targetCode,
+        foundStudent?.name
+      );
+
+      if (res.success) {
+        setLinkSuccessMessage(res.message);
+        setTimeout(() => {
+          setLinkSuccessMessage('');
+          setIsAddChildModalOpen(false);
+          setSearchQuery('');
+          setFoundStudent(null);
+          if (res.request) {
+            setSelectedChildId(res.request.id);
+          }
+        }, 2200);
+      } else {
+        setSearchError(res.message);
+      }
+    } catch (err: any) {
+      setSearchError(err.message || 'حدث خطأ أثناء إرسال الطلب.');
+    } finally {
+      setIsSubmittingLink(false);
+    }
+  };
+
+  /**
+   * Unlink or cancel request
+   */
+  const handleUnlinkChild = async (reqId: string, studentId: string) => {
+    if (!confirm('هل أنت متأكد من رغبتك في إلغاء ربط هذا الحساب؟')) return;
+    setUnlinkingId(reqId);
+    try {
+      await removeParentChildLink(reqId, studentId, user?.uid || '');
+      setSelectedChildId('');
+    } catch (err: any) {
+      alert(err.message || 'حدث خطأ أثناء إلغاء الربط.');
+    } finally {
+      setUnlinkingId(null);
+    }
   };
 
   const handleReportSubmit = (e: React.FormEvent) => {
@@ -121,48 +221,128 @@ export const ParentDashboardPage: React.FC<ParentDashboardPageProps> = ({
   };
 
   return (
-    <div className="space-y-8 text-right">
+    <div className="space-y-8 text-right font-['Tajawal',sans-serif]">
       
       {/* 1. Multi-Child Selector Bar */}
       <div className="bg-white border border-gray-200 rounded-3xl p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <Users className="w-5 h-5 text-[#2563EB]" />
           <span className="text-xs sm:text-sm font-black text-[#1E3A8A]">
-            الأبناء المسجلين في حسابك ({children.length}):
+            الأبناء المسجلين في حسابك ({childrenList.length}):
           </span>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {children.map((child) => (
-            <button
-              key={child.id}
-              onClick={() => setSelectedChildId(child.id)}
-              className={`px-3.5 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                child.id === currentChild.id
-                  ? 'bg-[#2563EB] text-white shadow-md'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              <img
-                src={child.avatarUrl}
-                alt={child.name}
-                className="w-5 h-5 rounded-full object-cover"
-                referrerPolicy="no-referrer"
-              />
-              <span>{child.name}</span>
-              <span className="text-[10px] opacity-80">({child.grade.split(' ')[0]})</span>
-            </button>
-          ))}
+          {childrenList.map((child) => {
+            const isSelected = child.id === currentChild.id;
+            return (
+              <button
+                key={child.id}
+                onClick={() => setSelectedChildId(child.id)}
+                className={`px-3.5 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer border ${
+                  isSelected
+                    ? 'bg-[#2563EB] text-white border-[#2563EB] shadow-md'
+                    : child.status === 'pending'
+                    ? 'bg-amber-50 text-amber-900 border-amber-200 hover:bg-amber-100'
+                    : child.status === 'rejected'
+                    ? 'bg-red-50 text-red-900 border-red-200 hover:bg-red-100'
+                    : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                }`}
+              >
+                <img
+                  src={child.avatarUrl}
+                  alt={child.name}
+                  className="w-5 h-5 rounded-full object-cover shrink-0"
+                  referrerPolicy="no-referrer"
+                />
+                <span>{child.name}</span>
+                {child.status === 'pending' && (
+                  <span className="text-[10px] bg-amber-200 text-amber-900 px-1.5 py-0.2 rounded-md font-bold">
+                    معلق ⏳
+                  </span>
+                )}
+                {child.status === 'rejected' && (
+                  <span className="text-[10px] bg-red-200 text-red-900 px-1.5 py-0.2 rounded-md font-bold">
+                    مرفوض ✕
+                  </span>
+                )}
+              </button>
+            );
+          })}
 
           <button
-            onClick={() => setIsAddChildModalOpen(true)}
-            className="px-3.5 py-2 rounded-2xl text-xs font-bold bg-[#EFF6FF] text-[#2563EB] hover:bg-blue-100 border border-blue-200 flex items-center gap-1.5 transition-colors cursor-pointer"
+            onClick={() => {
+              setSearchError('');
+              setFoundStudent(null);
+              setSearchQuery('');
+              setIsAddChildModalOpen(true);
+            }}
+            className="px-4 py-2 rounded-2xl text-xs font-bold bg-[#EFF6FF] text-[#2563EB] hover:bg-blue-100 border border-blue-200 flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>ربط ابن جديد</span>
+            <span>إضافة / ربط ابن جديد</span>
           </button>
         </div>
       </div>
+
+      {/* Status Warning Banner if current selected child is Pending or Rejected */}
+      {currentChild.status === 'pending' && (
+        <div className="p-5 bg-gradient-to-r from-amber-50 via-yellow-50 to-white border border-amber-200 rounded-3xl text-amber-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0">
+              <Clock className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-sm font-black">طلب الربط في انتظار موافقة الطالب ⏳</h4>
+              <p className="text-xs text-amber-800 mt-0.5">
+                تم إرسال طلب ربط الحساب إلى الطالب <strong>({currentChild.name})</strong>. ستظهر لك بياناته وحضوره فور قيامه بالموافقة من حسابه.
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => handleUnlinkChild(currentChild.id, currentChild.studentId)}
+            disabled={unlinkingId === currentChild.id}
+            className="px-3.5 py-2 bg-white hover:bg-red-50 text-red-600 border border-red-200 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0"
+          >
+            إلغاء الطلب
+          </button>
+        </div>
+      )}
+
+      {currentChild.status === 'rejected' && (
+        <div className="p-5 bg-gradient-to-r from-red-50 via-rose-50 to-white border border-red-200 rounded-3xl text-red-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-red-500 text-white flex items-center justify-center shrink-0">
+              <AlertCircle className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-sm font-black">تم رفض طلب الربط من قِبل الطالب</h4>
+              <p className="text-xs text-red-700 mt-0.5">
+                {currentChild.declineReason || 'قام الطالب برفض طلب ربط الحساب.'} يمكنك إعادة المحاولة والتأكد من الكود.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleUnlinkChild(currentChild.id, currentChild.studentId)}
+              className="px-3.5 py-2 bg-white hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-xl text-xs font-bold transition-all cursor-pointer"
+            >
+              حذف السجل
+            </button>
+            <button
+              onClick={() => {
+                setSearchQuery(currentChild.qrCode);
+                setIsAddChildModalOpen(true);
+              }}
+              className="px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
+            >
+              إعادة إرسال الطلب
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 2. Selected Student Header */}
       <div className="bg-[#1E3A8A] text-white rounded-3xl p-6 sm:p-8 shadow-md flex flex-col md:flex-row items-center justify-between gap-6">
@@ -170,13 +350,15 @@ export const ParentDashboardPage: React.FC<ParentDashboardPageProps> = ({
           <img
             src={currentChild.avatarUrl}
             alt={currentChild.name}
-            className="w-18 h-18 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-white ring-2 ring-blue-300 shadow-sm"
+            className="w-18 h-18 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-white ring-2 ring-blue-300 shadow-sm bg-white"
             referrerPolicy="no-referrer"
           />
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-bold bg-white/20 px-2.5 py-0.5 rounded-full text-blue-100">
-                متابعة الحصص
+              <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
+                currentChild.status === 'approved' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30' : 'bg-amber-500/20 text-amber-300 border border-amber-400/30'
+              }`}>
+                {currentChild.status === 'approved' ? 'مربوط ومعتمد ✓' : 'في انتظار الموافقة ⏳'}
               </span>
               <span className="text-xs text-blue-200">{currentChild.grade}</span>
             </div>
@@ -197,7 +379,7 @@ export const ParentDashboardPage: React.FC<ParentDashboardPageProps> = ({
             </div>
             <div>
               <span className="text-xs font-bold text-emerald-300 block">إشعارات الواتساب نشطة ✓</span>
-              <span className="text-[11px] text-blue-100 font-mono">01234567890</span>
+              <span className="text-[11px] text-blue-100 font-mono">{user?.phone || '010XXXXXXXX'}</span>
             </div>
           </div>
 
@@ -222,7 +404,7 @@ export const ParentDashboardPage: React.FC<ParentDashboardPageProps> = ({
             </div>
           </div>
           <p className="text-2xl font-black text-[#1E3A8A]">{currentChild.tutorsCount} معلمين</p>
-          <span className="text-[11px] text-[#2563EB] font-bold">كيمياء، فيزياء، لغة عربية</span>
+          <span className="text-[11px] text-[#2563EB] font-bold">حسب جدول مجموعات الطالب</span>
         </div>
 
         <div className="bg-white border border-gray-200 rounded-3xl p-5 space-y-1">
@@ -255,201 +437,148 @@ export const ParentDashboardPage: React.FC<ParentDashboardPageProps> = ({
             </div>
           </div>
           <p className="text-2xl font-black text-[#1E3A8A]">{currentChild.attendanceRate}%</p>
-          <span className="text-[11px] text-emerald-700 font-bold">مستوى ممتاز ومستقر</span>
+          <span className="text-[11px] text-emerald-700 font-bold">مستوى مستقر</span>
         </div>
 
       </div>
 
-      {/* 4. Real-Time Activity Feed & Educational Notes */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        {/* Left 2 Cols: Live Feed & Notes */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-[#1E3A8A] flex items-center gap-2">
-              <Clock className="w-4 h-4 text-[#2563EB]" />
-              <span>سجل الحضور اللحظي لـ ({currentChild.name})</span>
+      {/* 4. Educational Guidance & Fast Linking Quick Info */}
+      <div className="bg-white border border-gray-200 rounded-3xl p-6 sm:p-7 shadow-xs">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <h3 className="text-base font-black text-[#1E3A8A] flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-[#2563EB]" />
+              <span>إدارة الأبناء وطلبات الربط المعتمدة</span>
             </h3>
-            <button
-              onClick={() => onNavigate('/parent/attendance')}
-              className="text-xs font-bold text-[#2563EB] hover:underline flex items-center gap-1 cursor-pointer"
-            >
-              <span>عرض سجل الحضور الكامل</span>
-              <ArrowLeft className="w-3.5 h-3.5" />
-            </button>
+            <p className="text-xs text-gray-500">
+              يمكنك ربط أكثر من ابن بمجرد إدخال كود بطاقته الرقمية، وسيقوم النظام بإرسال طلب رسمي للطالب للموافقة والربط الفوري.
+            </p>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-xs space-y-3">
-            {recentActivities.length > 0 ? (
-              <div className="divide-y divide-gray-100">
-                {recentActivities.map((act) => (
-                  <div key={act.id} className="pt-3.5 first:pt-0 flex flex-col gap-2 text-xs">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3">
-                        <div
-                          className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                            act.status === 'present'
-                              ? 'bg-emerald-50 text-[#10B981]'
-                              : 'bg-red-50 text-[#EF4444]'
-                          }`}
-                        >
-                          {act.status === 'present' ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
-                        </div>
-
-                        <div>
-                          <h4 className="font-bold text-[#1E3A8A] text-sm">
-                            {act.status === 'present' ? 'حضر بنجاح: ' : 'غياب: '}
-                            {act.subject} مع {act.tutorName}
-                          </h4>
-                          <p className="text-[11px] text-[#6B7280] mt-0.5">
-                            {act.center} — مسح كود الـ QR الساعة {act.time}
-                          </p>
-                          <span className="text-[10px] text-gray-400 font-mono mt-0.5 block">
-                            {act.date}
-                          </span>
-                        </div>
-                      </div>
-
-                      <Badge variant={act.status === 'present' ? 'success' : 'danger'} size="sm">
-                        {act.status === 'present' ? 'حاضر في الموعد ✅' : 'غائب'}
-                      </Badge>
-                    </div>
-
-                    {/* Educational Follow-up note from teacher if present */}
-                    {act.teacherNotes && (
-                      <div className="p-3 bg-blue-50/70 border border-blue-100 rounded-2xl text-[11px] text-[#1E3A8A] flex items-start gap-2">
-                        <FileText className="w-4 h-4 text-[#2563EB] shrink-0 mt-0.5" />
-                        <div>
-                          <strong>ملاحظة وواجب المعلم:</strong> {act.teacherNotes}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 space-y-2">
-                <Clock className="w-8 h-8 text-gray-400 mx-auto" />
-                <p className="text-xs font-bold text-gray-700">لا توجد سجلات حضور مسجلة حتى الآن</p>
-                <p className="text-[11px] text-gray-500 max-w-sm mx-auto">
-                  بمجرد قيام الطالب بمسح كود الـ QR عند دخول الحصة في السنتر، ستصلك الإشعارات اللحظية ويظهر السجل هنا فوراً.
-                </p>
-              </div>
-            )}
-          </div>
+          <button
+            onClick={() => {
+              setSearchError('');
+              setFoundStudent(null);
+              setSearchQuery('');
+              setIsAddChildModalOpen(true);
+            }}
+            className="px-5 py-2.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs cursor-pointer active:scale-95 shrink-0"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>إضافة ابن آخر بالـ QR</span>
+          </button>
         </div>
-
-        {/* Right 1 Col: Quick Links */}
-        <div className="space-y-4">
-          <h3 className="text-base font-bold text-[#1E3A8A]">خدمات أولياء الأمور</h3>
-
-          <div className="bg-white border border-gray-200 rounded-3xl p-5 space-y-3 shadow-xs">
-            <button
-              onClick={() => onNavigate('/parent/attendance')}
-              className="w-full p-3.5 bg-gray-50 hover:bg-[#EFF6FF] text-right rounded-2xl border border-gray-100 hover:border-blue-200 transition-colors flex items-center justify-between cursor-pointer"
-            >
-              <div>
-                <span className="text-xs font-bold text-[#1E3A8A] block">سجل الحضور والتظلمات</span>
-                <span className="text-[10px] text-[#6B7280]">طلب حصة تعويضية أو مراجعة حضور</span>
-              </div>
-              <ArrowLeft className="w-4 h-4 text-[#2563EB]" />
-            </button>
-
-            <button
-              onClick={() => onNavigate('/parent/payments')}
-              className="w-full p-3.5 bg-gray-50 hover:bg-[#EFF6FF] text-right rounded-2xl border border-gray-100 hover:border-blue-200 transition-colors flex items-center justify-between cursor-pointer"
-            >
-              <div>
-                <span className="text-xs font-bold text-[#1E3A8A] block">سجل المدفوعات والإيصالات</span>
-                <span className="text-[10px] text-[#6B7280]">فواتير واشتراكات الأبناء</span>
-              </div>
-              <ArrowLeft className="w-4 h-4 text-[#2563EB]" />
-            </button>
-
-            <button
-              onClick={() => onNavigate('/parent/settings')}
-              className="w-full p-3.5 bg-gray-50 hover:bg-[#EFF6FF] text-right rounded-2xl border border-gray-100 hover:border-blue-200 transition-colors flex items-center justify-between cursor-pointer"
-            >
-              <div>
-                <span className="text-xs font-bold text-[#1E3A8A] block">إعدادات أرقام الواتساب والطوارئ</span>
-                <span className="text-[10px] text-[#6B7280]">تعديل رقم ولي الأمر ورقم الطوارئ</span>
-              </div>
-              <ArrowLeft className="w-4 h-4 text-[#2563EB]" />
-            </button>
-          </div>
-        </div>
-
       </div>
 
-      {/* MODAL: Link / Add New Child */}
+      {/* MODAL: Add Child / Send Link Request */}
       <Modal
         isOpen={isAddChildModalOpen}
-        onClose={() => setIsAddChildModalOpen(false)}
-        title="ربط حساب ابن إضافي"
-        subtitle="أدخل كود الطالب من بطاقة الـ QR الخاصة به"
-        icon={<UserPlus className="w-6 h-6" />}
+        onClose={() => {
+          setIsAddChildModalOpen(false);
+          setFoundStudent(null);
+          setSearchError('');
+        }}
+        title="إضافة وربط ابن جديد بحسابك"
+        subtitle="أدخل كود بطاقة الطالب وسيتم إرسال طلب ربط فوري له للموافقة"
+        icon={<UserPlus className="w-6 h-6 text-[#2563EB]" />}
         maxWidth="md"
       >
-        {addChildSuccess ? (
-          <div className="py-6 text-center text-xs text-emerald-800 space-y-2">
-            <CheckCircle2 className="w-10 h-10 text-emerald-600 mx-auto" />
-            <p className="font-bold">تم ربط حساب الطالب بنجاح!</p>
+        {linkSuccessMessage ? (
+          <div className="py-6 text-center space-y-3 animate-in fade-in duration-200">
+            <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+              <Check className="w-8 h-8" />
+            </div>
+            <h4 className="text-base font-black text-[#1E3A8A]">تم إرسال الطلب بنجاح! 🎉</h4>
+            <p className="text-xs text-gray-600 max-w-sm mx-auto leading-relaxed">
+              {linkSuccessMessage}
+            </p>
           </div>
         ) : (
-          <form onSubmit={handleAddChildSubmit} className="space-y-3 pt-1">
+          <form onSubmit={handleSendLinkSubmit} className="space-y-4 pt-1 text-right">
             <div>
-              <label className="block text-xs font-bold text-[#1F2937] mb-1">
-                اسم الابن / الابنة <span className="text-[#EF4444]">*</span>
+              <label className="block text-xs font-bold text-[#1F2937] mb-1.5">
+                كود بطاقة الطالب (QR Code) أو رقم الهاتف <span className="text-red-500">*</span>
               </label>
-              <input
-                type="text"
-                required
-                placeholder="مثال: يوسف أحمد"
-                value={newChildName}
-                onChange={(e) => setNewChildName(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-right focus:bg-white focus:outline-none focus:border-[#2563EB]"
-              />
+              
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  required
+                  placeholder="مثال: HASSTY-98120 أو رقم هاتف الطالب"
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    if (foundStudent) setFoundStudent(null);
+                    if (searchError) setSearchError('');
+                  }}
+                  className="flex-1 px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono text-left focus:bg-white focus:outline-none focus:border-[#2563EB]"
+                />
+                <button
+                  type="button"
+                  onClick={handleSearchStudent}
+                  disabled={isSearchingStudent || !searchQuery.trim()}
+                  className="px-4 py-2.5 bg-gray-800 hover:bg-black text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-1.5 cursor-pointer shrink-0"
+                >
+                  {isSearchingStudent ? (
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-3.5 h-3.5" />
+                  )}
+                  <span>بحث</span>
+                </button>
+              </div>
+              <span className="text-[10px] text-gray-400 mt-1 block">
+                يمكنك الحصول على الكود من شاشة البروفايل أو كارنيه الـ QR الخاص بالابن.
+              </span>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-[#1F2937] mb-1">
-                المرحلة والصف الدراسي
-              </label>
-              <select
-                value={newChildGrade}
-                onChange={(e) => setNewChildGrade(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-right focus:bg-white focus:outline-none focus:border-[#2563EB] cursor-pointer"
-              >
-                {ALL_EGYPT_GRADES.map((g) => (
-                  <option key={g} value={g}>{g}</option>
-                ))}
-              </select>
-            </div>
+            {/* Found Student Card */}
+            {foundStudent && (
+              <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-2xl flex items-center gap-3 animate-in fade-in duration-200">
+                <img
+                  src={getCleanAvatarUrl(foundStudent.avatarUrl, 'student', foundStudent.name)}
+                  alt={foundStudent.name}
+                  className="w-12 h-12 rounded-xl object-cover border border-blue-200 bg-white shrink-0"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black text-[#1E3A8A] truncate">
+                      {foundStudent.name}
+                    </span>
+                    <span className="text-[10px] font-bold bg-blue-200 text-blue-800 px-2 py-0.5 rounded-full">
+                      طالب مسجل
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-blue-700 mt-0.5">
+                    {foundStudent.grade || 'المرحلة الثانوية'} — كود: <strong className="font-mono">{foundStudent.qrCode || searchQuery}</strong>
+                  </p>
+                </div>
+              </div>
+            )}
 
-            <div>
-              <label className="block text-xs font-bold text-[#1F2937] mb-1">
-                كود بطاقة الطالب (QR Code) <span className="text-[#EF4444]">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="مثال: HST-2026-44910"
-                value={newChildCode}
-                onChange={(e) => setNewChildCode(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono text-center focus:bg-white focus:outline-none focus:border-[#2563EB]"
-              />
-            </div>
+            {searchError && (
+              <p className="text-xs text-red-600 font-medium flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>{searchError}</span>
+              </p>
+            )}
 
-            <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl text-[11px] text-[#1E3A8A]">
-              سيتم إرسال رمز تحقق سريع عبر رسالة واتساب لتأكيد ملكية بطاقة الطالب.
+            <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl text-[11px] text-gray-600 leading-relaxed">
+              💡 <strong>كيف تعمل آلية الموافقة؟</strong> بمجرد الضغط على إرسال، يظهر إشعار واضح في حساب الطالب لطلب موافقته على اعتمادك كولي أمر، وفور ضغطه على موافقة تظهر لك بياناته بالكامل.
             </div>
 
             <button
               type="submit"
-              className="w-full py-3 bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer mt-2"
+              disabled={isSubmittingLink || (!foundStudent && !searchQuery.trim())}
+              className="w-full py-3 bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-2"
             >
-              <UserPlus className="w-4 h-4" />
-              <span>تأكيد وربط الحساب</span>
+              {isSubmittingLink ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <UserPlus className="w-4 h-4" />
+              )}
+              <span>إرسال طلب ربط لولي الأمر</span>
             </button>
           </form>
         )}

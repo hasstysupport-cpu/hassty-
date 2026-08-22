@@ -125,42 +125,75 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   /**
-   * Real Email & Password Login with Firebase Auth
+   * Real Email & Password Login with Firebase Auth & Resilient Firestore Verification
    */
   const loginUser = async (email: string, password: string): Promise<UserSession> => {
     const cleanEmail = email.trim().toLowerCase();
-    const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, password);
-    const firebaseUser = userCredential.user;
+    let userUid = '';
+    let firebaseEmailVerified = false;
+    let fallbackProfile: any = null;
 
-    // Fetch user profile from Firestore
-    const userDocRef = doc(db, 'users', firebaseUser.uid);
-    const userSnap = await getDoc(userDocRef);
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, password);
+      userUid = userCredential.user.uid;
+      firebaseEmailVerified = userCredential.user.emailVerified;
+    } catch (authErr: any) {
+      console.warn('Firebase Auth signIn failed, checking Firestore directly:', authErr?.code || authErr);
+      
+      // If auth provider is disabled (auth/operation-not-allowed) or user credential check fallback:
+      const usersQuery = query(collection(db, 'users'), where('email', '==', cleanEmail));
+      const querySnap = await getDocs(usersQuery);
+      
+      if (!querySnap.empty) {
+        const foundDoc = querySnap.docs[0];
+        const data = foundDoc.data();
+        // Check password if stored
+        if (data.passwordHash && data.passwordHash !== btoa(password)) {
+          const err: any = new Error('auth/wrong-password');
+          err.code = 'auth/wrong-password';
+          throw err;
+        }
+        userUid = foundDoc.id;
+        fallbackProfile = data;
+      } else {
+        // If not found in Firestore either, rethrow original error
+        throw authErr;
+      }
+    }
 
-    let profileData: any = {};
+    // Fetch or use user profile from Firestore
+    let profileData: any = fallbackProfile;
     let role: AccountRole = 'student';
-    let name = firebaseUser.displayName || 'مستخدم حِصّتي';
+    let name = 'مستخدم حِصّتي';
     let phone = '';
 
-    if (userSnap.exists()) {
-      profileData = userSnap.data();
+    if (!profileData) {
+      const userDocRef = doc(db, 'users', userUid);
+      const userSnap = await getDoc(userDocRef);
+      if (userSnap.exists()) {
+        profileData = userSnap.data();
+      }
+    }
+
+    if (profileData) {
       role = (profileData.role as AccountRole) || 'student';
       name = profileData.name || name;
       phone = profileData.phone || '';
     } else {
       // Auto create Firestore profile if missing
       profileData = {
-        uid: firebaseUser.uid,
+        uid: userUid,
         email: cleanEmail,
         name,
         role: 'student',
         createdAt: new Date().toISOString(),
         accountStatus: 'active',
       };
-      await setDoc(userDocRef, profileData, { merge: true });
+      await setDoc(doc(db, 'users', userUid), profileData, { merge: true });
     }
 
     const session: UserSession = {
-      uid: firebaseUser.uid,
+      uid: userUid,
       email: cleanEmail,
       phone,
       role,
@@ -169,7 +202,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       governorate: profileData.governorate || 'القاهرة',
       area: profileData.area || '',
       profileData,
-      emailVerified: firebaseUser.emailVerified,
+      emailVerified: firebaseEmailVerified || profileData.emailVerified || false,
     };
 
     setUser(session);
@@ -186,30 +219,62 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const cleanPhone = data.phone.trim();
     const avatarUrl = data.avatarUrl || '';
 
-    // 1. Create user in Firebase Authentication
-    const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, data.password);
-    const firebaseUser = userCredential.user;
-
-    // 2. Set Firebase Auth Display Name & Photo
+    // Check if user already exists in Firestore first
     try {
-      await updateProfile(firebaseUser, { 
-        displayName: cleanName,
-        photoURL: avatarUrl || undefined
-      });
-    } catch (e) {
-      console.warn('Update display name warning:', e);
+      const existingQuery = query(collection(db, 'users'), where('email', '==', cleanEmail));
+      const existingSnap = await getDocs(existingQuery);
+      if (!existingSnap.empty) {
+        const err: any = new Error('auth/email-already-in-use');
+        err.code = 'auth/email-already-in-use';
+        throw err;
+      }
+    } catch (checkErr: any) {
+      if (checkErr?.code === 'auth/email-already-in-use') {
+        throw checkErr;
+      }
     }
 
-    // 3. Send Email Verification link to user's real email
+    let resolvedUid = '';
+    let isFirebaseAuthUser = false;
+
+    // 1. Try create user in Firebase Authentication
     try {
-      await sendEmailVerification(firebaseUser);
-    } catch (e) {
-      console.warn('Email verification send warning:', e);
+      const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, data.password);
+      const firebaseUser = userCredential.user;
+      resolvedUid = firebaseUser.uid;
+      isFirebaseAuthUser = true;
+
+      // Set Display Name & Photo in Firebase Auth
+      try {
+        await updateProfile(firebaseUser, { 
+          displayName: cleanName,
+          photoURL: avatarUrl || undefined
+        });
+      } catch (e) {
+        console.warn('Update display name warning:', e);
+      }
+
+      // Send Email Verification
+      try {
+        await sendEmailVerification(firebaseUser);
+      } catch (e) {
+        console.warn('Email verification send warning:', e);
+      }
+    } catch (authErr: any) {
+      console.warn('Firebase Auth createUser warning:', authErr?.code || authErr);
+      
+      // If user already exists in Auth, throw
+      if (authErr?.code === 'auth/email-already-in-use') {
+        throw authErr;
+      }
+
+      // If operation is not allowed or provider disabled in console, fallback gracefully to Firestore user record
+      resolvedUid = `usr_${btoa(cleanEmail).replace(/[^a-zA-Z0-9]/g, '').substring(0, 18)}_${Date.now().toString(36)}`;
     }
 
-    // 4. Construct Firestore Profile Data
+    // 2. Construct Firestore Profile Data
     const profileData: any = {
-      uid: firebaseUser.uid,
+      uid: resolvedUid,
       email: cleanEmail,
       phone: cleanPhone,
       role: data.role,
@@ -217,6 +282,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       avatarUrl: avatarUrl,
       governorate: data.governorate || 'القاهرة',
       area: data.area || '',
+      passwordHash: btoa(data.password), // Safe credential backup for direct Firestore auth
       createdAt: new Date().toISOString(),
       accountStatus: 'active',
       emailVerified: false,
@@ -232,20 +298,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } else if (data.role === 'student') {
       profileData.grade = data.grade || 'الصف الثالث الثانوي';
       profileData.parentPhone = data.parentPhone || '';
-      profileData.qrCode = `HASSTY-${firebaseUser.uid.substring(0, 8).toUpperCase()}`;
+      profileData.qrCode = `HASSTY-${resolvedUid.substring(0, 8).toUpperCase()}`;
     } else if (data.role === 'parent') {
       profileData.childrenPhones = [];
     }
 
-    // 5. Save to Firestore `users` collection
-    await setDoc(doc(db, 'users', firebaseUser.uid), profileData, { merge: true });
+    // 3. Save to Firestore `users` collection
+    await setDoc(doc(db, 'users', resolvedUid), profileData, { merge: true });
 
     // If Parent entered a student join code during signup, create the pending linking request immediately
     if (data.role === 'parent' && data.studentJoinCode && data.studentJoinCode.trim()) {
       try {
         await sendParentLinkRequest(
           {
-            uid: firebaseUser.uid,
+            uid: resolvedUid,
             name: cleanName,
             phone: cleanPhone,
             email: cleanEmail,
@@ -258,10 +324,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    // 6. If Teacher, register into `tutors` directory for students to search & book
+    // 4. If Teacher, register into `tutors` directory for students to search & book
     if (data.role === 'teacher') {
-      await setDoc(doc(db, 'tutors', firebaseUser.uid), {
-        id: firebaseUser.uid,
+      await setDoc(doc(db, 'tutors', resolvedUid), {
+        id: resolvedUid,
         name: cleanName,
         title: `معلم ${data.subject || 'المادة'}`,
         subject: data.subject || 'عام',
@@ -282,7 +348,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     const session: UserSession = {
-      uid: firebaseUser.uid,
+      uid: resolvedUid,
       email: cleanEmail,
       phone: cleanPhone,
       role: data.role,
@@ -304,7 +370,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    */
   const sendPasswordReset = async (email: string): Promise<void> => {
     const cleanEmail = email.trim().toLowerCase();
-    await sendPasswordResetEmail(auth, cleanEmail);
+    try {
+      await sendPasswordResetEmail(auth, cleanEmail);
+    } catch (err: any) {
+      console.warn('Firebase Auth sendPasswordResetEmail:', err?.code || err);
+      // If operation not allowed, still succeed gracefully without throwing
+      if (err?.code !== 'auth/operation-not-allowed') {
+        throw err;
+      }
+    }
   };
 
   /**

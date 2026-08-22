@@ -16,7 +16,9 @@ import {
   Trash2,
   RefreshCw,
   Clock,
-  BookOpen
+  BookOpen,
+  Copy,
+  Check
 } from 'lucide-react';
 import { useAuth } from '../../lib/AuthContext';
 import { LocationSelector } from '../../components/common/LocationSelector';
@@ -39,8 +41,15 @@ export const StudentProfilePage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccessMessage, setSaveSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [copiedCode, setCopiedCode] = useState(false);
 
   const qrCode = user?.profileData?.qrCode || (user?.uid ? `HASSTY-${user.uid.substring(0, 8).toUpperCase()}` : 'HASSTY-STU');
+
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(qrCode);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
+  };
 
   /**
    * Handle Photo File Selection & Client-Side Compression
@@ -368,15 +377,48 @@ export const StudentProfilePage: React.FC = () => {
         </div>
 
         {/* Section C: Parent Info & Safety Notifications */}
-        <div className="bg-white border border-[#E5E7EB] rounded-3xl p-6 sm:p-7 shadow-xs space-y-4">
+        <div className="bg-white border border-[#E5E7EB] rounded-3xl p-6 sm:p-7 shadow-xs space-y-5">
           <div>
             <h3 className="text-base font-black text-[#1E3A8A] flex items-center gap-2">
               <ShieldCheck className="w-5 h-5 text-emerald-600" />
-              <span>بيانات ولي الأمر وإشعارات الحضور (WhatsApp)</span>
+              <span>كود ربط ولي الأمر وإشعارات الحضور (WhatsApp)</span>
             </h3>
             <p className="text-xs text-gray-500 mt-0.5">
-              يصل لولي الأمر إشعار WhatsApp فوري عند مسح كود الـ QR الخاص بك في الحصة لتأكيد حضورك وموعد انصرافك.
+              شارك هذا الكود مع ولي أمرك عند إنشاء حسابه أو من لوحة تحكمه ليتمكن من إرسال طلب ربط الحساب.
             </p>
+          </div>
+
+          {/* Student Join Code Box */}
+          <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className="w-10 h-10 rounded-xl bg-[#2563EB] text-white flex items-center justify-center shrink-0 shadow-xs">
+                <QrCode className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="text-[11px] font-bold text-blue-900 block">كود البطاقة والربط الخاص بك:</span>
+                <span className="font-mono text-sm sm:text-base font-black text-[#1E3A8A] tracking-wider select-all">
+                  {qrCode}
+                </span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleCopyCode}
+              className="w-full sm:w-auto px-4 py-2 bg-white hover:bg-blue-100 text-[#2563EB] border border-blue-300 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
+            >
+              {copiedCode ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  <span className="text-emerald-700 font-bold">تم نسخ الكود!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>نسخ الكود لولي الأمر</span>
+                </>
+              )}
+            </button>
           </div>
 
           <div>
@@ -395,7 +437,7 @@ export const StudentProfilePage: React.FC = () => {
               <Phone className="w-4 h-4 text-emerald-600 absolute right-3.5 top-3.5" />
             </div>
             <span className="text-[11px] text-gray-400 mt-1 block">
-              سيتم ربط هذا الرقم بنظام إشعارات الحضور وغياب الحصص الذكي.
+              سيتم إرسال إشعارات الحضور وغياب الحصص التلقائية لهذا الرقم.
             </span>
           </div>
         </div>
