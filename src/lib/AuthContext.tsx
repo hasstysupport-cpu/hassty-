@@ -134,15 +134,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    */
   const loginUser = async (emailOrPhone: string, password: string): Promise<UserSession> => {
     const cleanInput = emailOrPhone.trim();
-    const cleanEmail = cleanInput.toLowerCase();
+    let targetEmail = cleanInput.toLowerCase();
+
+    // Check if input is a phone number (e.g. 010..., 011..., 012..., 015... or +20...)
+    const isPhoneNumber = /^(\+20|0020|0)?1[0125][0-9]{8}$/.test(cleanInput.replace(/\s+/g, ''));
+    if (isPhoneNumber) {
+      try {
+        const normalizedPhone = cleanInput.replace(/\s+/g, '');
+        const phoneQuery = query(collection(db, 'users'), where('phone', '==', normalizedPhone));
+        const phoneSnap = await getDocs(phoneQuery);
+        if (!phoneSnap.empty) {
+          const matchedUser = phoneSnap.docs[0].data();
+          if (matchedUser.email) {
+            targetEmail = matchedUser.email.toLowerCase();
+          }
+        }
+      } catch (phoneLookupErr) {
+        console.warn('Phone number lookup warning in login:', phoneLookupErr);
+      }
+    }
 
     // Check if it is one of the built-in demo accounts or admin
     const isDemoEmail =
-      cleanEmail === 'student@hassty.com' ||
-      cleanEmail === 'teacher@hassty.com' ||
-      cleanEmail === 'parent@hassty.com' ||
-      cleanEmail === 'hasstysupport@gmail.com' ||
-      cleanEmail === 'admin@hassty.com';
+      targetEmail === 'student@hassty.com' ||
+      targetEmail === 'teacher@hassty.com' ||
+      targetEmail === 'parent@hassty.com' ||
+      targetEmail === 'hasstysupport@gmail.com' ||
+      targetEmail === 'admin@hassty.com';
 
     let userCredential: any = null;
     let firebaseUser: FirebaseUser | null = null;
@@ -150,22 +168,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let firebaseEmailVerified = false;
 
     try {
-      userCredential = await signInWithEmailAndPassword(auth, cleanEmail, password);
+      userCredential = await signInWithEmailAndPassword(auth, targetEmail, password);
       firebaseUser = userCredential.user;
       userUid = firebaseUser.uid;
       firebaseEmailVerified = firebaseUser.emailVerified;
     } catch (authErr: any) {
+      console.warn('Firebase Auth signIn warning:', authErr?.code || authErr);
+
       // If it's a demo account and wasn't created yet in Firebase Auth, auto-provision it
       if (isDemoEmail && (authErr?.code === 'auth/user-not-found' || authErr?.code === 'auth/invalid-credential')) {
         try {
-          userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, password || 'Demo123456');
+          userCredential = await createUserWithEmailAndPassword(auth, targetEmail, password || 'Demo123456');
           firebaseUser = userCredential.user;
           userUid = firebaseUser.uid;
           firebaseEmailVerified = firebaseUser.emailVerified;
         } catch (createErr: any) {
           if (createErr?.code === 'auth/email-already-in-use') {
             try {
-              userCredential = await signInWithEmailAndPassword(auth, cleanEmail, password || 'Demo123456');
+              userCredential = await signInWithEmailAndPassword(auth, targetEmail, password || 'Demo123456');
               firebaseUser = userCredential.user;
               userUid = firebaseUser.uid;
               firebaseEmailVerified = firebaseUser.emailVerified;
@@ -184,7 +204,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             userUid = anonCred.user.uid;
             firebaseEmailVerified = true;
           } catch {
-            userUid = `usr_${btoa(cleanEmail).replace(/[^a-zA-Z0-9]/g, '').substring(0, 18)}`;
+            userUid = `usr_${btoa(targetEmail).replace(/[^a-zA-Z0-9]/g, '').substring(0, 18)}`;
             firebaseEmailVerified = true;
           }
         } else {
@@ -209,21 +229,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Auto-create initial profile for this user if missing
       let role: AccountRole = 'student';
       let name = firebaseUser?.displayName || 'مستخدم حِصّتي';
-      let phone = '';
+      let phone = isPhoneNumber ? cleanInput : '';
 
-      if (cleanEmail === 'hasstysupport@gmail.com' || cleanEmail === 'admin@hassty.com') {
+      if (targetEmail === 'hasstysupport@gmail.com' || targetEmail === 'admin@hassty.com') {
         role = 'admin';
         name = 'مدير منصة حِصّتي';
         phone = '01000000000';
-      } else if (cleanEmail === 'teacher@hassty.com') {
+      } else if (targetEmail === 'teacher@hassty.com') {
         role = 'teacher';
         name = 'أ. حسام الدين (معلم تجريبي)';
         phone = '01234567890';
-      } else if (cleanEmail === 'parent@hassty.com') {
+      } else if (targetEmail === 'parent@hassty.com') {
         role = 'parent';
         name = 'د. محمود عادل (ولي أمر تجريبي)';
         phone = '01123456789';
-      } else if (cleanEmail === 'student@hassty.com') {
+      } else if (targetEmail === 'student@hassty.com') {
         role = 'student';
         name = 'زياد محمود (طالب تجريبي)';
         phone = '01012345678';
@@ -231,7 +251,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       profileData = {
         uid: userUid,
-        email: cleanEmail,
+        email: targetEmail,
         name,
         phone,
         role,
@@ -270,7 +290,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             levels: ['الصف الثالث الثانوي'],
             bio: 'معلم متخصص في الفيزياء معتمد على منصة حِصّتي.',
             phone,
-            email: cleanEmail,
+            email: targetEmail,
           }, { merge: true });
         }
       } catch (writeErr) {
@@ -280,7 +300,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const session: UserSession = {
       uid: userUid,
-      email: cleanEmail,
+      email: targetEmail,
       phone: profileData.phone || '',
       role: (profileData.role as AccountRole) || 'student',
       name: profileData.name || 'مستخدم حِصّتي',
