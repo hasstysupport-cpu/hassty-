@@ -23,8 +23,11 @@ import { ContactPage } from './pages/ContactPage';
 import { ForTeachersPage } from './pages/ForTeachersPage';
 import { LoginPage } from './pages/LoginPage';
 import { SignupPage } from './pages/SignupPage';
+import { VerifyEmailPage } from './pages/VerifyEmailPage';
 import { WhatsAppStudioPage } from './pages/admin/WhatsAppStudioPage';
 import { HasstyAdminApp } from './pages/admin/HasstyAdminApp';
+
+import { SECRET_ADMIN_ROUTE } from './lib/securityConfig';
 
 // Student Pages
 import { StudentDashboardPage } from './pages/student/StudentDashboardPage';
@@ -127,17 +130,45 @@ export default function App() {
     currentPath.startsWith('/parent') ||
     currentPath.startsWith('/teacher');
 
-  const isAdminAppRoute = currentPath.startsWith('/admin') || window.location.hostname.startsWith('admin.');
+  // Check if current user is logged in but unverified (Mandatory Verification Guard)
+  const isUnverified = isLoggedIn && !user?.emailVerified && user?.role !== 'admin';
+
+  // Enforce mandatory verification: redirect any attempt to access dashboard to /verify-email
+  useEffect(() => {
+    if (isUnverified && (isDashboardRoute || currentPath === '/')) {
+      setCurrentPath('/verify-email');
+    }
+  }, [isUnverified, isDashboardRoute, currentPath]);
+
+  // Secret Obfuscated Admin Path & Legacy Route Guarding
+  const isAdminAppRoute =
+    currentPath.startsWith(SECRET_ADMIN_ROUTE) ||
+    currentPath.startsWith('/admin') ||
+    (typeof window !== 'undefined' && window.location.hostname.startsWith('admin.'));
+
+  // Extract authKey if present in query string
+  const [initialAdminToken] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('authKey') || null;
+    }
+    return null;
+  });
 
   if (isAdminAppRoute) {
-    return <HasstyAdminApp onSwitchToPublicApp={() => setCurrentPath('/')} />;
+    return (
+      <HasstyAdminApp
+        onSwitchToPublicApp={() => setCurrentPath('/')}
+        initialToken={initialAdminToken}
+      />
+    );
   }
 
   return (
     <div className="min-h-screen bg-[#F8FAFF] text-[#1F2937] font-['Tajawal',sans-serif] selection:bg-[#EFF6FF] selection:text-[#2563EB] flex flex-col antialiased">
       
       {/* 1. TOP NAVBAR */}
-      {isLoggedIn && isDashboardRoute ? (
+      {isLoggedIn && isDashboardRoute && !isUnverified ? (
         <LoggedInNavbar
           currentRole={currentRole}
           currentPath={currentPath}
@@ -161,7 +192,7 @@ export default function App() {
       )}
 
       {/* 2. MAIN VIEW AREA */}
-      {isDashboardRoute && isLoggedIn ? (
+      {isDashboardRoute && isLoggedIn && !isUnverified ? (
         // DASHBOARD LAYOUT (Sidebar + Main Content)
         <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 pb-24 sm:pb-28 lg:pb-8 flex flex-col md:flex-row gap-6 lg:gap-8 items-start">
           
@@ -251,6 +282,10 @@ export default function App() {
 
           {currentPath === '/signup' && (
             <SignupPage onNavigate={handleNavigate} onSignupSuccess={handleLogin} />
+          )}
+
+          {(currentPath === '/verify-email' || isUnverified) && (
+            <VerifyEmailPage onNavigate={handleNavigate} onVerificationSuccess={handleLogin} />
           )}
 
           {currentPath === '/whatsapp-studio' && (

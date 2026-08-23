@@ -10,10 +10,11 @@ import {
   CheckCircle2,
   KeyRound,
   Send,
-  Sparkles
+  ShieldCheck,
 } from 'lucide-react';
 import { AccountRole } from '../types';
 import { useAuth } from '../lib/AuthContext';
+import { sendServerVerificationOtp } from '../lib/securityService';
 
 interface LoginPageProps {
   onNavigate: (path: string) => void;
@@ -52,22 +53,49 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     try {
       const session = await loginUser(email, password);
       setIsLoading(false);
-      onLoginSuccess(session.role, session.email);
+
+      // Check email verification status: If unverified, mandatory redirect to dedicated /verify-email page
+      if (!session.emailVerified && session.role !== 'admin') {
+        // Trigger server-side OTP dispatch for email & WhatsApp
+        try {
+          await sendServerVerificationOtp({
+            email: session.email,
+            uid: session.uid,
+            name: session.name,
+            role: session.role,
+            phone: session.phone,
+            purpose: 'login',
+          });
+        } catch (e) {
+          console.warn('Initial OTP dispatch on login warning:', e);
+        }
+        
+        onNavigate('/verify-email');
+      } else {
+        onLoginSuccess(session.role, session.email);
+      }
     } catch (err: any) {
       setIsLoading(false);
       console.error('Login error:', err);
 
       const code = err?.code || '';
       if (code === 'auth/user-not-found' || code === 'auth/invalid-credential') {
-        setErrorMessage('البريد الإلكتروني أو كلمة المرور غير صحيحة. يرجى التأكد والمحاولة مجدداً.');
+        setErrorMessage('بيانات الدخول غير صحيحة. يرجى التأكد من البريد أو رقم الهاتف وكلمة المرور.');
       } else if (code === 'auth/wrong-password') {
         setErrorMessage('كلمة المرور غير صحيحة. يمكنك استعادة كلمة المرور عبر الرابط أدناه.');
       } else if (code === 'auth/invalid-email') {
         setErrorMessage('صيغة البريد الإلكتروني غير صالحة.');
       } else if (code === 'auth/too-many-requests') {
         setErrorMessage('تم حظر المحاولات مؤقتاً بسبب كثرة المحاولات الخاطئة. يرجى المحاولة بعد قليل.');
+      } else if (code === 'auth/operation-not-allowed') {
+        setErrorMessage('البريد الإلكتروني أو كلمة المرور غير صحيحة، أو الحساب غير مسجل بعد.');
       } else {
-        setErrorMessage(err.message || 'حدث خطأ أثناء تسجيل الدخول، يرجى المحاولة مرة أخرى.');
+        const msg = String(err?.message || '');
+        if (msg.includes('operation-not-allowed')) {
+          setErrorMessage('البريد الإلكتروني أو كلمة المرور غير صحيحة.');
+        } else {
+          setErrorMessage('حدث خطأ أثناء تسجيل الدخول، يرجى المحاولة مرة أخرى.');
+        }
       }
     }
   };
@@ -139,17 +167,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           {/* Email / Password Form */}
           <form onSubmit={handleLogin} className="space-y-4">
             
-            {/* Email Field */}
+            {/* Email or Phone Field */}
             <div>
               <label className="block text-xs font-bold text-[#1F2937] mb-1.5">
-                البريد الإلكتروني
+                البريد الإلكتروني أو رقم الهاتف
               </label>
               <div className="relative">
                 <input
-                  type="email"
+                  type="text"
                   required
                   dir="ltr"
-                  placeholder="name@example.com"
+                  placeholder="name@example.com أو 010xxxxxxxx"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-4 pr-10 py-3 bg-gray-50 border border-[#E5E7EB] rounded-xl text-sm font-sans text-left focus:bg-white focus:outline-none focus:border-[#2563EB] transition-colors"
@@ -203,17 +231,22 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               </div>
             </div>
 
-            {/* Remember Me */}
+            {/* Remember Me / Session Persistence */}
             <div className="flex items-center justify-between pt-1">
               <label className="flex items-center gap-2 text-xs text-[#4B5563] cursor-pointer">
                 <input
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 text-[#2563EB] rounded-md border-gray-300 focus:ring-0"
+                  className="w-4 h-4 text-[#2563EB] rounded-md border-gray-300 focus:ring-0 cursor-pointer"
                 />
-                <span>تذكر تسجيل الدخول</span>
+                <span className="font-semibold text-gray-700">حفظ الجلسة والبقاء متصلاً</span>
               </label>
+
+              <span className="text-[11px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-md flex items-center gap-1 border border-emerald-100">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                اتصال مشفر وآمن
+              </span>
             </div>
 
             {/* Submit Button */}
@@ -223,7 +256,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               className="w-full py-3.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-sm rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
               {isLoading ? (
-                <span>جاري تسجيل الدخول...</span>
+                <span>جاري التحقق وتسجيل الدخول...</span>
               ) : (
                 <>
                   <span>تسجيل الدخول</span>
@@ -339,4 +372,3 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     </div>
   );
 };
-

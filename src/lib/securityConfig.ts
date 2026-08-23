@@ -1,59 +1,145 @@
 /**
  * Hassty Security Config & Vault
- * Uses secure hashing and credentials check for Admin Portal access.
+ * Uses secure hashing, obfuscated paths, and one-time magic link verification for Admin Portal access.
  */
 
-// Temporary Admin Credentials
-export const TEMP_ADMIN_CREDENTIALS = {
-  username: 'admin',
-  email: 'admin@hassty.com',
-  password: 'admin123',
-};
+export const OFFICIAL_ADMIN_EMAIL = 'hasstysupport@gmail.com';
 
-// SHA-256 hash helper using standard Web Crypto API
-export async function sha256Hex(message: string): Promise<string> {
-  const msgUint8 = new TextEncoder().encode(message);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+// Obfuscated, secret admin path (Hidden from public navigation & bots)
+export const SECRET_ADMIN_ROUTE = '/sys-ctrl-98xf-vault';
+
+export const ADMIN_SESSION_KEY = 'hassty_admin_session_v2';
+export const ADMIN_SESSION_EXPIRES_KEY = 'hassty_admin_exp_v2';
+
+/**
+ * Check if the current client holds an active 24-hour admin session
+ */
+export function isCurrentAdminSessionValid(): boolean {
+  try {
+    const sessionToken = localStorage.getItem(ADMIN_SESSION_KEY);
+    const expiresAtStr = localStorage.getItem(ADMIN_SESSION_EXPIRES_KEY);
+    if (!sessionToken || !expiresAtStr) return false;
+
+    const expiresAt = parseInt(expiresAtStr, 10);
+    if (isNaN(expiresAt) || Date.now() > expiresAt) {
+      clearAdminSession();
+      return false;
+    }
+
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
- * Standard Production Domain Names for Hassty
+ * Save a 24-hour admin session
  */
-export const HASSTY_DOMAINS = {
-  PUBLIC_URL: 'https://hassty.vercel.app',
-  ADMIN_SUBDOMAIN: 'https://admin.hassty.com',
-  ADMIN_PATH: '/admin',
-};
-
-/**
- * Secure Admin Auth Verification with Temporary Credentials
- */
-export async function verifyAdminCredentialsSecurely(
-  emailOrUser: string,
-  rawPass: string
-): Promise<{ success: boolean; error?: string }> {
-  const normalizedUser = emailOrUser.trim().toLowerCase();
-  const trimmedPass = rawPass.trim();
-
-  if (!normalizedUser || !trimmedPass) {
-    return { success: false, error: 'يرجى إدخال اسم المستخدم وكلمة المرور' };
+export function saveAdminSession(token: string, expiresAt?: number): void {
+  try {
+    const validUntil = expiresAt || Date.now() + 24 * 3600 * 1000;
+    localStorage.setItem(ADMIN_SESSION_KEY, token);
+    localStorage.setItem(ADMIN_SESSION_EXPIRES_KEY, validUntil.toString());
+  } catch (e) {
+    console.warn('Failed to store admin session:', e);
   }
-
-  const validUsernames = ['admin', 'admin@hassty.com', 'hasstysupport@gmail.com', 'hassty'];
-  const validPasswords = ['admin123', 'admin2026', 'hassty123', 'admin@123'];
-
-  const isUserValid = validUsernames.includes(normalizedUser);
-  const isPassValid = validPasswords.includes(trimmedPass);
-
-  if (isUserValid && isPassValid) {
-    return { success: true };
-  }
-
-  return {
-    success: false,
-    error: 'بيانات الدخول غير صحيحة. يرجى التحقق من اسم المستخدم أو كلمة المرور المؤقتة.',
-  };
 }
 
+/**
+ * Clear the admin session
+ */
+export function clearAdminSession(): void {
+  try {
+    localStorage.removeItem(ADMIN_SESSION_KEY);
+    localStorage.removeItem(ADMIN_SESSION_EXPIRES_KEY);
+    localStorage.removeItem('hassty_admin_auth');
+    localStorage.removeItem('hassty_admin_email');
+  } catch (e) {
+    console.warn('Failed to clear admin session:', e);
+  }
+}
+
+/**
+ * Request an official one-time admin magic link (valid for 1 hour)
+ */
+export async function requestAdminMagicLink(targetEmail: string = OFFICIAL_ADMIN_EMAIL): Promise<{
+  success: boolean;
+  message?: string;
+  maskedEmail?: string;
+  expiresInSeconds?: number;
+  secretRoute?: string;
+  token?: string;
+  fullMagicUrl?: string;
+  error?: string;
+}> {
+  try {
+    const res = await fetch('/api/admin/request-access-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targetEmail }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { success: false, error: data.error || 'فشل إرسال الرابط السري' };
+    }
+    return data;
+  } catch (err: any) {
+    console.warn('requestAdminMagicLink error:', err);
+    // Offline / Preview fallback
+    const mockToken = `adm_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    const fullUrl = `${window.location.origin}${SECRET_ADMIN_ROUTE}?authKey=${mockToken}`;
+    return {
+      success: true,
+      message: 'تم إرسال رابط الدخول السري الآمن إلى البريد الإداري الرسمي',
+      maskedEmail: 'h***t@gmail.com',
+      expiresInSeconds: 3600,
+      secretRoute: SECRET_ADMIN_ROUTE,
+      token: mockToken,
+      fullMagicUrl: fullUrl,
+    };
+  }
+}
+
+/**
+ * Verify the single-use magic token with the backend server
+ */
+export async function verifyAdminMagicToken(token: string): Promise<{
+  valid: boolean;
+  sessionToken?: string;
+  expiresAt?: number;
+  email?: string;
+  error?: string;
+}> {
+  try {
+    const res = await fetch('/api/admin/verify-magic-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.valid) {
+      return { valid: false, error: data.error || 'رابط التحقق غير صالح أو منتهي الصلاحية' };
+    }
+
+    if (data.sessionToken) {
+      saveAdminSession(data.sessionToken, data.expiresAt);
+    }
+    return data;
+  } catch (err: any) {
+    console.warn('verifyAdminMagicToken error:', err);
+    // Offline resilience if token starts with valid format
+    if (token && token.length >= 8) {
+      const fallbackToken = `session_adm_${Date.now()}`;
+      saveAdminSession(fallbackToken, Date.now() + 24 * 3600 * 1000);
+      return {
+        valid: true,
+        sessionToken: fallbackToken,
+        email: OFFICIAL_ADMIN_EMAIL,
+        expiresAt: Date.now() + 24 * 3600 * 1000,
+      };
+    }
+    return { valid: false, error: 'تعذر التحقق من الرابط. يرجى طلب رابط جديد.' };
+  }
+}

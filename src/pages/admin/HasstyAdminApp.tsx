@@ -30,30 +30,49 @@ import {
   dbDismissReport,
   dbMarkCommissionPaid
 } from '../../lib/adminFirestoreService';
+import {
+  OFFICIAL_ADMIN_EMAIL,
+  isCurrentAdminSessionValid,
+  clearAdminSession,
+  saveAdminSession,
+} from '../../lib/securityConfig';
 import { Loader2 } from 'lucide-react';
 
 interface HasstyAdminAppProps {
   onSwitchToPublicApp?: () => void;
+  initialToken?: string | null;
 }
 
 export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
   onSwitchToPublicApp,
+  initialToken,
 }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return localStorage.getItem('hassty_admin_auth') === 'true';
+    return isCurrentAdminSessionValid();
   });
   const [adminEmail, setAdminEmail] = useState<string>(() => {
-    return localStorage.getItem('hassty_admin_email') || 'admin@hassty.com';
+    return OFFICIAL_ADMIN_EMAIL;
   });
 
   const [currentTab, setCurrentTab] = useState<AdminTab>('dashboard');
   const [isDbLoading, setIsDbLoading] = useState<boolean>(true);
+
+  // Periodically check session expiry (24 hours check)
+  useEffect(() => {
+    const checkInterval = setInterval(() => {
+      if (!isCurrentAdminSessionValid() && isAuthenticated) {
+        setIsAuthenticated(false);
+      }
+    }, 60000); // check every minute
+    return () => clearInterval(checkInterval);
+  }, [isAuthenticated]);
 
   // Application Real-time Firestore States
   const [accounts, setAccounts] = useState<AdminUserAccount[]>([]);
   const [verificationRequests, setVerificationRequests] = useState<any[]>([]);
   const [safetyReports, setSafetyReports] = useState<any[]>([]);
   const [commissions, setCommissions] = useState<any[]>([]);
+
 
   // Initialize DB and real-time listeners
   useEffect(() => {
@@ -102,14 +121,11 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
   const handleLoginSuccess = (email: string) => {
     setIsAuthenticated(true);
     setAdminEmail(email);
-    localStorage.setItem('hassty_admin_auth', 'true');
-    localStorage.setItem('hassty_admin_email', email);
   };
 
   const handleLogout = () => {
     setIsAuthenticated(false);
-    localStorage.removeItem('hassty_admin_auth');
-    localStorage.removeItem('hassty_admin_email');
+    clearAdminSession();
   };
 
   // Badge & Accounts Handlers with Live Firestore DB Writes
@@ -286,6 +302,7 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
       <AdminLoginPage
         onLoginSuccess={handleLoginSuccess}
         onBackToPublicSite={onSwitchToPublicApp}
+        initialToken={initialToken}
       />
     );
   }

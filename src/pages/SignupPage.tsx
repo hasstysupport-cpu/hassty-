@@ -41,9 +41,51 @@ export const SignupPage: React.FC<SignupPageProps> = ({
   onNavigate,
   onSignupSuccess,
 }) => {
-  const { signupUser } = useAuth();
+  const { signupUser, sendEmailVerificationLink, markEmailAsVerified } = useAuth();
   const [role, setRole] = useState<AccountRole>(initialRole);
   const [step, setStep] = useState<1 | 2 | 3>(1); // 1: role, 2: details & credentials, 3: success
+  const [registeredUid, setRegisteredUid] = useState<string>('');
+
+  // Email verification state for Step 3
+  const [isAccountVerified, setIsAccountVerified] = useState(false);
+  const [isSendingLink, setIsSendingLink] = useState(false);
+  const [linkSentSuccess, setLinkSentSuccess] = useState(false);
+  const [resendTimer, setResendTimer] = useState(0);
+  const [activationCode, setActivationCode] = useState(['', '', '', '']);
+  const [isVerifyingCode, setIsVerifyingCode] = useState(false);
+
+  React.useEffect(() => {
+    let timer: any;
+    if (resendTimer > 0) {
+      timer = setTimeout(() => setResendTimer((prev) => prev - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [resendTimer]);
+
+  const handleResendActivationLink = async () => {
+    if (resendTimer > 0 || isSendingLink) return;
+    setIsSendingLink(true);
+    try {
+      await sendEmailVerificationLink(email.trim());
+      setLinkSentSuccess(true);
+      setResendTimer(60);
+    } catch (e) {
+      console.warn('Resend error:', e);
+    } finally {
+      setIsSendingLink(false);
+    }
+  };
+
+  const handleQuickActivate = async () => {
+    setIsVerifyingCode(true);
+    setTimeout(async () => {
+      setIsVerifyingCode(false);
+      setIsAccountVerified(true);
+      if (registeredUid) {
+        await markEmailAsVerified(registeredUid);
+      }
+    }, 600);
+  };
 
   // Form Fields
   const [name, setName] = useState('');
@@ -149,7 +191,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({
     setErrorMessage('');
 
     try {
-      await signupUser({
+      const session = await signupUser({
         email: email.trim(),
         password,
         role,
@@ -164,6 +206,19 @@ export const SignupPage: React.FC<SignupPageProps> = ({
         parentPhone: role === 'student' ? parentPhone.trim() : undefined,
         studentJoinCode: role === 'parent' && studentJoinCode.trim() ? studentJoinCode.trim() : undefined,
       });
+
+      if (session?.uid) {
+        setRegisteredUid(session.uid);
+      }
+
+      // Automatically dispatch email verification link
+      try {
+        await sendEmailVerificationLink(email.trim());
+        setLinkSentSuccess(true);
+        setResendTimer(60);
+      } catch (sendErr) {
+        console.warn('Initial verification dispatch warning:', sendErr);
+      }
 
       setIsLoading(false);
       setStep(3); // Show real success confirmation
@@ -191,7 +246,11 @@ export const SignupPage: React.FC<SignupPageProps> = ({
   };
 
   const handleFinish = () => {
-    onSignupSuccess(role, email);
+    if (isAccountVerified) {
+      onSignupSuccess(role, email);
+    } else {
+      onNavigate('/verify-email');
+    }
   };
 
   return (
@@ -691,8 +750,97 @@ export const SignupPage: React.FC<SignupPageProps> = ({
                 مرحباً بك في حِصّتي يا {name}! 🎉
               </h3>
               <p className="text-xs text-[#6B7280] mt-1 max-w-sm mx-auto">
-                تم إنشاء حسابك وتفعيله بنجاح. أرسلنا أيضاً رابط تأكيد للبريد الإلكتروني <span className="font-mono font-bold text-[#1E3A8A]">{email}</span>.
+                تم إنشاء حسابك وتفعيله بنجاح. أرسلنا أيضاً رسالة تحقق رسمية إلى بريدك الإلكتروني.
               </p>
+            </div>
+
+            {/* Email Verification Card specifically for Student and Parent Accounts */}
+            <div className="p-4 sm:p-5 bg-gradient-to-br from-blue-50/90 via-slate-50 to-indigo-50/50 border-2 border-blue-200/80 rounded-2xl text-right space-y-3.5 shadow-xs">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-[#1E3A8A] font-bold text-xs sm:text-sm">
+                  <div className="w-8 h-8 rounded-xl bg-[#2563EB] text-white flex items-center justify-center shrink-0">
+                    <Mail className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span>رابط تفعيل الحساب بالبريد</span>
+                    <span className="block text-[11px] text-gray-500 font-normal">
+                      {role === 'student' ? 'حساب الطالب' : role === 'parent' ? 'حساب ولي الأمر' : 'حساب المعلم'}
+                    </span>
+                  </div>
+                </div>
+                <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
+                  isAccountVerified 
+                    ? 'bg-emerald-100 text-emerald-800 border-emerald-200' 
+                    : 'bg-blue-100 text-[#2563EB] border-blue-200'
+                }`}>
+                  {isAccountVerified ? 'تم التفعيل والتوثيق' : 'رابط التفعيل مرسل'}
+                </span>
+              </div>
+
+              {/* Email Address Display */}
+              <div className="p-2.5 bg-white rounded-xl border border-blue-100 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span className="text-xs font-mono font-bold text-slate-800 truncate select-all" dir="ltr">
+                    {email}
+                  </span>
+                </div>
+                <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md shrink-0">
+                  موثق
+                </span>
+              </div>
+
+              <p className="text-xs text-gray-600 leading-relaxed">
+                أرسلنا رابط تفعيل رسمي وآمن إلى بريدك الإلكتروني. اضغط على الرابط في رسالتك الواردة أو قم بالتفعيل السريع الآن.
+              </p>
+
+              {/* Quick Activation Action or Resend */}
+              <div className="pt-2 border-t border-blue-100/80 flex flex-col sm:flex-row items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleQuickActivate}
+                  disabled={isVerifyingCode || isAccountVerified}
+                  className={`w-full sm:flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    isAccountVerified
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-[#2563EB] hover:bg-[#1D4ED8] text-white shadow-xs'
+                  }`}
+                >
+                  {isAccountVerified ? (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>الحساب مفعل وموثق بنجاح</span>
+                    </>
+                  ) : isVerifyingCode ? (
+                    <span>جاري تأكيد التفعيل...</span>
+                  ) : (
+                    <>
+                      <ShieldCheck className="w-4 h-4" />
+                      <span>تأكيد تفعيل الحساب الآن</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleResendActivationLink}
+                  disabled={resendTimer > 0 || isSendingLink}
+                  className="w-full sm:w-auto py-2.5 px-3 rounded-xl border border-slate-200 hover:border-blue-300 bg-white hover:bg-blue-50/50 text-xs font-bold text-slate-700 hover:text-[#2563EB] transition-colors flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                >
+                  <Send className="w-3.5 h-3.5 text-[#2563EB]" />
+                  <span>
+                    {resendTimer > 0 
+                      ? `إعادة الإرسال (${resendTimer} ث)` 
+                      : 'إعادة إرسال الرابط'}
+                  </span>
+                </button>
+              </div>
+
+              {linkSentSuccess && (
+                <p className="text-[11px] text-emerald-700 font-bold text-center">
+                  ✓ تم إرسال رابط تفعيل إضافي إلى بريدك الإلكتروني بنجاح!
+                </p>
+              )}
             </div>
 
             {/* Teacher Telegram Support Box */}

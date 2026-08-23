@@ -1,9 +1,232 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow read/write for all users during setup and production application use
+
+    // ----------------------------------------------------------------------
+    // 0. GLOBAL CATCH-ALL DEFAULT-DENY (Zero-Trust Principle)
+    // ----------------------------------------------------------------------
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
+    }
+
+    // ----------------------------------------------------------------------
+    // HELPER FUNCTIONS & PRIMITIVES
+    // ----------------------------------------------------------------------
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'hasstysupport@gmail.com' ||
+        (request.auth.token.email_verified == true && request.auth.token.email == 'hasstysupport@gmail.com') ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // ----------------------------------------------------------------------
+    // VALIDATION HELPERS (Schema & Type Integrity)
+    // ----------------------------------------------------------------------
+    function isValidUser(data) {
+      return data.uid is string && data.uid.size() <= 128 &&
+             data.name is string && data.name.size() >= 2 && data.name.size() <= 100 &&
+             data.role in ['student', 'parent', 'teacher', 'admin'];
+    }
+
+    function isValidParentLink(data) {
+      return data.parentId is string && data.parentId.size() <= 128 &&
+             data.studentId is string && data.studentId.size() <= 128 &&
+             data.studentCode is string && data.studentCode.size() <= 64 &&
+             data.status in ['pending', 'approved', 'rejected'] &&
+             (!('parentName' in data) || (data.parentName is string && data.parentName.size() <= 100)) &&
+             (!('studentName' in data) || (data.studentName is string && data.studentName.size() <= 100));
+    }
+
+    function isValidVerificationRequest(data) {
+      return data.teacherId is string && data.teacherId.size() <= 128 &&
+             data.teacherName is string && data.teacherName.size() <= 100 &&
+             data.nationalId is string && data.nationalId.size() <= 30 &&
+             data.status in ['pending', 'approved', 'rejected'];
+    }
+
+    function isValidSafetyReport(data) {
+      return data.reporterName is string && data.reporterName.size() <= 100 &&
+             data.reportedTeacherId is string && data.reportedTeacherId.size() <= 128 &&
+             data.category is string && data.category.size() <= 100 &&
+             data.severity in ['high', 'medium', 'low'] &&
+             data.status in ['new', 'in_review', 'resolved'];
+    }
+
+    function isValidCommission(data) {
+      return data.teacherId is string && data.teacherId.size() <= 128 &&
+             data.grossRevenueEGP is number && data.grossRevenueEGP >= 0 &&
+             data.commissionDueEGP is number && data.commissionDueEGP >= 0 &&
+             data.paymentStatus in ['paid', 'pending', 'overdue'];
+    }
+
+    // ----------------------------------------------------------------------
+    // 1. USERS COLLECTION (/users/{userId})
+    // ----------------------------------------------------------------------
+    match /users/{userId} {
+      allow get: if isValidId(userId);
+
+      allow list: if true;
+
+      allow create: if isValidId(userId) &&
+                       incoming().uid == userId &&
+                       isValidUser(incoming()) &&
+                       (incoming().role != 'admin' || isAdmin()) &&
+                       (isOwner(userId) || !isSignedIn() || isAdmin());
+
+      allow update: if isValidId(userId) &&
+                       isValidUser(incoming()) &&
+                       (
+                         isAdmin() ||
+                         (
+                           isOwner(userId) &&
+                           incoming().uid == existing().uid &&
+                           // Prevent privilege escalation
+                           (incoming().role == existing().role || isAdmin())
+                         ) ||
+                         !isSignedIn()
+                       );
+
+      allow delete: if isValidId(userId) && (isOwner(userId) || isAdmin());
+    }
+
+    // ----------------------------------------------------------------------
+    // 2. PARENT LINK REQUESTS (/parent_link_requests/{requestId})
+    // ----------------------------------------------------------------------
+    match /parent_link_requests/{requestId} {
+      allow get, list: if isSignedIn();
+
+      allow create: if isValidId(requestId) &&
+                       isSignedIn() &&
+                       incoming().parentId == request.auth.uid &&
+                       isValidParentLink(incoming());
+
+      allow update: if isValidId(requestId) &&
+                       isValidParentLink(incoming()) &&
+                       (
+                         isAdmin() ||
+                         (
+                           isSignedIn() && (
+                             // Student accepting/rejecting
+                             (existing().studentId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'respondedAt', 'declineReason'])) ||
+                             // Parent canceling
+                             (existing().parentId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['status']))
+                           )
+                         )
+                       );
+
+      allow delete: if isValidId(requestId) && (
+        isAdmin() ||
+        (isSignedIn() && resource.data.parentId == request.auth.uid)
+      );
+    }
+
+    // ----------------------------------------------------------------------
+    // 3. TEACHER VERIFICATION REQUESTS (/verification_requests/{reqId})
+    // ----------------------------------------------------------------------
+    match /verification_requests/{reqId} {
+      allow get, list: if isSignedIn();
+
+      allow create: if isValidId(reqId) &&
+                       isSignedIn() &&
+                       incoming().teacherId == request.auth.uid &&
+                       isValidVerificationRequest(incoming());
+
+      allow update: if isValidId(reqId) && (isAdmin() || (isSignedIn() && existing().teacherId == request.auth.uid));
+      allow delete: if isValidId(reqId) && isAdmin();
+    }
+
+    // ----------------------------------------------------------------------
+    // 4. SAFETY & MISCONDUCT REPORTS (/safety_reports/{reportId})
+    // ----------------------------------------------------------------------
+    match /safety_reports/{reportId} {
+      allow get, list: if isSignedIn();
+
+      allow create: if isValidId(reportId) &&
+                       isSignedIn() &&
+                       isValidSafetyReport(incoming());
+
+      allow update: if isValidId(reportId) && isAdmin();
+      allow delete: if isValidId(reportId) && isAdmin();
+    }
+
+    // ----------------------------------------------------------------------
+    // 5. COMMISSIONS & BILLING (/commissions/{commId})
+    // ----------------------------------------------------------------------
+    match /commissions/{commId} {
+      allow get, list: if isSignedIn();
+
+      allow create, update, delete: if isValidId(commId) && (isAdmin() || (isSignedIn() && incoming().teacherId == request.auth.uid));
+    }
+
+    // ----------------------------------------------------------------------
+    // 6. TUTORS DIRECTORY (/tutors/{tutorId})
+    // ----------------------------------------------------------------------
+    match /tutors/{tutorId} {
+      allow read: if isValidId(tutorId);
+      allow list: if true;
+      allow create, update: if isValidId(tutorId) && (isOwner(tutorId) || !isSignedIn() || isAdmin());
+      allow delete: if isValidId(tutorId) && (isOwner(tutorId) || isAdmin());
+    }
+
+    // ----------------------------------------------------------------------
+    // 7. GROUPS COLLECTION (/groups/{groupId})
+    // ----------------------------------------------------------------------
+    match /groups/{groupId} {
+      allow read, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
+    // ----------------------------------------------------------------------
+    // 8. TEACHER STUDENTS (/teacher_students/{studentDocId})
+    // ----------------------------------------------------------------------
+    match /teacher_students/{studentDocId} {
+      allow read, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
+    // ----------------------------------------------------------------------
+    // 9. ATTENDANCE COLLECTION (/attendance/{attendanceId})
+    // ----------------------------------------------------------------------
+    match /attendance/{attendanceId} {
+      allow read, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
+    // ----------------------------------------------------------------------
+    // 10. BOOKING REQUESTS (/booking_requests/{requestId})
+    // ----------------------------------------------------------------------
+    match /booking_requests/{requestId} {
+      allow read, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
+    // ----------------------------------------------------------------------
+    // 11. ADMINS COLLECTION (/admins/{adminId})
+    // ----------------------------------------------------------------------
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
   }
 }

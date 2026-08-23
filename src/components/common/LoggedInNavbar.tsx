@@ -51,6 +51,12 @@ export const LoggedInNavbar: React.FC<LoggedInNavbarProps> = ({
       defaultPath: '/teacher/profile',
       defaultName: 'معلم حِصّتي',
     },
+    admin: {
+      title: 'حساب إدارة',
+      badgeClass: 'bg-purple-50 text-purple-800 border-purple-200',
+      defaultPath: '/admin',
+      defaultName: 'مدير منصة حِصّتي',
+    },
   };
 
   const currentRoleMeta = roleLabels[role] || roleLabels.student;

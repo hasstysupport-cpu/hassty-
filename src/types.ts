@@ -1,4 +1,4 @@
-export type AccountRole = 'student' | 'parent' | 'teacher';
+export type AccountRole = 'student' | 'parent' | 'teacher' | 'admin';
 
 export interface SubjectItem {
   id: string;
