@@ -5,7 +5,7 @@ import nodemailer from 'nodemailer';
 import { createServer as createViteServer } from 'vite';
 
 const app = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT || 3000);
 
 // Trust reverse proxy (Vercel, Cloud Run, Cloudflare)
 app.set('trust proxy', true);
@@ -13,9 +13,8 @@ app.set('trust proxy', true);
 // ----------------------------------------------------
 // SMTP EMAIL TRANSPORTER CONFIGURATION (GMAIL)
 // ----------------------------------------------------
-const SMTP_USER = process.env.SMTP_USER || 'hasstysupport@gmail.com';
-const rawPass = process.env.SMTP_PASS || 'nsdp ludq gqqr zgkm';
-const SMTP_PASS = rawPass.replace(/\s+/g, '');
+const SMTP_USER = process.env.SMTP_USER;
+const SMTP_PASS = process.env.SMTP_PASS?.replace(/\s+/g, '');
 const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
 const SMTP_PORT = parseInt(process.env.SMTP_PORT || '465', 10);
 
@@ -32,7 +31,7 @@ function getMailTransporter(): nodemailer.Transporter {
         pass: SMTP_PASS,
       },
       tls: {
-        rejectUnauthorized: false,
+        rejectUnauthorized: true,
       },
     });
   }
@@ -48,6 +47,9 @@ async function sendVerificationEmail(
   purpose?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    if (!SMTP_USER || !SMTP_PASS) {
+      return { success: false, error: 'Email service is not configured' };
+    }
     const transporter = getMailTransporter();
     const isLogin = purpose === 'login';
     const actionLabel = isLogin ? 'لتسجيل الدخول السريع' : 'لتأكيد وتفعيل حسابك الجديد';
@@ -143,7 +145,7 @@ async function sendVerificationEmail(
     return { success: true };
   } catch (err: any) {
     console.error(`❌ [SMTP ERROR] Failed to send email to ${targetEmail}:`, err?.message || err);
-    return { success: false, error: err?.message || 'SMTP delivery failed' };
+    return { success: false, error: 'SMTP delivery failed' };
   }
 }
 
@@ -220,7 +222,7 @@ async function sendAdminMagicLinkEmail(
     return { success: true };
   } catch (err: any) {
     console.error(`❌ [SMTP ERROR] Failed to send admin magic link to ${targetEmail}:`, err?.message || err);
-    return { success: false, error: err?.message || 'SMTP delivery failed' };
+    return { success: false, error: 'SMTP delivery failed' };
   }
 }
 
@@ -254,7 +256,7 @@ app.use(express.json({ limit: '1mb' }));
 // ----------------------------------------------------
 // CRYPTOGRAPHIC TOKEN & AUTHENTICATION SECRETS
 // ----------------------------------------------------
-const AUTH_TOKEN_SECRET = process.env.AUTH_TOKEN_SECRET || 'hassty_sec_k98f23_71e4a90bf1a_e78d142';
+const AUTH_TOKEN_SECRET = process.env.AUTH_TOKEN_SECRET;
 export const OFFICIAL_ADMIN_EMAIL = 'hasstysupport@gmail.com';
 export const SECRET_ADMIN_ROUTE_PREFIX = '/sys-ctrl-98xf-vault';
 
@@ -281,6 +283,7 @@ interface TokenPayload {
 }
 
 function signToken(payload: Omit<TokenPayload, 'iat'>): string {
+  if (!AUTH_TOKEN_SECRET) throw new Error('Authentication service is not configured');
   const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
   const fullPayload: TokenPayload = {
     ...payload,
@@ -296,6 +299,7 @@ function signToken(payload: Omit<TokenPayload, 'iat'>): string {
 
 function verifyToken(token: string): { valid: boolean; payload?: TokenPayload; error?: string } {
   try {
+    if (!AUTH_TOKEN_SECRET) return { valid: false, error: 'Authentication service is not configured' };
     if (!token || typeof token !== 'string') return { valid: false, error: 'Missing token' };
     const parts = token.split('.');
     if (parts.length !== 3) return { valid: false, error: 'Malformed token' };
@@ -318,7 +322,7 @@ function verifyToken(token: string): { valid: boolean; payload?: TokenPayload; e
 
     return { valid: true, payload };
   } catch (err: any) {
-    return { valid: false, error: err?.message || 'Token verification failed' };
+    return { valid: false, error: 'Token verification failed' };
   }
 }
 
@@ -339,8 +343,8 @@ const emailOtpStore = new Map<string, EmailOtpEntry>();
 const emailRateLimits = new Map<string, RateLimitRecord>();
 
 // WhatsApp Server Endpoint & Secret Key
-const WHATSAPP_SERVER_URL = process.env.WHATSAPP_SERVER_URL || 'http://54.85.197.100:3000';
-const WHATSAPP_API_KEY = process.env.WHATSAPP_API_KEY || 'CHANGE_THIS_SECRET_KEY';
+const WHATSAPP_SERVER_URL = process.env.WHATSAPP_SERVER_URL || '';
+const WHATSAPP_API_KEY = process.env.WHATSAPP_API_KEY || '';
 
 // In-Memory Temporary Store for OTP requests
 interface OtpEntry {
@@ -487,7 +491,7 @@ app.get(['/api/whatsapp/status', '/api/v1/status'], async (req, res) => {
     return res.json({
       success: false,
       connected: false,
-      error: err?.message || 'Could not connect to WhatsApp gateway server',
+      error: 'Could not connect to WhatsApp gateway server',
     });
   }
 });
@@ -529,7 +533,7 @@ app.post(['/api/whatsapp/send', '/api/v1/send/text'], async (req, res) => {
   } catch (err: any) {
     return res.status(500).json({
       success: false,
-      error: err?.message || 'Failed to send WhatsApp text message',
+      error: 'Failed to send WhatsApp text message',
     });
   }
 });
@@ -573,7 +577,7 @@ app.post('/api/v1/send/interactive', async (req, res) => {
       data,
     });
   } catch (err: any) {
-    return res.status(500).json({ success: false, error: err?.message || 'Interactive send failed' });
+    return res.status(500).json({ success: false, error: 'Interactive send failed' });
   }
 });
 
@@ -700,7 +704,7 @@ app.post('/api/otp/send', async (req, res) => {
         }
       }
     } catch (err: any) {
-      gatewayError = err?.message;
+      gatewayError = 'WhatsApp gateway request failed';
     }
 
     return res.json({
@@ -713,7 +717,7 @@ app.post('/api/otp/send', async (req, res) => {
       message: whatsappSent ? 'تم إرسال كود التحقق بنجاح إلى رقم الواتساب' : 'تم إنشاء كود التحقق بنجاح',
     });
   } catch (err: any) {
-    return res.status(500).json({ success: false, error: err?.message || 'Failed to process OTP request' });
+    return res.status(500).json({ success: false, error: 'Failed to process OTP request' });
   }
 });
 
@@ -773,7 +777,7 @@ app.post('/api/otp/verify', (req, res) => {
       error: `كود التحقق غير صحيح. متبقي ${4 - entry.attempts} محاولات.`,
     });
   } catch (err: any) {
-    return res.status(500).json({ success: false, error: err?.message || 'Verification failed' });
+    return res.status(500).json({ success: false, error: 'Verification failed' });
   }
 });
 
@@ -813,303 +817,6 @@ app.post(['/api/auth/otp/send-email', '/api/auth/send-verification-code'], async
       createdAt: Date.now(),
     });
 
-    console.log(`\n======================================================`);
-    console.log(`🔐 [SECURITY AUDIT] Hassty Verification Code Dispatched`);
-    console.log(`📧 Target Email: ${cleanEmail}`);
-    console.log(`👤 User UID: ${uid || 'pending'}`);
-    console.log(`🔑 Verification Code (OTP): [ ${generatedCode} ]`);
-    console.log(`⏳ Validity: 5 Minutes (Expires at: ${new Date(expiresAt).toLocaleTimeString('ar-EG')})`);
-    console.log(`======================================================\n`);
-
-    // Also attempt dispatching to WhatsApp if user provided a phone number
-    let whatsappDispatched = false;
-    if (phone) {
-      try {
-        const formattedPhone = formatEgyptianNumber(phone);
-        const actionText = purpose === 'login' ? 'لتسجيل الدخول' : 'لتفعيل الحساب الجديد';
-        const msg = `*منصة حِصّتي التعليمية — رمز التحقق الإجباري* 🔐\n\nأهلاً ${name || 'بك'}، رمز الأمان الخاص بك ${actionText} هو:\n\n\`\`\`${generatedCode}\`\`\`\n\n⏳ هذا الرمز صالح لمدة 5 دقائق فقط. لا تشاركه مع أي شخص.`;
-        
-        fetch(`${WHATSAPP_SERVER_URL}/api/v1/send/text`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-API-Key': WHATSAPP_API_KEY },
-          body: JSON.stringify({ number: formattedPhone, message: msg }),
-        }).catch(() => null);
-        whatsappDispatched = true;
-      } catch (e) {
-        console.warn('Optional WhatsApp notify warning:', e);
-      }
-    }
-
-    // Masked Email helper for UI security (e.g. m***d@gmail.com)
-    const [localPart, domainPart] = cleanEmail.split('@');
-    const maskedLocal = localPart.length > 2 
-      ? `${localPart[0]}***${localPart[localPart.length - 1]}` 
-      : `${localPart}*`;
-    const maskedEmail = `${maskedLocal}@${domainPart}`;
-
-    // Direct one-click activation link
-    const host = req.get('host') || 'localhost:3000';
-    const proto = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
-    const activationLink = `${proto}://${host}/verify-email?code=${generatedCode}&req=${requestId}`;
-
-    // Dispatch real email via Gmail SMTP
-    const emailResult = await sendVerificationEmail(
-      cleanEmail,
-      generatedCode,
-      activationLink,
-      name,
-      purpose
-    );
-
-    return res.json({
-      success: true,
-      requestId,
-      email: cleanEmail,
-      maskedEmail,
-      emailSent: emailResult.success,
-      emailError: emailResult.error,
-      whatsappDispatched,
-      expiresInSeconds: 300,
-      previewCode: generatedCode, // Delivered securely to support preview and real verification
-      activationLink,
-      message: emailResult.success 
-        ? 'تم إرسال كود التحقق ورابط التفعيل بنجاح إلى صندوق بريدك الإلكتروني'
-        : 'تم إنشاء كود التحقق بنجاح',
-    });
-  } catch (err: any) {
-    return res.status(500).json({ success: false, error: err?.message || 'Failed to dispatch verification code' });
-  }
-});
-
-// ----------------------------------------------------
-// 7. Verify Email OTP & Issue Secure Signed Session Token
-// ----------------------------------------------------
-app.post(['/api/auth/otp/verify-email', '/api/auth/verify-code'], (req, res) => {
-  try {
-    const { requestId, code, email, uid } = req.body;
-    if (!requestId || !code) {
-      return res.status(400).json({ success: false, error: 'معرّف الطلب ورمز التحقق مطلوبان' });
-    }
-
-    const entry = emailOtpStore.get(requestId);
-    if (!entry) {
-      return res.status(400).json({
-        success: false,
-        verified: false,
-        error: 'انتهت صلاحية رمز التحقق أو الطلب غير موجود. يرجى طلب كود جديد.',
-      });
-    }
-
-    if (Date.now() > entry.expiresAt) {
-      emailOtpStore.delete(requestId);
-      return res.status(400).json({
-        success: false,
-        verified: false,
-        error: 'انتهت صلاحية كود التحقق (5 دقائق). يرجى طلب رمز جديد.',
-      });
-    }
-
-    // Max 5 attempts
-    entry.attempts += 1;
-    if (entry.attempts > 5) {
-      emailOtpStore.delete(requestId);
-      return res.status(429).json({
-        success: false,
-        verified: false,
-        error: 'تم تجاوز الحد الأقصى للمحاولات الخاطئة. تم إلغاء الكود لأسباب أمنية.',
-      });
-    }
-
-    const sanitizedCode = code.toString().trim();
-    if (entry.code === sanitizedCode || (process.env.NODE_ENV !== 'production' && (sanitizedCode === '123456' || sanitizedCode === '1234'))) {
-      const resolvedUid = uid || entry.uid || `usr_${Date.now()}`;
-      const resolvedEmail = email || entry.email;
-      
-      // Issue cryptographically signed token valid for 7 days
-      const token = signToken({
-        uid: resolvedUid,
-        email: resolvedEmail,
-        role: entry.role || 'student',
-        emailVerified: true,
-        exp: Math.floor(Date.now() / 1000) + 7 * 24 * 3600,
-      });
-
-      emailOtpStore.delete(requestId);
-
-      return res.json({
-        success: true,
-        verified: true,
-        token,
-        sessionToken: token,
-        uid: resolvedUid,
-        email: resolvedEmail,
-        emailVerified: true,
-        message: 'تم تأكيد وتوثيق البريد الإلكتروني بنجاح',
-      });
-    }
-
-    return res.status(400).json({
-      success: false,
-      verified: false,
-      error: `رمز التحقق غير صحيح. متبقي ${5 - entry.attempts} محاولات.`,
-    });
-  } catch (err: any) {
-    return res.status(500).json({ success: false, error: err?.message || 'Verification failed' });
-  }
-});
-
-// ----------------------------------------------------
-// 8. Token Session Validation Endpoint
-// ----------------------------------------------------
-app.post('/api/auth/verify-token', (req, res) => {
-  try {
-    const authHeader = req.headers.authorization;
-    const token = (authHeader && authHeader.startsWith('Bearer ')) 
-      ? authHeader.split(' ')[1] 
-      : req.body?.token;
-
-    if (!token) {
-      return res.status(401).json({ valid: false, error: 'Authorization token is required' });
-    }
-
-    const result = verifyToken(token);
-    if (!result.valid || !result.payload) {
-      return res.status(401).json({ valid: false, error: result.error || 'Invalid or expired token' });
-    }
-
-    // If client provided a uid, verify it strictly matches token payload
-    if (req.body?.uid && req.body.uid !== result.payload.uid) {
-      return res.status(403).json({ valid: false, error: 'UID mismatch with token claims' });
-    }
-
-    return res.json({
-      valid: true,
-      payload: result.payload,
-      message: 'Token is valid and cryptographically authentic',
-    });
-  } catch (err: any) {
-    return res.status(500).json({ valid: false, error: err?.message || 'Token verification error' });
-  }
-});
-
-// ----------------------------------------------------
-// 9. Server-Side Data Ownership & Anti-Tampering Gatekeeper
-// ----------------------------------------------------
-app.post('/api/auth/check-data-ownership', (req, res) => {
-  try {
-    const { 
-      requestingUid, 
-      requestingRole, 
-      resourceOwnerUid, 
-      resourceType,
-      parentLinkedStudents,
-      teacherStudents
-    } = req.body;
-
-    if (!requestingUid) {
-      return res.status(401).json({ authorized: false, reason: 'Requesting identity is missing' });
-    }
-
-    // 1. Platform Admin has universal administrative permission
-    if (requestingRole === 'admin') {
-      return res.json({ 
-        authorized: true, 
-        rule: 'admin_universal',
-        message: 'Admin access authorized' 
-      });
-    }
-
-    // 2. Direct resource owner (e.g. Student accessing their own attendance, Teacher accessing their own class)
-    if (resourceOwnerUid && requestingUid === resourceOwnerUid) {
-      return res.json({ 
-        authorized: true, 
-        rule: 'direct_owner',
-        message: 'Owner access authorized' 
-      });
-    }
-
-    // 3. Parent accessing linked children data
-    if (requestingRole === 'parent' && resourceOwnerUid) {
-      if (Array.isArray(parentLinkedStudents) && parentLinkedStudents.includes(resourceOwnerUid)) {
-        return res.json({ 
-          authorized: true, 
-          rule: 'parent_linked_student',
-          message: 'Parent authorized to view linked student data' 
-        });
-      }
-    }
-
-    // 4. Teacher accessing enrolled student data
-    if (requestingRole === 'teacher' && resourceOwnerUid) {
-      if (Array.isArray(teacherStudents) && teacherStudents.includes(resourceOwnerUid)) {
-        return res.json({ 
-          authorized: true, 
-          rule: 'teacher_enrolled_student',
-          message: 'Teacher authorized to view enrolled student data' 
-        });
-      }
-    }
-
-    // 5. Default Deny - Close any security loopholes
-    return res.status(403).json({
-      authorized: false,
-      reason: 'Unauthorized: User is not the owner or authorized entity for this resource',
-      details: {
-        requestingUid,
-        resourceOwnerUid,
-        resourceType: resourceType || 'unknown',
-      },
-    });
-  } catch (err: any) {
-    return res.status(500).json({ authorized: false, error: err?.message || 'Data ownership evaluation failed' });
-  }
-});
-
-// ----------------------------------------------------
-// 10. Admin Secret Portal & Magic Link Verification Engine
-// ----------------------------------------------------
-app.post('/api/admin/request-access-link', async (req, res) => {
-  try {
-    const { targetEmail } = req.body;
-    const clientIp = getClientIp(req);
-
-    // Enforce strictly official admin email: hasstysupport@gmail.com
-    const normalizedEmail = (targetEmail || OFFICIAL_ADMIN_EMAIL).trim().toLowerCase();
-    if (normalizedEmail !== OFFICIAL_ADMIN_EMAIL && normalizedEmail !== 'admin@hassty.com') {
-      return res.status(403).json({
-        success: false,
-        error: 'غير مصرح: يتم إرسال روابط الدخول فقط إلى البريد الإداري الرسمي المعتمد للمنصة.',
-      });
-    }
-
-    // Generate high-entropy cryptographic token
-    const secretToken = crypto.randomBytes(32).toString('hex');
-    const expiresAt = Date.now() + 60 * 60 * 1000; // Strictly 1 Hour Expiration
-    
-    adminMagicLinksStore.set(secretToken, {
-      token: secretToken,
-      email: OFFICIAL_ADMIN_EMAIL,
-      expiresAt,
-      used: false,
-      createdAt: Date.now(),
-      ip: clientIp,
-    });
-
-    // Build the secret obfuscated link
-    const host = req.get('host') || 'localhost:3000';
-    const protocol = req.protocol === 'https' || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
-    const dynamicAdminPath = `${SECRET_ADMIN_ROUTE_PREFIX}?authKey=${secretToken}&time=${Date.now()}`;
-    const fullMagicUrl = `${protocol}://${host}${dynamicAdminPath}`;
-
-    console.log(`\n======================================================`);
-    console.log(`🛡️ [ADMIN VAULT SECURITY] Official Access Magic Link Generated`);
-    console.log(`📧 Target Admin Email: ${OFFICIAL_ADMIN_EMAIL}`);
-    console.log(`🔗 Secret Access Route: ${SECRET_ADMIN_ROUTE_PREFIX}`);
-    console.log(`🔑 One-Time Token (Valid 1 Hour): ${secretToken}`);
-    console.log(`🌐 Full Magic URL: ${fullMagicUrl}`);
-    console.log(`⏳ Expires: ${new Date(expiresAt).toLocaleTimeString('ar-EG')} (1 Hour)`);
-    console.log(`======================================================\n`);
-
     // Send real admin email via Gmail SMTP
     const adminEmailResult = await sendAdminMagicLinkEmail(OFFICIAL_ADMIN_EMAIL, fullMagicUrl);
 
@@ -1123,11 +830,9 @@ app.post('/api/admin/request-access-link', async (req, res) => {
       emailSent: adminEmailResult.success,
       expiresInSeconds: 3600, // 1 hour
       secretRoute: SECRET_ADMIN_ROUTE_PREFIX,
-      token: secretToken,
-      fullMagicUrl, // Provided for easy access in preview console & UI testing
     });
   } catch (err: any) {
-    return res.status(500).json({ success: false, error: err?.message || 'Failed to dispatch admin link' });
+    return res.status(500).json({ success: false, error: 'Failed to dispatch admin link' });
   }
 });
 
@@ -1183,7 +888,7 @@ app.post('/api/admin/verify-magic-token', (req, res) => {
       message: 'تم التحقق من الرابط الإداري بنجاح، صلاحية الجلسة 24 ساعة.',
     });
   } catch (err: any) {
-    return res.status(500).json({ valid: false, error: err?.message || 'Verification error' });
+    return res.status(500).json({ valid: false, error: 'Verification error' });
   }
 });
 
