@@ -33,9 +33,8 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && (
+      return isSignedIn() && request.auth.token.email_verified == true && (
         request.auth.token.email == 'hasstysupport@gmail.com' ||
-        (request.auth.token.email_verified == true && request.auth.token.email == 'hasstysupport@gmail.com') ||
         exists(/databases/$(database)/documents/admins/$(request.auth.uid))
       );
     }
@@ -84,15 +83,15 @@ service cloud.firestore {
     // 1. USERS COLLECTION (/users/{userId})
     // ----------------------------------------------------------------------
     match /users/{userId} {
-      allow get: if isValidId(userId);
+      allow get: if isValidId(userId) && isSignedIn() && (isOwner(userId) || isAdmin());
 
-      allow list: if true;
+      allow list: if isAdmin();
 
       allow create: if isValidId(userId) &&
                        incoming().uid == userId &&
                        isValidUser(incoming()) &&
                        (incoming().role != 'admin' || isAdmin()) &&
-                       (isOwner(userId) || !isSignedIn() || isAdmin());
+                       (isOwner(userId) || isAdmin());
 
       allow update: if isValidId(userId) &&
                        isValidUser(incoming()) &&
@@ -114,7 +113,7 @@ service cloud.firestore {
     // 2. PARENT LINK REQUESTS (/parent_link_requests/{requestId})
     // ----------------------------------------------------------------------
     match /parent_link_requests/{requestId} {
-      allow get, list: if isSignedIn();
+      allow get, list: if isSignedIn() && (isAdmin() || resource.data.parentId == request.auth.uid || resource.data.studentId == request.auth.uid);
 
       allow create: if isValidId(requestId) &&
                        isSignedIn() &&
@@ -145,7 +144,7 @@ service cloud.firestore {
     // 3. TEACHER VERIFICATION REQUESTS (/verification_requests/{reqId})
     // ----------------------------------------------------------------------
     match /verification_requests/{reqId} {
-      allow get, list: if isSignedIn();
+      allow get, list: if isSignedIn() && (isAdmin() || resource.data.teacherId == request.auth.uid);
 
       allow create: if isValidId(reqId) &&
                        isSignedIn() &&
@@ -160,7 +159,7 @@ service cloud.firestore {
     // 4. SAFETY & MISCONDUCT REPORTS (/safety_reports/{reportId})
     // ----------------------------------------------------------------------
     match /safety_reports/{reportId} {
-      allow get, list: if isSignedIn();
+      allow get, list: if isAdmin();
 
       allow create: if isValidId(reportId) &&
                        isSignedIn() &&
@@ -174,7 +173,7 @@ service cloud.firestore {
     // 5. COMMISSIONS & BILLING (/commissions/{commId})
     // ----------------------------------------------------------------------
     match /commissions/{commId} {
-      allow get, list: if isSignedIn();
+      allow get, list: if isSignedIn() && (isAdmin() || resource.data.teacherId == request.auth.uid);
 
       allow create, update, delete: if isValidId(commId) && (isAdmin() || (isSignedIn() && incoming().teacherId == request.auth.uid));
     }
@@ -185,7 +184,7 @@ service cloud.firestore {
     match /tutors/{tutorId} {
       allow read: if isValidId(tutorId);
       allow list: if true;
-      allow create, update: if isValidId(tutorId) && (isOwner(tutorId) || !isSignedIn() || isAdmin());
+      allow create, update: if isValidId(tutorId) && isSignedIn() && (isOwner(tutorId) || isAdmin());
       allow delete: if isValidId(tutorId) && (isOwner(tutorId) || isAdmin());
     }
 
@@ -194,15 +193,15 @@ service cloud.firestore {
     // ----------------------------------------------------------------------
     match /groups/{groupId} {
       allow read, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow create, update, delete: if isAdmin() || (isSignedIn() && request.auth.token.role == 'teacher');
     }
 
     // ----------------------------------------------------------------------
     // 8. TEACHER STUDENTS (/teacher_students/{studentDocId})
     // ----------------------------------------------------------------------
     match /teacher_students/{studentDocId} {
-      allow read, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow read, list: if isAdmin() || (isSignedIn() && request.auth.token.role == 'teacher');
+      allow create, update, delete: if isAdmin() || (isSignedIn() && request.auth.token.role == 'teacher');
     }
 
     // ----------------------------------------------------------------------
@@ -210,7 +209,7 @@ service cloud.firestore {
     // ----------------------------------------------------------------------
     match /attendance/{attendanceId} {
       allow read, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow create, update, delete: if isAdmin() || (isSignedIn() && request.auth.token.role == 'teacher');
     }
 
     // ----------------------------------------------------------------------
@@ -218,14 +217,14 @@ service cloud.firestore {
     // ----------------------------------------------------------------------
     match /booking_requests/{requestId} {
       allow read, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow create, update, delete: if isAdmin() || (isSignedIn() && request.auth.token.role in ['student', 'parent', 'teacher']);
     }
 
     // ----------------------------------------------------------------------
     // 11. ADMINS COLLECTION (/admins/{adminId})
     // ----------------------------------------------------------------------
     match /admins/{adminId} {
-      allow read: if isSignedIn();
+      allow get: if isAdmin() || (isSignedIn() && request.auth.uid == adminId);
       allow write: if isAdmin();
     }
   }
