@@ -271,3 +271,45 @@ button, a, input, select, textarea {
 
 
 
+
+
+/* Shared responsive foundation */
+@layer base {
+  html {
+    min-width: 320px;
+    overflow-x: hidden;
+  }
+
+  body {
+    min-width: 320px;
+    min-height: 100dvh;
+    margin: 0;
+    overflow-x: hidden;
+  }
+
+  #root {
+    min-height: 100dvh;
+    width: 100%;
+    overflow-x: clip;
+  }
+
+  img, svg, video, canvas {
+    max-width: 100%;
+  }
+
+  :focus-visible {
+    outline: 3px solid rgba(37, 99, 235, 0.45);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
