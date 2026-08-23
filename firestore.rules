@@ -102,6 +102,7 @@ service cloud.firestore {
                            incoming().uid == existing().uid &&
                            // Prevent privilege escalation
                            (incoming().role == existing().role || isAdmin())
+                         )
                         );
 
       allow delete: if isValidId(userId) && (isOwner(userId) || isAdmin());
