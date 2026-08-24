@@ -86,7 +86,7 @@ export const StudentDashboardPage: React.FC<StudentDashboardPageProps> = ({
   const myTutors: any[] = [];
 
   return (
-    <div className="space-y-8 text-right font-['Tajawal',sans-serif]">
+    <div className="space-y-8 text-right font-['IBM_Plex_Sans_Arabic',sans-serif]">
       
       {/* Alert Feedback Toast */}
       {actionAlert && (
