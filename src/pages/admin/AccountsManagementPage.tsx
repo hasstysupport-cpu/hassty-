@@ -442,8 +442,8 @@ export const AccountsManagementPage: React.FC<AccountsManagementPageProps> = ({
           MODAL: Comprehensive Profile Editor for Admin
          ========================================================================= */}
       {editModalAccount && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-7 space-y-5 shadow-2xl border border-gray-200 text-right animate-scale-up my-8">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-5 sm:p-7 space-y-4 sm:space-y-5 shadow-2xl border border-gray-200 text-right animate-scale-up my-auto max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2">
                 <div className="w-9 h-9 rounded-2xl bg-blue-50 text-[#2563EB] flex items-center justify-center font-bold">
