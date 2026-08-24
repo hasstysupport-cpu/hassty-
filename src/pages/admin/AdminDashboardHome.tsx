@@ -65,7 +65,7 @@ export const AdminDashboardHome: React.FC<AdminDashboardHomeProps> = ({
   }, [studentsCount, parentsCount, teachersCount, totalUsers]);
 
   return (
-    <div className="space-y-6 text-right font-['Tajawal',sans-serif]">
+    <div className="space-y-6 text-right font-['IBM_Plex_Sans_Arabic',sans-serif]">
       
       {/* 1. Header Banner */}
       <div className="bg-[#1E3A8A] text-white rounded-3xl p-6 sm:p-7 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
