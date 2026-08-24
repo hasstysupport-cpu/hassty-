@@ -186,7 +186,7 @@ export const WhatsAppStudioPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFF] py-10 px-4 sm:px-6 lg:px-8 text-right font-['Tajawal',sans-serif]">
+    <div className="min-h-screen bg-[#F8FAFF] py-10 px-4 sm:px-6 lg:px-8 text-right font-['IBM_Plex_Sans_Arabic',sans-serif]">
       <div className="max-w-5xl mx-auto space-y-6">
         
         {/* Header with Server Status */}
