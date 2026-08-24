@@ -849,7 +849,6 @@ app.post(['/api/auth/otp/send-email', '/api/auth/send-verification-code'], async
       emailSent: emailResult.success,
       emailError: emailResult.error,
       expiresInSeconds: 300,
-      previewCode: generatedCode, // Delivered securely to support preview and real verification
       activationLink,
       message: emailResult.success 
         ? 'تم إرسال كود التحقق ورابط التفعيل بنجاح إلى صندوق بريدك الإلكتروني'

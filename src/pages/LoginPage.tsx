@@ -53,7 +53,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   // OTP Verification State
   const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
   const [requestId, setRequestId] = useState<string>('');
-  const [previewCode, setPreviewCode] = useState<string>('');
   const [resendTimer, setResendTimer] = useState<number>(60);
   const [isSendingOtp, setIsSendingOtp] = useState<boolean>(false);
   const [otpSuccessMessage, setOtpSuccessMessage] = useState<string>('');
@@ -124,7 +123,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
         if (otpRes.success && otpRes.requestId) {
           setRequestId(otpRes.requestId);
-          if (otpRes.previewCode) setPreviewCode(otpRes.previewCode);
         }
       } catch (otpErr) {
         console.warn('Login OTP dispatch warning:', otpErr);
@@ -288,7 +286,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
       if (res.success && res.requestId) {
         setRequestId(res.requestId);
-        if (res.previewCode) setPreviewCode(res.previewCode);
         setOtpSuccessMessage('تم إرسال رمز تحقق جديد بنجاح إلى بريدك الإلكتروني.');
         setResendTimer(60);
         inputRefs.current[0]?.focus();
@@ -299,17 +296,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       setErrorMessage('حدث خطأ أثناء إعادة إرسال الكود.');
     } finally {
       setIsSendingOtp(false);
-    }
-  };
-
-  /**
-   * Fill preview code instantly
-   */
-  const handleFillPreviewCode = () => {
-    if (previewCode && previewCode.length === 6) {
-      const digits = previewCode.split('');
-      setOtpDigits(digits);
-      handleVerifyLoginOtp(previewCode);
     }
   };
 
@@ -554,26 +540,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   تم إرسال رمز الأمان إلى صندوق بريدك الإلكتروني ✉️
                 </div>
               </div>
-
-              {/* Preview Code Quick-Fill Helper */}
-              {previewCode && !isVerifiedSuccess && (
-                <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl flex items-center justify-between gap-2 shadow-xs">
-                  <div className="flex items-center gap-1.5 text-xs text-blue-950 font-bold">
-                    <KeyRound className="w-4 h-4 text-blue-600 shrink-0" />
-                    <span>رمز الدخول:</span>
-                    <span className="font-mono font-black text-blue-700 bg-white px-2 py-0.5 rounded-md border border-blue-200 text-xs" dir="ltr">
-                      {previewCode}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleFillPreviewCode}
-                    className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95 shrink-0"
-                  >
-                    تعبئة وتأكيد
-                  </button>
-                </div>
-              )}
 
               {/* 6-Digit OTP Inputs */}
               <div>

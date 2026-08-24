@@ -42,7 +42,6 @@ export const VerifyEmailPage: React.FC<VerifyEmailPageProps> = ({
 
   const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
   const [requestId, setRequestId] = useState<string>('');
-  const [previewCode, setPreviewCode] = useState<string>('');
   const [activationLink, setActivationLink] = useState<string>('');
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -153,7 +152,6 @@ export const VerifyEmailPage: React.FC<VerifyEmailPageProps> = ({
           if (res.success && res.requestId) {
             setRequestId(res.requestId);
             if (res.maskedEmail) setMaskedEmail(res.maskedEmail);
-            if (res.previewCode) setPreviewCode(res.previewCode);
             if (res.activationLink) setActivationLink(res.activationLink);
             setResendTimer(60);
           } else {
@@ -324,7 +322,6 @@ export const VerifyEmailPage: React.FC<VerifyEmailPageProps> = ({
 
       if (res.success && res.requestId) {
         setRequestId(res.requestId);
-        if (res.previewCode) setPreviewCode(res.previewCode);
         if (res.activationLink) setActivationLink(res.activationLink);
         setSuccessMessage('تم إرسال كود تحقق ورابط تفعيل جديد بنجاح إلى بريدك الإلكتروني');
         setResendTimer(60);
@@ -388,14 +385,6 @@ export const VerifyEmailPage: React.FC<VerifyEmailPageProps> = ({
       setErrorMessage(err?.message || 'فشل التحقق من الكود');
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleFillPreview = () => {
-    if (previewCode && previewCode.length === 6) {
-      const digits = previewCode.split('');
-      setOtpDigits(digits);
-      handleAutoVerify(previewCode);
     }
   };
 
@@ -474,43 +463,6 @@ export const VerifyEmailPage: React.FC<VerifyEmailPageProps> = ({
             تم إرسال رمز الأمان ورابط التفعيل إلى بريدك الإلكتروني ✉️
           </div>
         </div>
-
-        {/* Preview Code Quick-Fill & Instant Activation Link */}
-        {previewCode && !isVerified && (
-          <div className="mb-6 p-4 bg-gradient-to-br from-indigo-50/90 via-blue-50/60 to-white border border-indigo-200 rounded-2xl space-y-3 shadow-xs">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-xs text-indigo-950 font-bold">
-                <KeyRound className="w-4 h-4 text-indigo-600 shrink-0" />
-                <span>رمز التفعيل المُنشأ:</span>
-                <span className="font-mono font-black text-indigo-700 bg-white px-2.5 py-0.5 rounded-lg border border-indigo-200 shadow-xs text-sm" dir="ltr">
-                  {previewCode}
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={handleFillPreview}
-                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 shadow-xs"
-              >
-                تعبئة الرمز الفوري
-              </button>
-            </div>
-
-            {/* Direct 1-Click Activation Action */}
-            <div className="pt-2.5 border-t border-indigo-100 flex flex-col sm:flex-row items-center justify-between gap-2">
-              <span className="text-xs text-slate-600 font-medium">
-                ⚡ خيار التفعيل المباشر بنقرة واحدة:
-              </span>
-              <button
-                type="button"
-                onClick={() => handleAutoVerify(previewCode)}
-                className="w-full sm:w-auto px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1.5 active:scale-95"
-              >
-                <Check className="w-3.5 h-3.5" />
-                <span>تفعيل فوري والدخول للوحة التحكم</span>
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* 6-Digit OTP Inputs Form */}
         <div className="space-y-6">

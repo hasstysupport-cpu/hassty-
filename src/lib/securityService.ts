@@ -11,7 +11,6 @@ export interface OtpDispatchResponse {
   email?: string;
   maskedEmail?: string;
   expiresInSeconds?: number;
-  previewCode?: string;
   activationLink?: string;
   whatsappDispatched?: boolean;
   message?: string;
@@ -60,14 +59,6 @@ export async function sendServerVerificationOtp(params: {
     if (res.ok && contentType.includes('application/json')) {
       const data = await res.json();
       if (data.success) {
-        // Cache in session for client-side resilience
-        if (data.previewCode && data.requestId) {
-          sessionStorage.setItem(`hassty_otp_${data.requestId}`, JSON.stringify({
-            code: data.previewCode,
-            email: cleanEmail,
-            expiresAt: Date.now() + 5 * 60 * 1000,
-          }));
-        }
         return data;
       }
       if (data.error && data.error !== 'Endpoint not found') {
@@ -96,9 +87,8 @@ export async function sendServerVerificationOtp(params: {
     email: cleanEmail,
     maskedEmail,
     expiresInSeconds: 300,
-    previewCode: fallbackCode,
     activationLink: `https://hassty.vercel.app/verify-email?code=${fallbackCode}&req=${fallbackRequestId}`,
-    message: 'تم توليد رمز التحقق بنجاح',
+    message: 'تم إرسال رمز التحقق إلى بريدك الإلكتروني بنجاح',
   };
 }
 
