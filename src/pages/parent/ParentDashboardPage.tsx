@@ -221,7 +221,7 @@ export const ParentDashboardPage: React.FC<ParentDashboardPageProps> = ({
   };
 
   return (
-    <div className="space-y-8 text-right font-['Tajawal',sans-serif]">
+    <div className="space-y-8 text-right font-['IBM_Plex_Sans_Arabic',sans-serif]">
       
       {/* 1. Multi-Child Selector Bar */}
       <div className="bg-white border border-gray-200 rounded-3xl p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
