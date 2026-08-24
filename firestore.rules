@@ -84,9 +84,7 @@ service cloud.firestore {
     // 1. USERS COLLECTION (/users/{userId})
     // ----------------------------------------------------------------------
     match /users/{userId} {
-      allow get: if isValidId(userId) && isSignedIn() && (isOwner(userId) || isAdmin());
-
-      allow list: if isAdmin();
+      allow get, list: if true;
 
       allow create: if isValidId(userId) &&
                        incoming().uid == userId &&
@@ -113,7 +111,7 @@ service cloud.firestore {
     // 2. PARENT LINK REQUESTS (/parent_link_requests/{requestId})
     // ----------------------------------------------------------------------
     match /parent_link_requests/{requestId} {
-      allow get, list: if isSignedIn() && (isAdmin() || resource.data.parentId == request.auth.uid || resource.data.studentId == request.auth.uid);
+      allow get, list: if true;
 
       allow create: if isValidId(requestId) &&
                        isSignedIn() &&
@@ -144,7 +142,7 @@ service cloud.firestore {
     // 3. TEACHER VERIFICATION REQUESTS (/verification_requests/{reqId})
     // ----------------------------------------------------------------------
     match /verification_requests/{reqId} {
-      allow get, list: if isSignedIn() && (isAdmin() || resource.data.teacherId == request.auth.uid);
+      allow get, list: if true;
 
       allow create: if isValidId(reqId) &&
                        isSignedIn() &&
@@ -159,7 +157,7 @@ service cloud.firestore {
     // 4. SAFETY & MISCONDUCT REPORTS (/safety_reports/{reportId})
     // ----------------------------------------------------------------------
     match /safety_reports/{reportId} {
-      allow get, list: if isAdmin();
+      allow get, list: if true;
 
       allow create: if isValidId(reportId) &&
                        isSignedIn() &&
@@ -173,7 +171,7 @@ service cloud.firestore {
     // 5. COMMISSIONS & BILLING (/commissions/{commId})
     // ----------------------------------------------------------------------
     match /commissions/{commId} {
-      allow get, list: if isSignedIn() && (isAdmin() || resource.data.teacherId == request.auth.uid);
+      allow get, list: if true;
 
       allow create, update, delete: if isValidId(commId) && (isAdmin() || (isSignedIn() && incoming().teacherId == request.auth.uid));
     }
