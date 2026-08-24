@@ -55,18 +55,8 @@ export async function sendServerVerificationOtp(params: {
     }
     return data;
   } catch (err: any) {
-    console.warn('sendServerVerificationOtp network error, fallbacking:', err);
-    // Graceful fallback for offline / preview
-    const randomFallbackCode = Math.floor(100000 + Math.random() * 900000).toString();
-    return {
-      success: true,
-      requestId: `vreq_offline_${Date.now()}`,
-      email: params.email,
-      maskedEmail: params.email,
-      expiresInSeconds: 300,
-      previewCode: randomFallbackCode,
-      message: 'تم إرسال رمز التحقق إلى بريدك الإلكتروني',
-    };
+    console.warn('sendServerVerificationOtp network error:', err);
+    return { success: false, error: 'تعذر الاتصال بخادم إرسال رمز التحقق. حاول مرة أخرى.' };
   }
 }
 
@@ -93,20 +83,6 @@ export async function verifyServerOtp(params: {
     return data;
   } catch (err: any) {
     console.warn('verifyServerOtp network error:', err);
-    // If offline / local test with fallback code or 123456
-    if (params.code === '123456' || params.code === '1234' || params.code.length === 6) {
-      const fallbackToken = `mock_sec_tok_${Date.now()}_${params.uid || 'usr'}`;
-      setStoredToken(fallbackToken);
-      return {
-        success: true,
-        verified: true,
-        token: fallbackToken,
-        uid: params.uid,
-        email: params.email,
-        emailVerified: true,
-        message: 'تم التحقق بنجاح وتوثيق الحساب',
-      };
-    }
     return {
       success: false,
       verified: false,
@@ -135,7 +111,7 @@ export async function validateServerSession(token?: string, uid?: string): Promi
     const data = await res.json().catch(() => ({}));
     return !!data.valid;
   } catch {
-    return true; // Graceful offline resilience
+    return false;
   }
 }
 
@@ -164,11 +140,6 @@ export async function checkServerDataOwnership(params: {
     const data = await res.json().catch(() => ({}));
     return !!data.authorized;
   } catch {
-    // Client-side fallback rule
-    if (params.requestingRole === 'admin') return true;
-    if (params.requestingUid === params.resourceOwnerUid) return true;
-    if (params.requestingRole === 'parent' && params.parentLinkedStudents?.includes(params.resourceOwnerUid)) return true;
-    if (params.requestingRole === 'teacher' && params.teacherStudents?.includes(params.resourceOwnerUid)) return true;
     return false;
   }
 }
