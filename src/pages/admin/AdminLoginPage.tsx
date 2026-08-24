@@ -143,7 +143,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-[#070D18] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 font-['Tajawal',sans-serif] text-right antialiased relative overflow-hidden select-none">
+    <div className="min-h-screen bg-[#070D18] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 font-['IBM_Plex_Sans_Arabic',sans-serif] text-right antialiased relative overflow-hidden select-none">
       
       {/* Dynamic Cyber Grid Background */}
       <div className="absolute inset-0 bg-[radial-gradient(#1E40AF_1.2px,transparent_1.2px)] [background-size:28px_28px] opacity-20 pointer-events-none" />
