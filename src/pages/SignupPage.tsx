@@ -254,7 +254,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFF] py-12 sm:px-6 lg:px-8 text-right font-['Tajawal',sans-serif]">
+    <div className="min-h-screen bg-[#F8FAFF] py-12 sm:px-6 lg:px-8 text-right font-['IBM_Plex_Sans_Arabic',sans-serif]">
       
       <div className="max-w-xl mx-auto px-4">
         
