@@ -95,7 +95,7 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/70 backdrop-blur-xs font-['Tajawal',sans-serif] text-right overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/70 backdrop-blur-xs font-['IBM_Plex_Sans_Arabic',sans-serif] text-right overflow-y-auto">
       <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-100 relative my-auto p-5 sm:p-6 overflow-hidden">
         
         {/* Top Accent Strip */}
