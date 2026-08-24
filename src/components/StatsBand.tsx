@@ -15,7 +15,7 @@ export const StatsBand: React.FC = () => {
               className="flex flex-col items-center justify-center p-4"
               id={`stat-item-${idx}`}
             >
-              <span className="text-3xl sm:text-4xl lg:text-5xl font-black text-[#1E3A8A] tracking-tight mb-2 font-['Tajawal']">
+              <span className="text-3xl sm:text-4xl lg:text-5xl font-black text-[#1E3A8A] tracking-tight mb-2 font-['IBM_Plex_Sans_Arabic']">
                 {stat.value}
               </span>
               <span className="text-base sm:text-lg font-bold text-[#1F2937] mb-1">
