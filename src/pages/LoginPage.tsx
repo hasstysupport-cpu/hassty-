@@ -345,7 +345,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const RoleIcon = currentRoleInfo.icon;
 
   return (
-    <div className="min-h-screen bg-[#F8FAFF] flex flex-col justify-center py-12 sm:px-6 lg:px-8 text-right font-['Tajawal',sans-serif] relative overflow-hidden">
+    <div className="min-h-screen bg-[#F8FAFF] flex flex-col justify-center py-12 sm:px-6 lg:px-8 text-right font-['IBM_Plex_Sans_Arabic',sans-serif] relative overflow-hidden">
       
       {/* Background Decorative Blurs */}
       <div className="absolute -top-32 -left-32 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
