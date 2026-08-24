@@ -246,11 +246,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({
   };
 
   const handleFinish = () => {
-    if (isAccountVerified) {
-      onSignupSuccess(role, email);
-    } else {
-      onNavigate('/verify-email');
-    }
+    onNavigate('/verify-email');
   };
 
   return (
@@ -794,31 +790,15 @@ export const SignupPage: React.FC<SignupPageProps> = ({
                 أرسلنا رابط تفعيل رسمي وآمن إلى بريدك الإلكتروني. اضغط على الرابط في رسالتك الواردة أو قم بالتفعيل السريع الآن.
               </p>
 
-              {/* Quick Activation Action or Resend */}
+              {/* Resend Link and Go to Verification */}
               <div className="pt-2 border-t border-blue-100/80 flex flex-col sm:flex-row items-center gap-2">
                 <button
                   type="button"
-                  onClick={handleQuickActivate}
-                  disabled={isVerifyingCode || isAccountVerified}
-                  className={`w-full sm:flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                    isAccountVerified
-                      ? 'bg-emerald-600 text-white shadow-xs'
-                      : 'bg-[#2563EB] hover:bg-[#1D4ED8] text-white shadow-xs'
-                  }`}
+                  onClick={() => onNavigate('/verify-email')}
+                  className="w-full sm:flex-1 py-2.5 px-3 rounded-xl font-bold text-xs bg-[#2563EB] hover:bg-[#1D4ED8] text-white shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-98"
                 >
-                  {isAccountVerified ? (
-                    <>
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>الحساب مفعل وموثق بنجاح</span>
-                    </>
-                  ) : isVerifyingCode ? (
-                    <span>جاري تأكيد التفعيل...</span>
-                  ) : (
-                    <>
-                      <ShieldCheck className="w-4 h-4" />
-                      <span>تأكيد تفعيل الحساب الآن</span>
-                    </>
-                  )}
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>إدخال كود التفعيل (OTP)</span>
                 </button>
 
                 <button
@@ -885,7 +865,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({
               onClick={handleFinish}
               className="w-full py-3.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-sm rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer active:scale-95"
             >
-              <span>الدخول إلى لوحة التحكم</span>
+              <span>المتابعة إلى صفحة التوثيق وتأكيد الرمز</span>
               <ArrowLeft className="w-4 h-4" />
             </button>
           </div>

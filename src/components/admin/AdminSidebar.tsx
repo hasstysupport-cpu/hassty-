@@ -11,7 +11,11 @@ import {
   ExternalLink,
   ChevronLeft,
   Server,
-  Lock
+  Lock,
+  Database,
+  RefreshCw,
+  AlertTriangle,
+  CheckCircle2
 } from 'lucide-react';
 
 export type AdminTab = 
@@ -30,6 +34,8 @@ interface AdminSidebarProps {
   adminEmail: string;
   onLogout: () => void;
   onSwitchToPublicApp?: () => void;
+  dbConnectionStatus?: 'connected' | 'connecting' | 'failed';
+  onRetryDbConnection?: () => void;
 }
 
 export const AdminSidebar: React.FC<AdminSidebarProps> = ({
@@ -40,6 +46,8 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   adminEmail,
   onLogout,
   onSwitchToPublicApp,
+  dbConnectionStatus = 'connected',
+  onRetryDbConnection,
 }) => {
   const menuItems = [
     {
@@ -113,6 +121,44 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
             <span>IP Allowlist: محمي</span>
           </div>
           <span className="text-[10px] text-blue-300 font-mono">197.34.120.*</span>
+        </div>
+
+        {/* Database Connection Live Status Indicator */}
+        <div className={`mt-2 p-2.5 rounded-xl border flex items-center justify-between text-[11px] transition-all ${
+          dbConnectionStatus === 'connected'
+            ? 'bg-emerald-950/40 border-emerald-700/60 text-emerald-300'
+            : dbConnectionStatus === 'connecting'
+            ? 'bg-amber-950/40 border-amber-700/60 text-amber-300'
+            : 'bg-red-950/60 border-red-700/70 text-red-200'
+        }`}>
+          <div className="flex items-center gap-1.5 font-bold">
+            {dbConnectionStatus === 'connected' ? (
+              <>
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                <Database className="w-3.5 h-3.5 text-emerald-400" />
+                <span>قاعدة البيانات: متصل (Live)</span>
+              </>
+            ) : dbConnectionStatus === 'connecting' ? (
+              <>
+                <RefreshCw className="w-3.5 h-3.5 text-amber-400 animate-spin" />
+                <span>جاري الاتصال بقاعدة البيانات...</span>
+              </>
+            ) : (
+              <>
+                <AlertTriangle className="w-3.5 h-3.5 text-red-400 animate-bounce" />
+                <span>فشل الاتصال بقاعدة البيانات</span>
+              </>
+            )}
+          </div>
+
+          {dbConnectionStatus === 'failed' && onRetryDbConnection && (
+            <button
+              onClick={onRetryDbConnection}
+              className="px-2 py-0.5 bg-red-800/80 hover:bg-red-700 text-white rounded text-[10px] font-black transition-colors cursor-pointer"
+            >
+              إعادة الاتصال
+            </button>
+          )}
         </div>
       </div>
 

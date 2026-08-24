@@ -40,7 +40,10 @@ export async function seedAdminDatabaseIfEmpty() {
 /**
  * Subscribes to real-time Users collection in Firestore
  */
-export function subscribeToUsers(callback: (users: AdminUserAccount[]) => void) {
+export function subscribeToUsers(
+  callback: (users: AdminUserAccount[]) => void,
+  onError?: (err: any) => void
+) {
   const q = collection(db, USERS_COLLECTION);
   return onSnapshot(q, (snapshot) => {
     if (snapshot.empty) {
@@ -73,6 +76,7 @@ export function subscribeToUsers(callback: (users: AdminUserAccount[]) => void) 
     callback(accounts);
   }, (err) => {
     console.error('Firestore subscribeToUsers error:', err);
+    if (onError) onError(err);
     callback([]);
   });
 }
@@ -80,7 +84,10 @@ export function subscribeToUsers(callback: (users: AdminUserAccount[]) => void) 
 /**
  * Subscribes to real-time Verification Requests in Firestore
  */
-export function subscribeToVerifications(callback: (reqs: TeacherVerificationRequest[]) => void) {
+export function subscribeToVerifications(
+  callback: (reqs: TeacherVerificationRequest[]) => void,
+  onError?: (err: any) => void
+) {
   const q = collection(db, VERIFICATIONS_COLLECTION);
   return onSnapshot(q, (snapshot) => {
     if (snapshot.empty) {
@@ -94,6 +101,7 @@ export function subscribeToVerifications(callback: (reqs: TeacherVerificationReq
     callback(list);
   }, (err) => {
     console.error('Firestore subscribeToVerifications error:', err);
+    if (onError) onError(err);
     callback([]);
   });
 }
@@ -101,7 +109,10 @@ export function subscribeToVerifications(callback: (reqs: TeacherVerificationReq
 /**
  * Subscribes to real-time Safety Reports in Firestore
  */
-export function subscribeToReports(callback: (reps: AdminSafetyReport[]) => void) {
+export function subscribeToReports(
+  callback: (reps: AdminSafetyReport[]) => void,
+  onError?: (err: any) => void
+) {
   const q = collection(db, REPORTS_COLLECTION);
   return onSnapshot(q, (snapshot) => {
     if (snapshot.empty) {
@@ -115,6 +126,7 @@ export function subscribeToReports(callback: (reps: AdminSafetyReport[]) => void
     callback(list);
   }, (err) => {
     console.error('Firestore subscribeToReports error:', err);
+    if (onError) onError(err);
     callback([]);
   });
 }
@@ -122,7 +134,10 @@ export function subscribeToReports(callback: (reps: AdminSafetyReport[]) => void
 /**
  * Subscribes to real-time Commission records in Firestore
  */
-export function subscribeToCommissions(callback: (comms: TeacherCommissionTrackingItem[]) => void) {
+export function subscribeToCommissions(
+  callback: (comms: TeacherCommissionTrackingItem[]) => void,
+  onError?: (err: any) => void
+) {
   const q = collection(db, COMMISSIONS_COLLECTION);
   return onSnapshot(q, (snapshot) => {
     if (snapshot.empty) {
@@ -136,6 +151,7 @@ export function subscribeToCommissions(callback: (comms: TeacherCommissionTracki
     callback(list);
   }, (err) => {
     console.error('Firestore subscribeToCommissions error:', err);
+    if (onError) onError(err);
     callback([]);
   });
 }

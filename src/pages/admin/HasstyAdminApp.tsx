@@ -36,7 +36,7 @@ import {
   clearAdminSession,
   saveAdminSession,
 } from '../../lib/securityConfig';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertTriangle, RefreshCw, Database } from 'lucide-react';
 
 interface HasstyAdminAppProps {
   onSwitchToPublicApp?: () => void;
@@ -56,6 +56,9 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
 
   const [currentTab, setCurrentTab] = useState<AdminTab>('dashboard');
   const [isDbLoading, setIsDbLoading] = useState<boolean>(true);
+  const [dbConnectionStatus, setDbConnectionStatus] = useState<'connected' | 'connecting' | 'failed'>('connecting');
+  const [dbErrorMessage, setDbErrorMessage] = useState<string | null>(null);
+  const [retryTrigger, setRetryTrigger] = useState<number>(0);
 
   // Periodically check session expiry (24 hours check)
   useEffect(() => {
@@ -73,7 +76,6 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
   const [safetyReports, setSafetyReports] = useState<any[]>([]);
   const [commissions, setCommissions] = useState<any[]>([]);
 
-
   // Initialize DB and real-time listeners
   useEffect(() => {
     let unsubUsers: (() => void) | undefined;
@@ -81,28 +83,62 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
     let unsubReports: (() => void) | undefined;
     let unsubComms: (() => void) | undefined;
 
+    setDbConnectionStatus('connecting');
+    setDbErrorMessage(null);
+    setIsDbLoading(true);
+
     async function initRealtimeSync() {
       try {
         await seedAdminDatabaseIfEmpty();
         
-        unsubUsers = subscribeToUsers((data) => {
-          setAccounts(data);
-          setIsDbLoading(false);
-        });
+        unsubUsers = subscribeToUsers(
+          (data) => {
+            setAccounts(data);
+            setDbConnectionStatus('connected');
+            setDbErrorMessage(null);
+            setIsDbLoading(false);
+          },
+          (err) => {
+            console.error('Firestore Users Sync Error:', err);
+            setDbConnectionStatus('failed');
+            setDbErrorMessage('فشل الاتصال بقاعدة البيانات (Firestore) — تعذر جلب سجلات المستخدمين');
+            setIsDbLoading(false);
+          }
+        );
 
-        unsubVerifs = subscribeToVerifications((data) => {
-          setVerificationRequests(data);
-        });
+        unsubVerifs = subscribeToVerifications(
+          (data) => {
+            setVerificationRequests(data);
+          },
+          (err) => {
+            console.error('Firestore Verifications Sync Error:', err);
+            setDbConnectionStatus('failed');
+          }
+        );
 
-        unsubReports = subscribeToReports((data) => {
-          setSafetyReports(data);
-        });
+        unsubReports = subscribeToReports(
+          (data) => {
+            setSafetyReports(data);
+          },
+          (err) => {
+            console.error('Firestore Reports Sync Error:', err);
+            setDbConnectionStatus('failed');
+          }
+        );
 
-        unsubComms = subscribeToCommissions((data) => {
-          setCommissions(data);
-        });
-      } catch (err) {
+        unsubComms = subscribeToCommissions(
+          (data) => {
+            setCommissions(data);
+          },
+          (err) => {
+            console.error('Firestore Commissions Sync Error:', err);
+            setDbConnectionStatus('failed');
+          }
+        );
+      } catch (err: any) {
         console.warn('Firestore subscription init warning:', err);
+        setDbConnectionStatus('failed');
+        setDbErrorMessage(err?.message || 'فشل الاتصال بقاعدة البيانات — يرجى التأكد من اتصال الإنترنت');
         setIsDbLoading(false);
       }
     }
@@ -115,7 +151,11 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
       if (unsubReports) unsubReports();
       if (unsubComms) unsubComms();
     };
-  }, []);
+  }, [retryTrigger]);
+
+  const handleRetryConnection = () => {
+    setRetryTrigger((prev) => prev + 1);
+  };
 
   // Auth Handlers
   const handleLoginSuccess = (email: string) => {
@@ -325,10 +365,39 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
         adminEmail={adminEmail}
         onLogout={handleLogout}
         onSwitchToPublicApp={onSwitchToPublicApp}
+        dbConnectionStatus={dbConnectionStatus}
+        onRetryDbConnection={handleRetryConnection}
       />
 
       {/* 2. Main Content View Area */}
-      <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full overflow-y-auto">
+      <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full overflow-y-auto space-y-6">
+        {/* Database Connection Failure Alert Banner */}
+        {dbConnectionStatus === 'failed' && (
+          <div className="p-4 bg-red-50 border-2 border-red-300 rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm animate-in fade-in duration-300">
+            <div className="flex items-center gap-3 text-right">
+              <div className="w-10 h-10 rounded-2xl bg-red-100 border border-red-200 flex items-center justify-center text-red-600 shrink-0">
+                <AlertTriangle className="w-5 h-5 animate-pulse" />
+              </div>
+              <div>
+                <h4 className="text-sm font-black text-red-900">
+                  فشل الاتصال بقاعدة البيانات (Database Connection Failed)
+                </h4>
+                <p className="text-xs text-red-700 mt-0.5">
+                  {dbErrorMessage || 'تعذر الاتصال بخوادم Firestore السحابية. يرجى التحقق من اتصال الإنترنت.'}
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={handleRetryConnection}
+              className="w-full sm:w-auto px-4 py-2 bg-red-600 hover:bg-red-700 active:scale-95 text-white text-xs font-black rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer shrink-0"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>إعادة المحاولة الآن</span>
+            </button>
+          </div>
+        )}
+
         {isDbLoading ? (
           <div className="py-20 flex flex-col items-center justify-center gap-3 text-slate-500">
             <Loader2 className="w-8 h-8 animate-spin text-blue-600" />

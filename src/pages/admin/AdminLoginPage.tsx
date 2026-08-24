@@ -4,7 +4,6 @@ import {
   Mail,
   Send,
   Lock,
-  KeyRound,
   CheckCircle2,
   AlertCircle,
   Clock,
@@ -13,9 +12,7 @@ import {
   ExternalLink,
   ShieldAlert,
   Fingerprint,
-  RefreshCw,
-  Copy,
-  Check
+  RefreshCw
 } from 'lucide-react';
 import {
   OFFICIAL_ADMIN_EMAIL,
@@ -45,12 +42,6 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
   const [cooldown, setCooldown] = useState(0);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
-  const [generatedLinkInfo, setGeneratedLinkInfo] = useState<{
-    token: string;
-    url: string;
-    expiresInSeconds: number;
-  } | null>(null);
-  const [copiedLink, setCopiedLink] = useState(false);
 
   // If page was opened with an authKey in query parameter, auto-verify immediately
   useEffect(() => {
@@ -83,13 +74,8 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
     try {
       const res = await requestAdminMagicLink(OFFICIAL_ADMIN_EMAIL);
 
-      if (res.success && res.token) {
-        setGeneratedLinkInfo({
-          token: res.token,
-          url: res.fullMagicUrl || `${window.location.origin}${SECRET_ADMIN_ROUTE}?authKey=${res.token}`,
-          expiresInSeconds: res.expiresInSeconds || 3600,
-        });
-        setSuccessMessage('تم إرسال رابط الدخول السري المشفر بنجاح إلى البريد الإداري الرسمي (صلاحية الرابط: 60 دقيقة).');
+      if (res.success) {
+        setSuccessMessage('تم إرسال رابط الدخول السري المشفر بنجاح إلى البريد الإداري الرسمي (hasstysupport@gmail.com). يرجى فتح بريدك والضغط على الرابط أو إدخال رمز التحقق المستلم.');
         setCooldown(60);
       } else {
         setErrorMessage(res.error || 'تعذر إرسال الرابط. يرجى التأكد من البريد الإداري الرسمي.');
@@ -131,14 +117,6 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
       setErrorMessage('فشل التحقق من الرابط الإداري.');
     } finally {
       setIsVerifying(false);
-    }
-  };
-
-  const handleCopyMagicUrl = () => {
-    if (generatedLinkInfo?.url) {
-      navigator.clipboard?.writeText(generatedLinkInfo.url);
-      setCopiedLink(true);
-      setTimeout(() => setCopiedLink(false), 2000);
     }
   };
 
@@ -257,54 +235,6 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
                   </>
                 )}
               </button>
-
-              {/* Generated Magic Link Card (Convenient Direct Access / Testing) */}
-              {generatedLinkInfo && (
-                <div className="p-4 bg-blue-950/50 border border-blue-700/60 rounded-2xl space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-blue-300">
-                      <KeyRound className="w-4 h-4 text-amber-400" />
-                      <span>رابط الدخول السري (صلاحية 60 دقيقة)</span>
-                    </div>
-                    <span className="text-[10px] text-amber-300 bg-amber-950/80 border border-amber-800/80 px-2 py-0.5 rounded-md font-mono">
-                      ينتهي خلال 1 ساعة
-                    </span>
-                  </div>
-
-                  <div className="p-2.5 bg-slate-900/90 rounded-xl border border-slate-700 text-[11px] font-mono text-slate-300 break-all select-all text-left" dir="ltr">
-                    {generatedLinkInfo.url}
-                  </div>
-
-                  <div className="flex items-center gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={handleCopyMagicUrl}
-                      className="flex-1 py-2 px-3 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer border border-slate-600"
-                    >
-                      {copiedLink ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 text-emerald-400" />
-                          <span>تم نسخ الرابط!</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3.5 h-3.5 text-slate-400" />
-                          <span>نسخ رابط الدخول</span>
-                        </>
-                      )}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleVerifyToken(generatedLinkInfo.token)}
-                      className="flex-1 py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
-                    >
-                      <ShieldCheck className="w-4 h-4" />
-                      <span>دخول وتفعيل الجلسة (24 س)</span>
-                    </button>
-                  </div>
-                </div>
-              )}
 
               {/* Manual Token Verification Fallback */}
               <div className="pt-3 border-t border-slate-800/80 space-y-3">

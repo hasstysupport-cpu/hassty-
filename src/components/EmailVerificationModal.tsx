@@ -170,33 +170,19 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
             </div>
           </div>
 
-          {/* Direct Verification Action */}
+          {/* Redirect to Verification Page */}
           <button
             type="button"
-            onClick={handleVerifyDirect}
-            disabled={isVerifying || isVerified}
-            className={`w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs ${
-              isVerified
-                ? 'bg-emerald-600 text-white'
-                : 'bg-[#2563EB] hover:bg-[#1D4ED8] text-white'
-            }`}
+            onClick={() => {
+              onClose();
+              if (onVerifyManually) {
+                onVerifyManually();
+              }
+            }}
+            className="w-full py-2.5 rounded-xl font-bold text-xs bg-[#2563EB] hover:bg-[#1D4ED8] text-white flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs active:scale-98"
           >
-            {isVerified ? (
-              <>
-                <CheckCircle2 className="w-4 h-4" />
-                <span>تم تأكيد وتوثيق الحساب بنجاح!</span>
-              </>
-            ) : isVerifying ? (
-              <>
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>جاري توثيق البريد...</span>
-              </>
-            ) : (
-              <>
-                <CheckCircle2 className="w-4 h-4" />
-                <span>تأكيد الحساب ومتابعة الدخول</span>
-              </>
-            )}
+            <ShieldCheck className="w-4 h-4" />
+            <span>الانتقال لصفحة إدخال كود التحقق الأمني</span>
           </button>
         </div>
 

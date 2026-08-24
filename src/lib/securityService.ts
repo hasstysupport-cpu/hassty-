@@ -61,7 +61,7 @@ export async function sendServerVerificationOtp(params: {
       if (data.success) {
         return data;
       }
-      if (data.error && data.error !== 'Endpoint not found') {
+      if (data.error && !data.error.includes('405') && !data.error.includes('404') && data.error !== 'Endpoint not found') {
         return data;
       }
     }
@@ -120,7 +120,7 @@ export async function verifyServerOtp(params: {
         }
         return data;
       }
-      if (data.error && data.error !== 'Endpoint not found') {
+      if (data.error && !data.error.includes('405') && !data.error.includes('404') && data.error !== 'Endpoint not found') {
         return data;
       }
     }

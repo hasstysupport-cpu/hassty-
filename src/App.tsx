@@ -185,9 +185,13 @@ export default function App() {
       ) : (
         <PublicNavbar
           currentPath={currentPath}
+          isLoggedIn={isLoggedIn && !isUnverified}
+          user={user}
+          currentRole={currentRole}
           onNavigate={handleNavigate}
           onOpenLogin={() => handleNavigate('/login')}
           onOpenSignup={() => handleNavigate('/signup')}
+          onLogout={handleLogout}
         />
       )}
 
