@@ -164,10 +164,74 @@ export const CommissionTrackingPage: React.FC<CommissionTrackingPageProps> = ({
         </div>
       </div>
 
-      {/* 5. Commissions Table */}
-      <div className="bg-white border border-gray-200 rounded-3xl overflow-hidden shadow-xs">
+      {/* 5. Commissions Display: Mobile Cards (< md) & Desktop Table (>= md) */}
+      
+      {/* 5A. Mobile Cards View */}
+      <div className="block md:hidden space-y-3">
+        {filteredCommissions.length === 0 ? (
+          <div className="bg-white border border-gray-200 rounded-3xl p-8 text-center text-gray-400 text-xs font-bold">
+            لا توجد بيانات مطابقة للبحث
+          </div>
+        ) : (
+          filteredCommissions.map((item) => (
+            <div key={item.id} className="bg-white border border-gray-200 rounded-3xl p-4 space-y-3 shadow-xs">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h4 className="font-black text-sm text-[#1E3A8A]">{item.teacherName}</h4>
+                  <span className="text-xs text-gray-500 font-bold">{item.subject}</span>
+                </div>
+                <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-black ${
+                  item.paymentStatus === 'paid' ? 'bg-emerald-100 text-emerald-800' :
+                  item.paymentStatus === 'overdue' ? 'bg-red-100 text-red-800' :
+                  'bg-amber-100 text-amber-800'
+                }`}>
+                  {item.paymentStatus === 'paid' ? 'تم السداد ✓' : item.paymentStatus === 'overdue' ? 'متأخر ⚠️' : 'قيد التحصيل'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 bg-gray-50 p-2.5 rounded-2xl text-xs">
+                <div>
+                  <span className="text-gray-400 block text-[10px]">الطلاب الفعالين:</span>
+                  <span className="font-bold text-gray-800">{item.activeStudentsCount} طالب</span>
+                </div>
+                <div>
+                  <span className="text-gray-400 block text-[10px]">نسبة الشريحة:</span>
+                  <span className="font-mono font-bold text-blue-700">{item.tierRate}%</span>
+                </div>
+                <div>
+                  <span className="text-gray-400 block text-[10px]">التحصيل الشهري:</span>
+                  <span className="font-mono font-bold text-gray-700">{item.monthlyGrossEgp.toLocaleString()} ج.م</span>
+                </div>
+                <div>
+                  <span className="text-gray-400 block text-[10px]">مستحق المنصة:</span>
+                  <span className="font-mono font-black text-emerald-700">{item.dueCommissionEgp} ج.م</span>
+                </div>
+              </div>
+
+              <div className="pt-1 flex items-center justify-end">
+                {item.paymentStatus !== 'paid' ? (
+                  <button
+                    type="button"
+                    onClick={() => onMarkPaid(item.id)}
+                    className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-black transition-all shadow-xs cursor-pointer text-center"
+                  >
+                    تأكيد السداد واستلام العمولة ✓
+                  </button>
+                ) : (
+                  <span className="text-xs text-gray-400 font-mono">
+                    تاريخ السداد: {item.lastPaymentDate || 'تم الدفع'}
+                  </span>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* 5B. Desktop Table View */}
+      <div className="hidden md:block bg-white border border-gray-200 rounded-3xl overflow-hidden shadow-xs">
         <div className="overflow-x-auto">
-          <table className="w-full text-right text-xs">
+          <table className="w-full text-right text-xs min-w-[700px]">
             <thead className="bg-gray-50/80 text-gray-500 font-bold border-b border-gray-200">
               <tr>
                 <th className="py-3.5 px-4">المعلم والمادة</th>
@@ -227,7 +291,7 @@ export const CommissionTrackingPage: React.FC<CommissionTrackingPageProps> = ({
                       {item.paymentStatus !== 'paid' ? (
                         <button
                           onClick={() => onMarkPaid(item.id)}
-                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
                         >
                           تأكيد السداد ✓
                         </button>

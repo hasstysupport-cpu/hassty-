@@ -278,10 +278,149 @@ export const AccountsManagementPage: React.FC<AccountsManagementPageProps> = ({
         </div>
       </div>
 
-      {/* 3. Accounts Table */}
-      <div className="bg-white border border-gray-200 rounded-3xl shadow-xs overflow-hidden">
+      {/* 3. Accounts Display: Mobile Cards (< md) & Desktop Table (>= md) */}
+      
+      {/* 3A. MOBILE CARDS VIEW (Visible on mobile/small screens) */}
+      <div className="block md:hidden space-y-3">
+        {filteredAccounts.length === 0 ? (
+          <div className="bg-white border border-gray-200 rounded-3xl p-8 text-center text-gray-400">
+            <Users className="w-10 h-10 mx-auto text-gray-300 mb-2" />
+            <p className="font-bold text-xs">لم يتم العثور على أي حسابات مطابقة للبحث</p>
+          </div>
+        ) : (
+          filteredAccounts.map((account) => (
+            <div
+              key={account.id}
+              className="bg-white border border-gray-200 rounded-3xl p-4 space-y-3 shadow-xs"
+            >
+              {/* Card Header: Avatar, Name, Role & Status Toggle */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <img
+                    src={getCleanAvatarUrl(account.avatarUrl, account.role, account.name)}
+                    alt={account.name}
+                    className="w-12 h-12 rounded-2xl object-cover border border-gray-200 shrink-0 bg-gray-50 shadow-2xs"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div>
+                    <h4
+                      onClick={() => setSelectedAccountForDetail(account)}
+                      className="font-black text-sm text-gray-900 cursor-pointer hover:text-blue-600 hover:underline"
+                    >
+                      {account.name}
+                    </h4>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-black ${
+                        account.role === 'teacher' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' :
+                        account.role === 'student' ? 'bg-blue-50 text-blue-800 border border-blue-200' :
+                        'bg-amber-50 text-amber-800 border border-amber-200'
+                      }`}>
+                        {account.role === 'teacher' ? 'مدرس معتمد' : account.role === 'student' ? 'طالب' : account.role === 'parent' ? 'ولي أمر' : 'مشرف'}
+                      </span>
+                      {account.subject && (
+                        <span className="text-[10px] text-gray-500 font-bold">
+                          • {account.subject}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Status Toggle Button */}
+                <button
+                  type="button"
+                  onClick={() => onToggleAccountStatus(account.id)}
+                  className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-black cursor-pointer transition-all active:scale-95 shrink-0 ${
+                    account.status === 'active'
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-red-50 hover:text-red-700'
+                      : 'bg-red-50 text-red-700 border border-red-200 hover:bg-emerald-50 hover:text-emerald-700'
+                  }`}
+                  title="انقر لتبديل حالة الحساب"
+                >
+                  <span className={`w-2 h-2 rounded-full ${account.status === 'active' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                  <span>{account.status === 'active' ? 'نشط' : 'موقوف'}</span>
+                </button>
+              </div>
+
+              {/* Card Meta Details */}
+              <div className="grid grid-cols-2 gap-2 bg-gray-50 p-2.5 rounded-2xl text-[11px]">
+                <div>
+                  <span className="text-gray-400 block text-[9px] font-bold">رقم الموبايل:</span>
+                  <span className="font-mono font-bold text-gray-800 dir-ltr inline-block">
+                    {account.phone || '—'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-400 block text-[9px] font-bold">تاريخ الانضمام:</span>
+                  <span className="font-mono font-bold text-gray-600">
+                    {account.createdAt ? account.createdAt.substring(0, 10) : '—'}
+                  </span>
+                </div>
+                {account.governorate && (
+                  <div className="col-span-2 flex items-center justify-between pt-1 border-t border-gray-200/60">
+                    <span className="text-gray-500 text-[10px]">
+                      📍 {account.governorate} {account.area ? `• ${account.area}` : ''}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setBadgeModalAccount(account)}
+                      className="inline-flex items-center gap-1 text-[10px] text-blue-600 font-bold hover:underline cursor-pointer"
+                    >
+                      <AccountBadge badge={account.badge} />
+                      <span>(تغيير)</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Card Actions: 4 Touch-Friendly Buttons */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => handleOpenEditModal(account)}
+                  className="py-2.5 px-3 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition-all shadow-2xs cursor-pointer"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>تعديل شامل</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedAccountForDetail(account)}
+                  className="py-2.5 px-3 bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-800 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Eye className="w-3.5 h-3.5 text-slate-600" />
+                  <span>التفاصيل</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setBadgeModalAccount(account)}
+                  className="py-2.5 px-3 bg-amber-50 hover:bg-amber-100 active:scale-95 text-amber-900 border border-amber-200/80 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Award className="w-3.5 h-3.5 text-amber-600" />
+                  <span>الشارة</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirmAccount(account)}
+                  className="py-2.5 px-3 bg-red-50 hover:bg-red-100 active:scale-95 text-red-700 border border-red-200/80 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                  <span>حذف</span>
+                </button>
+              </div>
+
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* 3B. DESKTOP TABLE VIEW (Visible on tablet & desktop >= md) */}
+      <div className="hidden md:block bg-white border border-gray-200 rounded-3xl shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-right text-xs">
+          <table className="w-full text-right text-xs min-w-[780px]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200 text-gray-600 font-bold">
                 <th className="py-3.5 px-4">المستخدم</th>
@@ -290,7 +429,7 @@ export const AccountsManagementPage: React.FC<AccountsManagementPageProps> = ({
                 <th className="py-3.5 px-4">تاريخ الانضمام</th>
                 <th className="py-3.5 px-4">الشارة (Badge)</th>
                 <th className="py-3.5 px-4">الحالة</th>
-                <th className="py-3.5 px-4 text-center">إجراءات التحكم</th>
+                <th className="py-3.5 px-4 text-center min-w-[170px]">إجراءات التحكم</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -315,16 +454,16 @@ export const AccountsManagementPage: React.FC<AccountsManagementPageProps> = ({
                           referrerPolicy="no-referrer"
                         />
                         <div>
-                          <p className="hover:underline cursor-pointer" onClick={() => setSelectedAccountForDetail(account)}>
+                          <p className="hover:underline cursor-pointer font-black text-gray-900" onClick={() => setSelectedAccountForDetail(account)}>
                             {account.name}
                           </p>
                           {account.subject && (
-                            <span className="text-[10px] text-gray-400 font-normal">
+                            <span className="text-[10px] text-gray-400 font-normal block">
                               {account.subject} • {account.governorate || 'القاهرة'}
                             </span>
                           )}
                           {account.grade && (
-                            <span className="text-[10px] text-gray-400 font-normal">
+                            <span className="text-[10px] text-gray-400 font-normal block">
                               {account.grade}
                             </span>
                           )}
@@ -356,6 +495,7 @@ export const AccountsManagementPage: React.FC<AccountsManagementPageProps> = ({
                     {/* Badge Column with quick action */}
                     <td className="py-3.5 px-4">
                       <button
+                        type="button"
                         onClick={() => setBadgeModalAccount(account)}
                         className="hover:opacity-80 transition-opacity cursor-pointer inline-flex items-center gap-1.5"
                         title="انقر لتعديل الشارة"
@@ -368,8 +508,9 @@ export const AccountsManagementPage: React.FC<AccountsManagementPageProps> = ({
                     {/* Status Toggle */}
                     <td className="py-3.5 px-4">
                       <button
+                        type="button"
                         onClick={() => onToggleAccountStatus(account.id)}
-                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold cursor-pointer transition-all ${
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold cursor-pointer transition-all active:scale-95 ${
                           account.status === 'active'
                             ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-red-50 hover:text-red-700 hover:border-red-200'
                             : 'bg-red-50 text-red-700 border border-red-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200'
@@ -396,32 +537,36 @@ export const AccountsManagementPage: React.FC<AccountsManagementPageProps> = ({
                         
                         {/* Edit Button (Comprehensive profile editor) */}
                         <button
+                          type="button"
                           onClick={() => handleOpenEditModal(account)}
-                          className="p-1.5 bg-blue-50 hover:bg-blue-100 text-[#2563EB] rounded-xl transition-colors cursor-pointer"
+                          className="p-2 bg-blue-50 hover:bg-blue-600 hover:text-white text-[#2563EB] rounded-xl transition-all cursor-pointer shadow-2xs active:scale-95"
                           title="تعديل شامل للبروفايل والبيانات"
                         >
                           <Edit3 className="w-4 h-4" />
                         </button>
 
                         <button
+                          type="button"
                           onClick={() => setSelectedAccountForDetail(account)}
-                          className="p-1.5 bg-gray-100 hover:bg-blue-100 text-gray-700 hover:text-blue-700 rounded-xl transition-colors cursor-pointer"
+                          className="p-2 bg-gray-100 hover:bg-slate-700 hover:text-white text-gray-700 rounded-xl transition-all cursor-pointer shadow-2xs active:scale-95"
                           title="عرض بطاقة التفاصيل"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
 
                         <button
+                          type="button"
                           onClick={() => setBadgeModalAccount(account)}
-                          className="p-1.5 bg-gray-100 hover:bg-amber-100 text-gray-700 hover:text-amber-800 rounded-xl transition-colors cursor-pointer"
+                          className="p-2 bg-amber-50 hover:bg-amber-600 hover:text-white text-amber-700 border border-amber-200/60 rounded-xl transition-all cursor-pointer shadow-2xs active:scale-95"
                           title="تعديل الشارة (Badge)"
                         >
                           <Award className="w-4 h-4" />
                         </button>
 
                         <button
+                          type="button"
                           onClick={() => setDeleteConfirmAccount(account)}
-                          className="p-1.5 bg-gray-100 hover:bg-red-100 text-gray-700 hover:text-red-700 rounded-xl transition-colors cursor-pointer"
+                          className="p-2 bg-red-50 hover:bg-red-600 hover:text-white text-red-600 border border-red-200/60 rounded-xl transition-all cursor-pointer shadow-2xs active:scale-95"
                           title="حذف الحساب نهائياً"
                         >
                           <Trash2 className="w-4 h-4" />
