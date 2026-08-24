@@ -165,7 +165,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFF] text-[#1F2937] font-['Tajawal',sans-serif] selection:bg-[#EFF6FF] selection:text-[#2563EB] flex flex-col antialiased">
+    <div className="min-h-screen bg-[#F8FAFF] text-[#1F2937] font-['IBM_Plex_Sans_Arabic',sans-serif] selection:bg-[#EFF6FF] selection:text-[#2563EB] flex flex-col antialiased">
       
       {/* 1. TOP NAVBAR */}
       {isLoggedIn && isDashboardRoute && !isUnverified ? (
