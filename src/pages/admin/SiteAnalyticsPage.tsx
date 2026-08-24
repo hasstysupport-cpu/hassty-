@@ -90,7 +90,7 @@ export const SiteAnalyticsPage: React.FC<SiteAnalyticsPageProps> = ({ accounts }
   }, [activeStudentsCount, totalTeachersCount, parentsCount]);
 
   return (
-    <div className="space-y-6 text-right font-['Tajawal',sans-serif]">
+    <div className="space-y-6 text-right font-['IBM_Plex_Sans_Arabic',sans-serif]">
       
       {/* 1. Header */}
       <div>
