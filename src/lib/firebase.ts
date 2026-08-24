@@ -9,28 +9,37 @@ const dbId = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatab
   ? firebaseConfig.firestoreDatabaseId
   : undefined;
 
-// Use experimentalAutoDetectLongPolling and memoryLocalCache to prevent transport dropouts in sandboxed iframes
+// Initialize Firestore using the standard and robust configurations for AI Studio / Web iframe environment
 function createFirestoreInstance() {
+  const customDbId = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)'
+    ? firebaseConfig.firestoreDatabaseId
+    : undefined;
+
   try {
-    return initializeFirestore(
-      app,
-      {
-        experimentalAutoDetectLongPolling: true,
-        localCache: memoryLocalCache(),
-      },
-      dbId
-    );
-  } catch {
-    try {
+    if (customDbId) {
       return initializeFirestore(
         app,
         {
-          experimentalForceLongPolling: true,
+          experimentalAutoDetectLongPolling: true,
+          localCache: memoryLocalCache(),
         },
-        dbId
+        customDbId
       );
-    } catch {
-      return dbId ? getFirestore(app, dbId) : getFirestore(app);
+    } else {
+      return initializeFirestore(
+        app,
+        {
+          experimentalAutoDetectLongPolling: true,
+          localCache: memoryLocalCache(),
+        }
+      );
+    }
+  } catch {
+    try {
+      return customDbId ? getFirestore(app, customDbId) : getFirestore(app);
+    } catch (e) {
+      console.warn('Fallback getFirestore initialization:', e);
+      return getFirestore(app);
     }
   }
 }

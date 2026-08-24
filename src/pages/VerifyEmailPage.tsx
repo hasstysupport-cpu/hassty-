@@ -465,19 +465,14 @@ export const VerifyEmailPage: React.FC<VerifyEmailPageProps> = ({
             </span>
           </div>
 
-          <div className="p-3 bg-white rounded-xl border border-slate-200 font-mono text-sm font-bold text-slate-900 text-center tracking-wider select-all shadow-xs" dir="ltr">
-            {targetEmail || 'hasstysupport@gmail.com'}
+          <div className="p-3 bg-white rounded-xl border border-slate-200 font-mono text-sm font-bold text-slate-900 text-center tracking-wider select-all shadow-xs flex items-center justify-center gap-2" dir="ltr">
+            <Mail className="w-4 h-4 text-blue-600 shrink-0" />
+            <span>{targetEmail || 'hasstysupport@gmail.com'}</span>
           </div>
 
-          {targetPhone && (
-            <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
-              <div className="flex items-center gap-1.5">
-                <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
-                <span>إشعار الواتساب / الهاتف:</span>
-              </div>
-              <span className="font-mono font-bold text-slate-700" dir="ltr">{targetPhone}</span>
-            </div>
-          )}
+          <div className="text-[11px] text-blue-700 font-semibold text-center pt-0.5">
+            تم إرسال رمز الأمان ورابط التفعيل إلى بريدك الإلكتروني ✉️
+          </div>
         </div>
 
         {/* Preview Code Quick-Fill & Instant Activation Link */}

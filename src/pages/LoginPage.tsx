@@ -21,8 +21,8 @@ import {
   Briefcase,
   UserCheck
 } from 'lucide-react';
-import { AccountRole, UserSession } from '../types';
-import { useAuth } from '../lib/AuthContext';
+import { AccountRole } from '../types';
+import { useAuth, UserSession } from '../lib/AuthContext';
 import { sendServerVerificationOtp, verifyServerOtp, setStoredToken } from '../lib/securityService';
 
 interface LoginPageProps {
@@ -546,19 +546,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   </span>
                 </div>
 
-                <div className="text-xs font-mono font-bold text-slate-700 bg-white p-2 rounded-xl border border-slate-200 text-center select-all" dir="ltr">
-                  {pendingSession?.email}
+                <div className="text-xs font-mono font-bold text-slate-700 bg-white p-2.5 rounded-xl border border-slate-200 text-center select-all flex items-center justify-center gap-2" dir="ltr">
+                  <Mail className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  <span>{pendingSession?.email}</span>
                 </div>
-
-                {pendingSession?.phone && (
-                  <div className="flex items-center justify-between text-[11px] text-slate-500 pt-0.5">
-                    <span className="flex items-center gap-1">
-                      <Smartphone className="w-3 h-3 text-emerald-600" />
-                      إشعار الهاتف:
-                    </span>
-                    <span className="font-mono font-bold text-slate-700" dir="ltr">{pendingSession.phone}</span>
-                  </div>
-                )}
+                <div className="text-[11px] text-blue-700 font-semibold text-center pt-0.5">
+                  تم إرسال رمز الأمان إلى صندوق بريدك الإلكتروني ✉️
+                </div>
               </div>
 
               {/* Preview Code Quick-Fill Helper */}
@@ -697,98 +691,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
         </div>
       </div>
-
-      {/* Forgot Password Modal */}
-      {showForgotModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="bg-white w-full max-w-md rounded-3xl p-6 sm:p-8 shadow-2xl border border-gray-200 text-right animate-scaleUp">
-            
-            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-[#2563EB] flex items-center justify-center mb-4">
-              <KeyRound className="w-6 h-6" />
-            </div>
-
-            <h3 className="text-lg font-black text-[#1E3A8A]">
-              استعادة كلمة المرور
-            </h3>
-            <p className="text-xs text-[#6B7280] mt-1 mb-4">
-              أدخل بريدك الإلكتروني المسجل وسنرسل لك رابطاً مباشراً لتعيين كلمة مرور جديدة فوراً.
-            </p>
-
-            {resetSuccessMessage ? (
-              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs font-bold text-emerald-800 space-y-3">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-                  <span>{resetSuccessMessage}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowForgotModal(false)}
-                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold cursor-pointer transition-colors"
-                >
-                  العودة لتسجيل الدخول
-                </button>
-              </div>
-            ) : (
-              <form onSubmit={handleResetPassword} className="space-y-4">
-                {resetErrorMessage && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs font-bold text-red-800 flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
-                    <span>{resetErrorMessage}</span>
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-xs font-bold text-[#1F2937] mb-1.5">
-                    البريد الإلكتروني المسجل
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="email"
-                      required
-                      dir="ltr"
-                      placeholder="name@example.com"
-                      value={resetEmail}
-                      onChange={(e) => setResetEmail(e.target.value)}
-                      className="w-full pl-4 pr-10 py-3 bg-gray-50 border border-[#E5E7EB] rounded-xl text-sm font-sans text-left focus:bg-white focus:outline-none focus:border-[#2563EB]"
-                    />
-                    <Mail className="w-4 h-4 text-gray-400 absolute right-3.5 top-3.5" />
-                  </div>
-                </div>
-
-                <div className="flex gap-2 pt-2">
-                  <button
-                    type="submit"
-                    disabled={isResetting || !resetEmail.trim()}
-                    className="flex-1 py-3 bg-[#2563EB] hover:bg-[#1D4ED8] text-white rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
-                  >
-                    {isResetting ? (
-                      <span>جاري الإرسال...</span>
-                    ) : (
-                      <>
-                        <Send className="w-3.5 h-3.5" />
-                        <span>إرسال رابط الاستعادة</span>
-                      </>
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowForgotModal(false)}
-                    className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold cursor-pointer transition-colors"
-                  >
-                    إلغاء
-                  </button>
-                </div>
-              </form>
-            )}
-
-          </div>
-        </div>
-      )}
-
-    </div>
-  );
-};
-
 
       {/* Forgot Password Modal */}
       {showForgotModal && (
