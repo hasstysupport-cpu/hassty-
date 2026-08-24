@@ -118,7 +118,7 @@ export const StudentProfilePage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 text-right font-['Tajawal',sans-serif]">
+    <div className="space-y-6 text-right font-['IBM_Plex_Sans_Arabic',sans-serif]">
       
       {/* 1. Header with Live Photo & QR Badge */}
       <div className="bg-white border border-[#E5E7EB] rounded-3xl p-6 sm:p-8 shadow-xs flex flex-col md:flex-row items-center justify-between gap-6">
