@@ -36,7 +36,9 @@ import {
   clearAdminSession,
   saveAdminSession,
 } from '../../lib/securityConfig';
-import { Loader2, AlertTriangle, RefreshCw, Database } from 'lucide-react';
+import { Loader2, AlertTriangle, RefreshCw, Database, LogIn, ShieldCheck } from 'lucide-react';
+import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { auth } from '../../lib/firebase';
 
 interface HasstyAdminAppProps {
   onSwitchToPublicApp?: () => void;
@@ -155,6 +157,19 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
 
   const handleRetryConnection = () => {
     setRetryTrigger((prev) => prev + 1);
+  };
+
+  const handleGoogleAdminAuth = async () => {
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      const result = await signInWithPopup(auth, provider);
+      if (result.user) {
+        setRetryTrigger((prev) => prev + 1);
+      }
+    } catch (err: any) {
+      console.warn('Google Admin Auth popup notice:', err);
+    }
   };
 
   // Auth Handlers
@@ -383,18 +398,30 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
                   فشل الاتصال بقاعدة البيانات (Database Connection Failed)
                 </h4>
                 <p className="text-xs text-red-700 mt-0.5">
-                  {dbErrorMessage || 'تعذر الاتصال بخوادم Firestore السحابية. يرجى التحقق من اتصال الإنترنت.'}
+                  {dbErrorMessage || 'تعذر الاتصال بخوادم Firestore السحابية. يرجى التحقق من صلاحيات الدخول أو اتصال الإنترنت.'}
                 </p>
               </div>
             </div>
 
-            <button
-              onClick={handleRetryConnection}
-              className="w-full sm:w-auto px-4 py-2 bg-red-600 hover:bg-red-700 active:scale-95 text-white text-xs font-black rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer shrink-0"
-            >
-              <RefreshCw className="w-4 h-4" />
-              <span>إعادة المحاولة الآن</span>
-            </button>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={handleGoogleAdminAuth}
+                className="flex-1 sm:flex-initial px-4 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-black rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer shrink-0"
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>توثيق حساب Google الرسمي</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleRetryConnection}
+                className="px-3 py-2 bg-slate-800 hover:bg-slate-900 active:scale-95 text-white text-xs font-black rounded-2xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+              >
+                <RefreshCw className="w-4 h-4" />
+                <span>إعادة المحاولة</span>
+              </button>
+            </div>
           </div>
         )}
 
