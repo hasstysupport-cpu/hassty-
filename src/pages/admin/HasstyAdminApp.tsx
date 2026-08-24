@@ -311,7 +311,7 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
   const pendingReportsCount = safetyReports.filter((r) => r.status === 'new' || r.status === 'in_review').length;
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col lg:flex-row text-right font-['Tajawal',sans-serif] antialiased">
+    <div className="min-h-screen bg-[#F8FAFC] flex flex-col lg:flex-row text-right font-['IBM_Plex_Sans_Arabic',sans-serif] antialiased">
       
       {/* 1. RTL Persistent Sidebar */}
       <AdminSidebar
