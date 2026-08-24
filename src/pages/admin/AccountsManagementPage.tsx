@@ -177,7 +177,7 @@ export const AccountsManagementPage: React.FC<AccountsManagementPageProps> = ({
   }, [accounts, searchTerm, roleFilter, statusFilter, badgeFilter]);
 
   return (
-    <div className="space-y-6 text-right font-['Tajawal',sans-serif]">
+    <div className="space-y-6 text-right font-['IBM_Plex_Sans_Arabic',sans-serif]">
       
       {/* 1. Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
