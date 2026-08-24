@@ -59,6 +59,8 @@ export interface InteractiveListSection {
 }
 
 
+const DIRECT_WHATSAPP_SERVER = 'http://54.85.197.100:3000';
+
 async function postGatewayApi(endpoint: string, body: any): Promise<any> {
   try {
     const res = await fetch(endpoint, {
