@@ -236,7 +236,7 @@ export const StudentCardRenderer: React.FC<StudentCardRendererProps> = ({
           className="w-full h-full rounded-[24px] overflow-hidden shadow-2xl relative border border-slate-700/20 bg-white"
           style={{
             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.08)',
-            fontFamily: "'Tajawal', 'Cairo', system-ui, sans-serif",
+            fontFamily: "'IBM Plex Sans Arabic', 'Cairo', system-ui, sans-serif",
             direction: 'ltr',
           }}
         >
