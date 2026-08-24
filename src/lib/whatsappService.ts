@@ -58,7 +58,6 @@ export interface InteractiveListSection {
   }>;
 }
 
-const DIRECT_WHATSAPP_SERVER = 'http://54.85.197.100:3000';
 
 async function postGatewayApi(endpoint: string, body: any): Promise<any> {
   try {
@@ -271,54 +270,6 @@ export const whatsappService = {
    */
   async verifyOtp(requestId: string, code: string): Promise<OtpVerifyResult> {
     const cleanCode = code.trim();
-
-    // Universal test codes for instant development testing
-    if (cleanCode === '1234' || cleanCode === '0000' || cleanCode === '2026') {
-      return { success: true, verified: true, message: 'تم التحقق بنجاح (وضع المحاكاة المعتمد)' };
-    }
-
-    try {
-      const fingerprint = await getBrowserFingerprint();
-      const res = await fetch('/api/otp/verify', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'X-Client-Fingerprint': fingerprint.visitorId
-        },
-        body: JSON.stringify({ 
-          requestId, 
-          code: cleanCode,
-          fingerprint: fingerprint.visitorId 
-        }),
-      });
-
-      const contentType = res.headers.get('content-type') || '';
-      if (res.ok && contentType.includes('application/json')) {
-        const json = await res.json();
-        if (json.success || json.verified) return json;
-      }
-    } catch (e: any) {
-      console.info('Proxy verify endpoint fallback to local verification:', e);
-    }
-
-    // Local / Session verification fallback
-    const storedStr = sessionStorage.getItem(`otp_${requestId}`) || sessionStorage.getItem('hassty_last_otp');
-    if (storedStr) {
-      try {
-        const stored = typeof storedStr === 'string' && storedStr.startsWith('{') ? JSON.parse(storedStr) : { code: storedStr };
-        if (stored.code === cleanCode || cleanCode === '1234') {
-          sessionStorage.removeItem(`otp_${requestId}`);
-          return { success: true, verified: true };
-        }
-      } catch {
-        // Fallback for plain string
-      }
-    }
-
-    // If 4 digits provided, accept for seamless dev testing
-    if (cleanCode.length === 4) {
-      return { success: true, verified: true };
-    }
 
     return { success: false, verified: false, error: 'كود التحقق غير صحيح، يرجى إدخال 1234 للاختبار الفوري' };
   },
