@@ -57,7 +57,7 @@ export const Modal: React.FC<ModalProps> = ({
 
   const modalContent = (
     <div
-      className="fixed inset-0 z-999 flex items-center justify-center p-4 sm:p-6 overflow-y-auto bg-black/65 backdrop-blur-xs text-right font-['Tajawal',sans-serif] animate-fadeIn"
+      className="fixed inset-0 z-999 flex items-center justify-center p-4 sm:p-6 overflow-y-auto bg-black/65 backdrop-blur-xs text-right font-['IBM_Plex_Sans_Arabic',sans-serif] animate-fadeIn"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           onClose();
