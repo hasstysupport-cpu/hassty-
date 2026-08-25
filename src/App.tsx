@@ -107,9 +107,15 @@ export default function App() {
 
   // Login handler
   const handleLogin = (role: AccountRole) => {
-    if (role === 'student') setCurrentPath('/student/dashboard');
-    if (role === 'parent') setCurrentPath('/parent/dashboard');
-    if (role === 'teacher') setCurrentPath('/teacher/dashboard');
+    if (role === 'admin') {
+      setCurrentPath(SECRET_ADMIN_ROUTE);
+    } else if (role === 'teacher') {
+      setCurrentPath('/teacher/dashboard');
+    } else if (role === 'parent') {
+      setCurrentPath('/parent/dashboard');
+    } else {
+      setCurrentPath('/student/dashboard');
+    }
   };
 
   // Logout handler
@@ -139,6 +145,23 @@ export default function App() {
       setCurrentPath('/verify-email');
     }
   }, [isUnverified, isDashboardRoute, currentPath]);
+
+  // Automatically redirect authenticated users away from /login or /signup
+  useEffect(() => {
+    if (isLoggedIn && !isUnverified) {
+      if (currentPath === '/login' || currentPath === '/signup') {
+        if (currentRole === 'admin') {
+          setCurrentPath(SECRET_ADMIN_ROUTE);
+        } else if (currentRole === 'teacher') {
+          setCurrentPath('/teacher/dashboard');
+        } else if (currentRole === 'parent') {
+          setCurrentPath('/parent/dashboard');
+        } else {
+          setCurrentPath('/student/dashboard');
+        }
+      }
+    }
+  }, [isLoggedIn, currentRole, currentPath, isUnverified]);
 
   // Secret Obfuscated Admin Path & Legacy Route Guarding
   const isAdminAppRoute =

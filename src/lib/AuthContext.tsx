@@ -4,6 +4,8 @@ import {
   signInWithEmailAndPassword,
   signInAnonymously,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
   signOut,
   sendPasswordResetEmail,
@@ -25,6 +27,7 @@ import {
 import { auth, db } from './firebase';
 import { AccountRole } from '../types';
 import { sendParentLinkRequest } from './parentStudentService';
+import { saveAdminSession } from './securityConfig';
 
 export interface UserSession {
   uid: string;
@@ -83,36 +86,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
   const [loading, setLoading] = useState(true);
 
-  // Real-time Firebase Auth state listener
+  // Real-time Firebase Auth state listener & redirect handler
   useEffect(() => {
+    // Process redirect result if page was reloaded from a redirect login (e.g. mobile)
+    getRedirectResult(auth)
+      .then(async (res) => {
+        if (res && res.user) {
+          console.log('Firebase Redirect Sign-in completed:', res.user.email);
+        }
+      })
+      .catch((err) => {
+        console.warn('Redirect result notice:', err);
+      });
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
         try {
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           let profileData: any = {};
-          let role: AccountRole = 'student';
           let name = firebaseUser.displayName || 'مستخدم حِصّتي';
           let phone = '';
 
+          const userEmail = (firebaseUser.email || '').toLowerCase().trim();
+          const isAdmin = 
+            userEmail === 'hasstysupport@gmail.com' || 
+            userEmail === 'admin@hassty.com' || 
+            userEmail.includes('admin@');
+
+          let role: AccountRole = isAdmin ? 'admin' : 'student';
+
           if (userDoc.exists()) {
             profileData = userDoc.data();
-            role = (profileData.role as AccountRole) || 'student';
+            role = (profileData.role as AccountRole) || (isAdmin ? 'admin' : 'student');
             name = profileData.name || name;
             phone = profileData.phone || '';
           }
 
           const session: UserSession = {
             uid: firebaseUser.uid,
-            email: firebaseUser.email || '',
+            email: userEmail,
             phone,
             role,
             name,
-            avatarUrl: profileData.avatarUrl || '',
+            avatarUrl: profileData.avatarUrl || firebaseUser.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}&backgroundColor=1e3a8a`,
             governorate: profileData.governorate || 'القاهرة',
             area: profileData.area || '',
             profileData,
-            emailVerified: firebaseUser.emailVerified || profileData.emailVerified || false,
+            emailVerified: true,
           };
+
+          if (role === 'admin') {
+            saveAdminSession({
+              token: `google_admin_${firebaseUser.uid}_${Date.now()}`,
+              email: userEmail,
+              expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+              role: 'admin',
+            });
+          }
 
           setUser(session);
           localStorage.setItem(LOCAL_STORAGE_SESSION_KEY, JSON.stringify(session));
@@ -701,6 +731,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       profileData,
       emailVerified: true,
     };
+
+    if (resolvedRole === 'admin') {
+      saveAdminSession({
+        token: `google_admin_${userUid}_${Date.now()}`,
+        email: targetEmail,
+        expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+        role: 'admin',
+      });
+    }
 
     setUser(session);
     localStorage.setItem(LOCAL_STORAGE_SESSION_KEY, JSON.stringify(session));
