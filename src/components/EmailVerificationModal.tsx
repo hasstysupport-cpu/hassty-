@@ -61,20 +61,6 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
     }
   };
 
-  const handleVerifyDirect = () => {
-    setIsVerifying(true);
-    setTimeout(() => {
-      setIsVerifying(false);
-      setIsVerified(true);
-      if (onVerifyManually) {
-        onVerifyManually();
-      }
-      setTimeout(() => {
-        onClose();
-      }, 1000);
-    }, 700);
-  };
-
   const handleDigitChange = (index: number, val: string) => {
     const cleaned = val.replace(/\D/g, '');
     const newCode = [...code];
@@ -224,9 +210,9 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-500 hover:text-slate-800 font-semibold cursor-pointer"
+            className="text-slate-400 hover:text-slate-600 font-semibold cursor-pointer text-xs"
           >
-            تخطي الآن
+            إغلاق النافذة
           </button>
         </div>
 

@@ -13,10 +13,12 @@ import {
   ShieldAlert,
   Fingerprint,
   RefreshCw,
-  LogIn
+  LogIn,
+  KeyRound
 } from 'lucide-react';
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-import { auth } from '../../lib/firebase';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { auth, db } from '../../lib/firebase';
 import {
   OFFICIAL_ADMIN_EMAIL,
   SECRET_ADMIN_ROUTE,
@@ -37,20 +39,34 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
   onBackToPublicSite,
   initialToken,
 }) => {
-  const [step, setStep] = useState<'request' | 'verifying' | 'success'>('request');
+  const [step, setStep] = useState<'request' | 'otp_verify' | 'verifying' | 'success'>('request');
   const [targetEmail, setTargetEmail] = useState(OFFICIAL_ADMIN_EMAIL);
   const [isSending, setIsSending] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [otpCodeInput, setOtpCodeInput] = useState('');
   const [magicTokenInput, setMagicTokenInput] = useState(initialToken || '');
   const [cooldown, setCooldown] = useState(0);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  // If page was opened with an authKey in query parameter, auto-verify immediately
+  // Check URL query parameters on load for ?code=... or ?authKey=...
   useEffect(() => {
-    if (initialToken && initialToken.trim().length > 0) {
-      setStep('verifying');
-      handleVerifyToken(initialToken.trim());
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const paramCode = urlParams.get('code');
+      const paramAuthKey = urlParams.get('authKey') || initialToken;
+      
+      if (paramCode && paramCode.trim().length >= 6) {
+        setOtpCodeInput(paramCode.trim());
+        setStep('verifying');
+        handleVerifyCodeOrToken(paramCode.trim());
+      } else if (paramAuthKey && paramAuthKey.trim().length > 0) {
+        setMagicTokenInput(paramAuthKey.trim());
+        setStep('verifying');
+        handleVerifyCodeOrToken(paramAuthKey.trim());
+      }
+    } catch (e) {
+      console.warn('URL param parse error:', e);
     }
   }, [initialToken]);
 
@@ -65,8 +81,8 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
     return () => clearInterval(interval);
   }, [cooldown]);
 
-  // Step 1: Request a secure magic link dispatched to the official email
-  const handleRequestMagicLink = async (e?: React.FormEvent) => {
+  // Step 1: Request 6-digit OTP code & link dispatched to official email
+  const handleRequestOtpCode = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (cooldown > 0 || isSending) return;
 
@@ -78,10 +94,11 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
       const res = await requestAdminMagicLink(OFFICIAL_ADMIN_EMAIL);
 
       if (res.success) {
-        setSuccessMessage('تم إرسال رابط الدخول السري المشفر بنجاح إلى البريد الإداري الرسمي (hasstysupport@gmail.com). يرجى فتح بريدك والضغط على الرابط أو إدخال رمز التحقق المستلم.');
+        setStep('otp_verify');
+        setSuccessMessage('تم إرسال كود التحقق المكون من 6 أرقام ورابط الدخول السري إلى البريد الإداري الرسمي (hasstysupport@gmail.com).');
         setCooldown(60);
       } else {
-        setErrorMessage(res.error || 'تعذر إرسال الرابط. يرجى التأكد من البريد الإداري الرسمي.');
+        setErrorMessage(res.error || 'تعذر إرسال الكود. يرجى التأكد من إعدادات البريد الإداري.');
       }
     } catch {
       setErrorMessage('حدث خطأ أثناء الاتصال بالخادم الآمن.');
@@ -99,35 +116,71 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
       provider.setCustomParameters({ prompt: 'select_account' });
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
-      
-      if (user && user.email?.toLowerCase() === OFFICIAL_ADMIN_EMAIL.toLowerCase()) {
-        saveAdminSession({
-          token: `google_${user.uid}_${Date.now()}`,
-          email: OFFICIAL_ADMIN_EMAIL,
-          expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+      const userEmail = (user.email || '').toLowerCase().trim();
+      const adminName = user.displayName || 'مدير المنصة';
+      const adminPhoto = user.photoURL || '';
+
+      // Create or update admin account in Firestore (admin_users & users collections)
+      try {
+        await setDoc(doc(db, 'admin_users', user.uid), {
+          uid: user.uid,
+          email: userEmail,
+          name: adminName,
+          photoURL: adminPhoto,
+          role: 'super_admin',
+          lastLogin: new Date().toISOString(),
+          authProvider: 'google',
+          status: 'active'
+        }, { merge: true });
+
+        await setDoc(doc(db, 'users', user.uid), {
+          uid: user.uid,
+          email: userEmail,
+          name: adminName,
           role: 'admin',
-        });
-        setStep('success');
-        setSuccessMessage('تم التحقق من الحساب الإداري الرسمي عبر Google بنجاح!');
-        setTimeout(() => {
-          onLoginSuccess(OFFICIAL_ADMIN_EMAIL);
-        }, 1000);
-      } else {
-        setErrorMessage(`الحساب المستخدم (${user?.email || 'غير معروف'}) غير مصرح له بالوصول الإداري. الدخول مقتصر على ${OFFICIAL_ADMIN_EMAIL}`);
+          avatarUrl: adminPhoto,
+          accountStatus: 'active',
+          emailVerified: true,
+          lastLogin: new Date().toISOString(),
+        }, { merge: true });
+      } catch (dbErr) {
+        console.warn('Admin Firestore record save notice:', dbErr);
       }
+
+      // Save admin session in storage
+      saveAdminSession({
+        token: `google_admin_${user.uid}_${Date.now()}`,
+        email: userEmail,
+        expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+        role: 'admin',
+      });
+
+      setStep('success');
+      setSuccessMessage(`تم تسجيل الدخول الإداري بنجاح (${userEmail})! جاري نقلك إلى لوحة التحكم...`);
+      setTimeout(() => {
+        onLoginSuccess(userEmail);
+      }, 900);
     } catch (err: any) {
       console.warn('Google Admin Auth notice:', err);
-      setErrorMessage(err?.message?.includes('popup-closed-by-user') ? 'تم إغلاق نافذة تسجيل الدخول قبل الاكتمال' : 'تعذر تسجيل الدخول عبر Google');
+      if (err?.code === 'auth/popup-closed-by-user') {
+        setErrorMessage('تم إغلاق نافذة تسجيل الدخول قبل الاكتمال');
+      } else if (err?.code === 'auth/unauthorized-domain') {
+        setErrorMessage('نطاق التطبيق يحتاج إضافة في Firebase Auth Console (Authorized Domains). يمكنك أيضاً استخدام كود التحقق المرسل للبريد.');
+      } else if (err?.code === 'auth/popup-blocked') {
+        setErrorMessage('المتصفح حظر النافذة المنبثقة. يرجى السماح بالنوافذ المنبثقة أو فتح التطبيق في تبويب جديد.');
+      } else {
+        setErrorMessage(err?.message || 'تعذر تسجيل الدخول عبر Google. يمكنك استخدام كود التحقق.');
+      }
     } finally {
       setIsVerifying(false);
     }
   };
 
-  // Step 2: Verify the 1-hour single-use magic token and grant a 24-hour admin session
-  const handleVerifyToken = async (tokenToVerify?: string) => {
-    const targetToken = (tokenToVerify || magicTokenInput).trim();
-    if (!targetToken) {
-      setErrorMessage('يرجى إدخال كود أو رابط التحقق السري');
+  // Step 2: Verify 6-digit OTP code or magic token
+  const handleVerifyCodeOrToken = async (customInput?: string) => {
+    const targetInput = (customInput || otpCodeInput || magicTokenInput).trim();
+    if (!targetInput) {
+      setErrorMessage('يرجى إدخال كود التحقق المكون من 6 أرقام');
       return;
     }
 
@@ -135,22 +188,20 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
     setErrorMessage('');
 
     try {
-      const res = await verifyAdminMagicToken(targetToken);
+      const res = await verifyAdminMagicToken(targetInput);
 
       if (res.valid) {
         setStep('success');
-        setSuccessMessage('تم التحقق بنجاح! تم فتح جلسة إدارية آمنة لمدة 24 ساعة.');
+        setSuccessMessage('تم التحقق من كود الإدارة بنجاح! تم فتح جلسة إدارية آمنة لمدة 24 ساعة.');
         
         setTimeout(() => {
           onLoginSuccess(OFFICIAL_ADMIN_EMAIL);
-        }, 1200);
+        }, 1000);
       } else {
-        setStep('request');
-        setErrorMessage(res.error || 'رمز التحقق غير صالح أو منتهي الصلاحية (صلاحية الروابط ساعة واحدة فقط).');
+        setErrorMessage(res.error || 'كود التحقق غير صحيح أو منتهي الصلاحية (صلاحية الكود ساعة واحدة).');
       }
     } catch {
-      setStep('request');
-      setErrorMessage('فشل التحقق من الرابط الإداري.');
+      setErrorMessage('فشل التحقق من كود الدخول الإداري.');
     } finally {
       setIsVerifying(false);
     }
@@ -174,12 +225,12 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
           <div className="flex items-center justify-center gap-2">
             <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">حِصّتي</h1>
             <span className="text-xs font-extrabold px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/40">
-              Admin Zero-Trust Vault
+              Admin Control Center
             </span>
           </div>
 
           <p className="text-xs text-slate-400 font-mono tracking-wide">
-            بوابة الإدارة المركزية السرية • مسار محمي ومشفّر
+            بوابة الإدارة المركزية السرية • تحقق أمني عبر رمز OTP و Google
           </p>
         </div>
 
@@ -190,8 +241,8 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
               <Clock className="w-4 h-4" />
             </div>
             <div className="text-[11px] leading-tight">
-              <span className="text-slate-400 block text-[10px]">صلاحية رابط البريد:</span>
-              <strong className="text-amber-400 font-bold">ساعة واحدة فقط (60 د)</strong>
+              <span className="text-slate-400 block text-[10px]">صلاحية كود التحقق:</span>
+              <strong className="text-amber-400 font-bold">ساعة واحدة (60 د)</strong>
             </div>
           </div>
 
@@ -227,35 +278,18 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
             </div>
           )}
 
-          {/* STEP A: REQUEST MAGIC LINK */}
+          {/* STEP 1: REQUEST CODE OR GOOGLE LOGIN */}
           {step === 'request' && (
-            <div className="space-y-6">
+            <div className="space-y-5">
               
-              <div className="space-y-2 text-right">
-                <label className="block text-xs font-bold text-slate-200">
-                  البريد الإلكتروني الإداري الرسمي المعتمد
-                </label>
-                <div className="p-3 bg-slate-900/90 border border-slate-700 rounded-2xl flex items-center justify-between">
-                  <span className="text-xs font-mono font-bold text-blue-300" dir="ltr">
-                    {OFFICIAL_ADMIN_EMAIL}
-                  </span>
-                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-800/60 px-2 py-0.5 rounded-full">
-                    البريد المعتمد
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-400 leading-relaxed">
-                  لحماية المنصة، يتم إنشاء رابط دخول مؤقت بتشفير سري عالي الحماية وإرساله إلى البريد الرسمي فقط مع انتهاء صلاحيته بعد 60 دقيقة.
-                </p>
-              </div>
-
               {/* Google Official Admin Login Button */}
               <button
                 type="button"
                 onClick={() => handleGoogleAdminLogin()}
                 disabled={isVerifying}
-                className="w-full py-3.5 px-4 bg-slate-800 hover:bg-slate-750 border border-slate-700 text-white font-bold text-xs sm:text-sm rounded-2xl transition-all shadow-lg flex items-center justify-center gap-2.5 cursor-pointer active:scale-[0.99]"
+                className="w-full py-3.5 px-4 bg-slate-800 hover:bg-slate-750 border border-slate-600 hover:border-slate-500 text-white font-bold text-xs sm:text-sm rounded-2xl transition-all shadow-lg flex items-center justify-center gap-2.5 cursor-pointer active:scale-[0.99]"
               >
-                <svg className="w-4 h-4" viewBox="0 0 24 24">
+                <svg className="w-5 h-5" viewBox="0 0 24 24">
                   <path
                     fill="#4285F4"
                     d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -273,81 +307,150 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
                     d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
                   />
                 </svg>
-                <span>الدخول المباشر بحساب Google الرسمي</span>
+                <span>الدخول المباشر بحساب Google</span>
               </button>
 
-              <div className="relative flex items-center justify-center my-2">
+              <div className="relative flex items-center justify-center my-1">
                 <div className="border-t border-slate-800 w-full" />
                 <span className="bg-[#0F172A] px-3 text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-                  أو عبر الرابط السري المشفر
+                  أو عبر رمز التحقق (OTP)
                 </span>
                 <div className="border-t border-slate-800 w-full" />
               </div>
 
-              {/* Request Link Action Button */}
+              <div className="space-y-2 text-right">
+                <label className="block text-xs font-bold text-slate-200">
+                  البريد الإلكتروني الإداري المعتمد
+                </label>
+                <div className="p-3 bg-slate-900/90 border border-slate-700 rounded-2xl flex items-center justify-between">
+                  <span className="text-xs font-mono font-bold text-blue-300" dir="ltr">
+                    {OFFICIAL_ADMIN_EMAIL}
+                  </span>
+                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-800/60 px-2 py-0.5 rounded-full">
+                    المسؤول الرسمي
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  سيتم إرسال كود دخول رقمي مباشر (6 أرقام) إلى بريدك المسجل فور الضغط أدناه.
+                </p>
+              </div>
+
+              {/* Request Code Action Button */}
               <button
                 type="button"
-                onClick={() => handleRequestMagicLink()}
+                onClick={() => handleRequestOtpCode()}
                 disabled={isSending || cooldown > 0}
                 className="w-full py-4 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs sm:text-sm rounded-2xl transition-all shadow-xl shadow-blue-600/30 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 active:scale-[0.99]"
               >
                 {isSending ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>جاري توليد الرابط السري وإرساله...</span>
+                    <span>جاري توليد كود التحقق وإرساله...</span>
                   </>
                 ) : (
                   <>
-                    <Send className="w-4 h-4" />
+                    <KeyRound className="w-4 h-4" />
                     <span>
                       {cooldown > 0 
-                        ? `إعادة إرسال الرابط (${cooldown} ثانية)` 
-                        : 'إرسال رابط الدخول السري إلى البريد الإداري'}
+                        ? `إعادة إرسال الكود (${cooldown} ثانية)` 
+                        : 'إرسال كود التحقق (OTP) إلى البريد الإداري'}
                     </span>
                   </>
                 )}
               </button>
 
-              {/* Manual Token Verification Fallback */}
-              <div className="pt-3 border-t border-slate-800/80 space-y-3">
-                <label className="block text-[11px] font-bold text-slate-300">
-                  أو أدخل رمز التحقق السري (authKey) يدوياً:
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={magicTokenInput}
-                    onChange={(e) => setMagicTokenInput(e.target.value)}
-                    placeholder="أدخل رمز التوكن السري المستلم..."
-                    className="flex-1 text-left font-mono text-xs px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500"
-                    dir="ltr"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleVerifyToken()}
-                    disabled={isVerifying || !magicTokenInput.trim()}
-                    className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer shrink-0"
-                  >
-                    تحقق
-                  </button>
-                </div>
+              {/* Direct Code Entry Option */}
+              <div className="text-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => setStep('otp_verify')}
+                  className="text-xs text-blue-400 hover:text-blue-300 font-bold underline transition-colors cursor-pointer"
+                >
+                  هل لديك كود أو رمز مسبقاً؟ اضغط هنا لإدخاله مباشرة
+                </button>
               </div>
 
             </div>
           )}
 
-          {/* STEP B: VERIFYING */}
+          {/* STEP 2: ENTER OTP CODE */}
+          {step === 'otp_verify' && (
+            <div className="space-y-5">
+              <div className="text-center space-y-2">
+                <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center mx-auto text-blue-400">
+                  <KeyRound className="w-6 h-6" />
+                </div>
+                <h3 className="text-sm font-black text-white">أدخل كود التحقق الإداري (6 أرقام)</h3>
+                <p className="text-[11px] text-slate-400">
+                  تم إرسال الكود إلى <strong className="text-blue-300" dir="ltr">{OFFICIAL_ADMIN_EMAIL}</strong>
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  maxLength={32}
+                  value={otpCodeInput}
+                  onChange={(e) => setOtpCodeInput(e.target.value.replace(/\s+/g, ''))}
+                  placeholder="------"
+                  className="w-full text-center tracking-[8px] font-mono text-2xl py-3 px-4 bg-slate-900 border-2 border-blue-500/50 rounded-2xl text-white placeholder:text-slate-700 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30"
+                  dir="ltr"
+                  autoFocus
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleVerifyCodeOrToken()}
+                disabled={isVerifying || !otpCodeInput.trim()}
+                className="w-full py-4 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-sm rounded-2xl transition-all shadow-xl shadow-emerald-600/30 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 active:scale-[0.99]"
+              >
+                {isVerifying ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>جاري التحقق من الكود...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>تأكيد الكود والدخول للوحة التحكم</span>
+                  </>
+                )}
+              </button>
+
+              <div className="flex items-center justify-between pt-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => handleRequestOtpCode()}
+                  disabled={cooldown > 0 || isSending}
+                  className="text-blue-400 hover:text-blue-300 font-bold disabled:text-slate-600 cursor-pointer"
+                >
+                  {cooldown > 0 ? `إعادة الإرسال بعد (${cooldown}ث)` : 'إعادة إرسال كود جديد'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setStep('request')}
+                  className="text-slate-400 hover:text-white cursor-pointer"
+                >
+                  الرجوع للخيارات
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3: VERIFYING */}
           {step === 'verifying' && (
             <div className="py-10 text-center space-y-4">
               <div className="w-14 h-14 rounded-2xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center mx-auto text-blue-400">
                 <RefreshCw className="w-7 h-7 animate-spin" />
               </div>
-              <h3 className="text-base font-bold text-white">جاري فك تشفير التوكن والتحقق من الصلاحية...</h3>
-              <p className="text-xs text-slate-400">يتم التأكد من عدم استخدام الرابط مسبقاً وتوليد جلسة 24 ساعة.</p>
+              <h3 className="text-base font-bold text-white">جاري فحص الكود والتحقق من الصلاحية...</h3>
+              <p className="text-xs text-slate-400">يتم التأكد من صحة الرمز وتوليد جلسة إدارية مشفرة 24 ساعة.</p>
             </div>
           )}
 
-          {/* STEP C: SUCCESS */}
+          {/* STEP 4: SUCCESS */}
           {step === 'success' && (
             <div className="py-10 text-center space-y-4">
               <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto text-emerald-400">

@@ -474,6 +474,7 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
             {currentTab === 'commissions' && (
               <CommissionTrackingPage
                 commissions={commissions}
+                accounts={accounts}
                 onMarkPaid={handleMarkCommissionPaid}
               />
             )}

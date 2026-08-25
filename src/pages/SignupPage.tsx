@@ -21,7 +21,8 @@ import {
   Camera,
   UploadCloud,
   X as CloseIcon,
-  Trash2
+  Trash2,
+  RefreshCw
 } from 'lucide-react';
 import { AccountRole } from '../types';
 import { SUBJECTS_DATA } from '../data/mockData';
@@ -41,10 +42,11 @@ export const SignupPage: React.FC<SignupPageProps> = ({
   onNavigate,
   onSignupSuccess,
 }) => {
-  const { signupUser, sendEmailVerificationLink, markEmailAsVerified } = useAuth();
+  const { signupUser, loginWithGoogle, sendEmailVerificationLink, markEmailAsVerified } = useAuth();
   const [role, setRole] = useState<AccountRole>(initialRole);
   const [step, setStep] = useState<1 | 2 | 3>(1); // 1: role, 2: details & credentials, 3: success
   const [registeredUid, setRegisteredUid] = useState<string>('');
+  const [isGoogleLoading, setIsGoogleLoading] = useState<boolean>(false);
 
   // Email verification state for Step 3
   const [isAccountVerified, setIsAccountVerified] = useState(false);
@@ -118,6 +120,41 @@ export const SignupPage: React.FC<SignupPageProps> = ({
   const handleStep1Select = (selected: AccountRole) => {
     setRole(selected);
     setStep(2);
+  };
+
+  /**
+   * Handle One-Click Google Signup & Login
+   */
+  const handleGoogleSignup = async (selectedRole?: AccountRole) => {
+    const targetRole = selectedRole || role;
+    setIsGoogleLoading(true);
+    setErrorMessage('');
+    try {
+      const session = await loginWithGoogle(targetRole, {
+        governorate,
+        area,
+        grade: targetRole === 'student' ? grade : undefined,
+        subject: targetRole === 'teacher' ? subject : undefined,
+        experience: targetRole === 'teacher' ? experience : undefined,
+        phone: phone || '',
+      });
+      if (session) {
+        onSignupSuccess(session.role, session.email);
+      }
+    } catch (err: any) {
+      console.warn('Google signup error:', err);
+      if (err?.code === 'auth/popup-closed-by-user') {
+        setErrorMessage('تم إغلاق نافذة تسجيل الدخول عبر Google قبل إكمال التسجيل.');
+      } else if (err?.code === 'auth/unauthorized-domain') {
+        setErrorMessage('نطاق الموقع يحتاج إلى إدراجه في Firebase Console (Authorized Domains). يمكنك التسجيل بالبريد وكلمة المرور.');
+      } else if (err?.code === 'auth/popup-blocked') {
+        setErrorMessage('المتصفح حظر النافذة المنبثقة. يرجى السماح بالنوافذ المنبثقة.');
+      } else {
+        setErrorMessage('تعذر التسجيل عبر Google. يرجى ملء النموذج أدناه والمتابعة.');
+      }
+    } finally {
+      setIsGoogleLoading(false);
+    }
   };
 
   /**
@@ -286,7 +323,61 @@ export const SignupPage: React.FC<SignupPageProps> = ({
         {/* Step 1: Select Role */}
         {step === 1 && (
           <div className="bg-white border border-[#E5E7EB] rounded-3xl p-6 sm:p-8 shadow-xs space-y-4 animate-step-prev">
-            <h3 className="text-base font-bold text-[#1E3A8A] text-center mb-4">
+            
+            {/* Quick Google Sign Up Block */}
+            <div className="p-4 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 border border-blue-200/70 rounded-2xl space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-[#1E3A8A] flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-blue-600" />
+                  التسجيل السريع بحساب Google
+                </span>
+                <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-md">
+                  ضغطة واحدة
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-600">
+                اختر نوع حسابك واضغط للتسجيل المباشر بدون الحاجة لإنشاء كلمة مرور:
+              </p>
+              <div className="grid grid-cols-3 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => handleGoogleSignup('student')}
+                  disabled={isGoogleLoading}
+                  className="py-2.5 px-2 bg-white hover:bg-blue-600 hover:text-white text-[#1E3A8A] border border-blue-200 rounded-xl text-xs font-bold transition-all shadow-xs flex flex-col items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                >
+                  <span className="text-sm">👨‍🎓</span>
+                  <span>طالب بـ Google</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleGoogleSignup('parent')}
+                  disabled={isGoogleLoading}
+                  className="py-2.5 px-2 bg-white hover:bg-[#1E3A8A] hover:text-white text-[#1E3A8A] border border-blue-200 rounded-xl text-xs font-bold transition-all shadow-xs flex flex-col items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                >
+                  <span className="text-sm">👨‍👧</span>
+                  <span>ولي أمر بـ Google</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleGoogleSignup('teacher')}
+                  disabled={isGoogleLoading}
+                  className="py-2.5 px-2 bg-white hover:bg-emerald-600 hover:text-white text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold transition-all shadow-xs flex flex-col items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                >
+                  <span className="text-sm">👨‍🏫</span>
+                  <span>معلم بـ Google</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="relative flex items-center justify-center my-3">
+              <div className="border-t border-gray-200 w-full" />
+              <span className="bg-white px-3 text-[11px] text-gray-400 font-bold shrink-0">
+                أو تابع التسجيل اليدوي بتحديد النوع
+              </span>
+              <div className="border-t border-gray-200 w-full" />
+            </div>
+
+            <h3 className="text-sm font-bold text-[#1E3A8A] text-center mb-1">
               الخطوة 1: حدد نوع الحساب المناسب لك
             </h3>
 
@@ -404,6 +495,41 @@ export const SignupPage: React.FC<SignupPageProps> = ({
                 <div className="flex-1">{errorMessage}</div>
               </div>
             )}
+
+            {/* One-Click Google Signup for selected role */}
+            <button
+              type="button"
+              onClick={() => handleGoogleSignup(role)}
+              disabled={isLoading || isGoogleLoading}
+              className="w-full py-3 px-4 bg-white hover:bg-slate-50 border-2 border-slate-200 hover:border-blue-400 text-slate-700 font-bold text-xs sm:text-sm rounded-xl transition-all shadow-xs flex items-center justify-center gap-3 cursor-pointer disabled:opacity-50 active:scale-[0.99]"
+            >
+              {isGoogleLoading ? (
+                <>
+                  <RefreshCw className="w-4 h-4 text-blue-600 animate-spin" />
+                  <span className="text-blue-700 font-bold">جاري التسجيل بـ Google...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                  </svg>
+                  <span>
+                    التسجيل السريع كـ {role === 'student' ? 'طالب' : role === 'parent' ? 'ولي أمر' : 'معلم'} بـ Google
+                  </span>
+                </>
+              )}
+            </button>
+
+            <div className="relative flex items-center justify-center my-1">
+              <div className="border-t border-gray-200 w-full" />
+              <span className="bg-white px-3 text-[11px] text-gray-400 font-bold shrink-0">
+                أو أكمل بيانات النموذج يدوياً
+              </span>
+              <div className="border-t border-gray-200 w-full" />
+            </div>
 
             <form onSubmit={handleSubmitRegistration} className="space-y-4">
               

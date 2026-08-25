@@ -14,9 +14,10 @@ import { Badge } from '../../components/common/Badge';
 import { useAuth } from '../../lib/AuthContext';
 
 export const TeacherProfileEditPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, updateUserProfile } = useAuth();
 
   const [name, setName] = useState(user?.name || 'أستاذ المادة');
+  const [phone, setPhone] = useState(user?.phone || '01060809952');
   const [subject, setSubject] = useState(user?.profileData?.subject || 'الرياضيات');
   const [headline, setHeadline] = useState(user?.profileData?.headline || 'معلم خبير ومعد للمناهج');
   const [bio, setBio] = useState(user?.profileData?.bio || 'خبرة أكثر من 10 سنوات في تدريس المنهج المصري والمراجعات النهائية.');
@@ -24,13 +25,36 @@ export const TeacherProfileEditPage: React.FC = () => {
   const [area, setArea] = useState(user?.profileData?.area || 'مدينة نصر / مصر الجديدة');
   const [pricePerSession, setPricePerSession] = useState(user?.profileData?.pricePerSession || 120);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const joinCode = user?.profileData?.joinCode || `TCH-${user?.uid?.slice(0, 5) || '101'}`;
 
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 2500);
+    setIsSaving(true);
+    try {
+      if (updateUserProfile) {
+        await updateUserProfile({
+          name,
+          phone,
+          governorate,
+          area,
+          profileData: {
+            ...(user?.profileData || {}),
+            subject,
+            headline,
+            bio,
+            pricePerSession,
+          },
+        });
+      }
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 3000);
+    } catch (err) {
+      console.warn('Save profile error:', err);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -169,12 +193,35 @@ export const TeacherProfileEditPage: React.FC = () => {
           </div>
         </div>
 
+        {savedSuccess && (
+          <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs font-bold text-emerald-800 text-center flex items-center justify-center gap-2 animate-drawer">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>✓ تم حفظ التعديلات وتحديث ملفك الشخصي بنجاح!</span>
+          </div>
+        )}
+
         <button
           type="submit"
-          className="w-full py-3.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-sm rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer"
+          disabled={isSaving}
+          className={`w-full py-3.5 ${
+            savedSuccess 
+              ? 'bg-emerald-600 text-white' 
+              : 'bg-[#2563EB] hover:bg-[#1D4ED8] text-white'
+          } font-bold text-sm rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50`}
         >
-          <Save className="w-4 h-4" />
-          <span>حفظ وتحديث الملف الشخصي</span>
+          {isSaving ? (
+            <span>جاري الحفظ والمزامنة...</span>
+          ) : savedSuccess ? (
+            <>
+              <CheckCircle2 className="w-4 h-4" />
+              <span>تم الحفظ والتحديث ✓</span>
+            </>
+          ) : (
+            <>
+              <Save className="w-4 h-4" />
+              <span>حفظ وتحديث الملف الشخصي</span>
+            </>
+          )}
         </button>
 
       </form>

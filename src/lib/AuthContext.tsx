@@ -3,6 +3,8 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signInAnonymously,
+  signInWithPopup,
+  GoogleAuthProvider,
   signOut,
   sendPasswordResetEmail,
   sendEmailVerification,
@@ -57,6 +59,7 @@ interface AuthContextType {
   user: UserSession | null;
   loading: boolean;
   loginUser: (email: string, password: string) => Promise<UserSession>;
+  loginWithGoogle: (defaultRole?: AccountRole, extraData?: any) => Promise<UserSession>;
   signupUser: (data: SignupData) => Promise<UserSession>;
   sendPasswordReset: (email: string) => Promise<void>;
   sendEmailVerificationLink: (email: string) => Promise<void>;
@@ -566,6 +569,117 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   /**
+   * Google Authentication for Users, Teachers, Parents and Students
+   */
+  const loginWithGoogle = async (defaultRole: AccountRole = 'student', extraData: any = {}): Promise<UserSession> => {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    const result = await signInWithPopup(auth, provider);
+    const firebaseUser = result.user;
+    const userUid = firebaseUser.uid;
+    const targetEmail = (firebaseUser.email || '').toLowerCase();
+    const cleanName = firebaseUser.displayName || 'مستخدم حِصّتي';
+    const photoUrl = firebaseUser.photoURL || '';
+
+    // Check if user document already exists in Firestore by UID or by email
+    const userDocRef = doc(db, 'users', userUid);
+    let profileData: any = null;
+    try {
+      const userSnap = await getDoc(userDocRef);
+      if (userSnap.exists()) {
+        profileData = userSnap.data();
+      } else {
+        const emailQuery = query(collection(db, 'users'), where('email', '==', targetEmail));
+        const emailSnap = await getDocs(emailQuery);
+        if (!emailSnap.empty) {
+          profileData = emailSnap.docs[0].data();
+        }
+      }
+    } catch (e) {
+      console.warn('Error reading Google user doc:', e);
+    }
+
+    if (!profileData) {
+      let role = defaultRole;
+      if (targetEmail === 'hasstysupport@gmail.com' || targetEmail === 'admin@hassty.com') {
+        role = 'admin';
+      }
+
+      profileData = {
+        uid: userUid,
+        email: targetEmail,
+        name: cleanName,
+        phone: extraData.phone || '',
+        role,
+        avatarUrl: photoUrl,
+        governorate: extraData.governorate || 'القاهرة',
+        area: extraData.area || '',
+        createdAt: new Date().toISOString(),
+        accountStatus: 'active',
+        emailVerified: true,
+        isVerified: true,
+        ...extraData,
+      };
+
+      if (role === 'student') {
+        profileData.grade = extraData.grade || 'الصف الثالث الثانوي';
+        profileData.parentPhone = extraData.parentPhone || '';
+        profileData.qrCode = `HASSTY-${userUid.substring(0, 8).toUpperCase()}`;
+      } else if (role === 'teacher') {
+        profileData.subject = extraData.subject || 'عام';
+        profileData.experienceYears = extraData.experience || '5 سنوات';
+        profileData.rating = 5.0;
+        profileData.reviewsCount = 0;
+        profileData.studentsCount = 0;
+      }
+
+      try {
+        await setDoc(userDocRef, profileData, { merge: true });
+        if (role === 'teacher') {
+          await setDoc(doc(db, 'tutors', userUid), {
+            id: userUid,
+            name: cleanName,
+            title: `معلم ${extraData.subject || 'المادة'}`,
+            subject: extraData.subject || 'عام',
+            governorate: extraData.governorate || 'القاهرة',
+            area: extraData.area || 'مدينة نصر',
+            rating: 5.0,
+            reviewsCount: 0,
+            studentsCount: 0,
+            pricePerSession: 150,
+            isVerified: true,
+            joinCode: Math.floor(100000 + Math.random() * 900000).toString(),
+            levels: [extraData.grade || 'ثانوية عامة'],
+            avatarUrl: photoUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(cleanName)}&backgroundColor=1e3a8a`,
+            bio: `معلم متخصص معتمد على منصة حِصّتي.`,
+            phone: extraData.phone || '',
+            email: targetEmail,
+          }, { merge: true });
+        }
+      } catch (writeErr) {
+        console.warn('Initial Google profile creation warning:', writeErr);
+      }
+    }
+
+    const session: UserSession = {
+      uid: userUid,
+      email: targetEmail,
+      phone: profileData.phone || '',
+      role: (profileData.role as AccountRole) || defaultRole,
+      name: profileData.name || cleanName,
+      avatarUrl: profileData.avatarUrl || photoUrl,
+      governorate: profileData.governorate || 'القاهرة',
+      area: profileData.area || '',
+      profileData,
+      emailVerified: true,
+    };
+
+    setUser(session);
+    localStorage.setItem(LOCAL_STORAGE_SESSION_KEY, JSON.stringify(session));
+    return session;
+  };
+
+  /**
    * Real Logout with Firebase Auth
    */
   const logout = async () => {
@@ -583,6 +697,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       user, 
       loading, 
       loginUser, 
+      loginWithGoogle,
       signupUser, 
       sendPasswordReset, 
       sendEmailVerificationLink,
