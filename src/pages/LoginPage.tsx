@@ -108,7 +108,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         setOtpSuccessMessage('🎉 تم تسجيل الدخول بنجاح بحساب Google! جاري التوجيه...');
         setTimeout(() => {
           onLoginSuccess(session.role, session.email);
-        }, 800);
+        }, 500);
       }
     } catch (err: any) {
       console.warn('Google signin error:', err);
@@ -119,7 +119,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       } else if (err?.code === 'auth/popup-blocked') {
         setErrorMessage('حجب المتصفح النافذة المنبثقة. يرجى السماح بالنوافذ المنبثقة للمتابعة.');
       } else {
-        setErrorMessage('تعذر تسجيل الدخول بحساب Google. يمكنك المحاولة مجدداً أو الدخول ببيانات الحساب.');
+        setErrorMessage(err?.message || 'تعذر تسجيل الدخول بحساب Google. يمكنك المحاولة مجدداً أو الدخول ببيانات الحساب.');
       }
     } finally {
       setIsGoogleLoading(false);

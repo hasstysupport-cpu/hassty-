@@ -577,8 +577,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const result = await signInWithPopup(auth, provider);
     const firebaseUser = result.user;
     const userUid = firebaseUser.uid;
-    const targetEmail = (firebaseUser.email || '').toLowerCase();
-    const cleanName = firebaseUser.displayName || 'مستخدم حِصّتي';
+    const targetEmail = (firebaseUser.email || '').toLowerCase().trim();
+    const cleanName = firebaseUser.displayName || (targetEmail ? targetEmail.split('@')[0] : 'مستخدم حِصّتي');
     const photoUrl = firebaseUser.photoURL || '';
 
     // Check if user document already exists in Firestore by UID or by email
@@ -599,33 +599,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('Error reading Google user doc:', e);
     }
 
-    if (!profileData) {
-      let role = defaultRole;
-      if (targetEmail === 'hasstysupport@gmail.com' || targetEmail === 'admin@hassty.com') {
-        role = 'admin';
-      }
+    const isAdminAccount = 
+      targetEmail === 'hasstysupport@gmail.com' || 
+      targetEmail === 'admin@hassty.com' ||
+      targetEmail.includes('admin@');
 
+    let resolvedRole: AccountRole = profileData?.role || (isAdminAccount ? 'admin' : defaultRole);
+
+    if (!profileData) {
       profileData = {
         uid: userUid,
         email: targetEmail,
         name: cleanName,
         phone: extraData.phone || '',
-        role,
-        avatarUrl: photoUrl,
+        role: resolvedRole,
+        avatarUrl: photoUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(cleanName)}&backgroundColor=1e3a8a`,
         governorate: extraData.governorate || 'القاهرة',
         area: extraData.area || '',
         createdAt: new Date().toISOString(),
         accountStatus: 'active',
         emailVerified: true,
         isVerified: true,
+        lastLogin: new Date().toISOString(),
         ...extraData,
       };
 
-      if (role === 'student') {
+      if (resolvedRole === 'student') {
         profileData.grade = extraData.grade || 'الصف الثالث الثانوي';
         profileData.parentPhone = extraData.parentPhone || '';
         profileData.qrCode = `HASSTY-${userUid.substring(0, 8).toUpperCase()}`;
-      } else if (role === 'teacher') {
+      } else if (resolvedRole === 'teacher') {
         profileData.subject = extraData.subject || 'عام';
         profileData.experienceYears = extraData.experience || '5 سنوات';
         profileData.rating = 5.0;
@@ -635,7 +638,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       try {
         await setDoc(userDocRef, profileData, { merge: true });
-        if (role === 'teacher') {
+
+        if (resolvedRole === 'admin') {
+          await setDoc(doc(db, 'admin_users', userUid), {
+            uid: userUid,
+            email: targetEmail,
+            name: cleanName,
+            photoURL: photoUrl,
+            role: 'super_admin',
+            lastLogin: new Date().toISOString(),
+            authProvider: 'google',
+            status: 'active'
+          }, { merge: true });
+        }
+
+        if (resolvedRole === 'teacher') {
           await setDoc(doc(db, 'tutors', userUid), {
             id: userUid,
             name: cleanName,
@@ -659,13 +676,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch (writeErr) {
         console.warn('Initial Google profile creation warning:', writeErr);
       }
+    } else {
+      // Update lastLogin on existing doc
+      try {
+        await setDoc(userDocRef, {
+          lastLogin: new Date().toISOString(),
+          emailVerified: true,
+          avatarUrl: photoUrl || profileData.avatarUrl
+        }, { merge: true });
+      } catch {
+        // ignore
+      }
     }
 
     const session: UserSession = {
       uid: userUid,
       email: targetEmail,
       phone: profileData.phone || '',
-      role: (profileData.role as AccountRole) || defaultRole,
+      role: resolvedRole,
       name: profileData.name || cleanName,
       avatarUrl: profileData.avatarUrl || photoUrl,
       governorate: profileData.governorate || 'القاهرة',

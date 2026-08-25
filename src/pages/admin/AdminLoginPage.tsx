@@ -159,7 +159,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
       setSuccessMessage(`تم تسجيل الدخول الإداري بنجاح (${userEmail})! جاري نقلك إلى لوحة التحكم...`);
       setTimeout(() => {
         onLoginSuccess(userEmail);
-      }, 900);
+      }, 500);
     } catch (err: any) {
       console.warn('Google Admin Auth notice:', err);
       if (err?.code === 'auth/popup-closed-by-user') {
