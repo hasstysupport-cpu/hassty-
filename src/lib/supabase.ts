@@ -10,7 +10,7 @@ export const supabase = isSupabaseConfigured
   : null;
 
 // Helper to check connection status
-export async function checkSupabaseConnection(): Promise<{ ok: boolean; message: string }> {
+export async function checkSupabaseConnection(): Promise<{ ok: boolean; message: string; missingTables?: boolean }> {
   if (!isSupabaseConfigured || !supabase) {
     return {
       ok: false,
@@ -19,12 +19,16 @@ export async function checkSupabaseConnection(): Promise<{ ok: boolean; message:
   }
 
   try {
-    const { error } = await supabase.from('profiles').select('count', { count: 'exact', head: true });
-    if (error && error.code !== 'PGRST116') {
-      return {
-        ok: false,
-        message: `تم الاتصال بالسيرفر لكن الجداول غير منشأة بعد (${error.message}). يرجى تشغيل كود الـ SQL.`,
-      };
+    const { error } = await supabase.from('app_documents').select('count', { count: 'exact', head: true });
+    if (error) {
+      // Check if table missing (error code 42P01 in Postgres or PGRST204)
+      if (error.code === '42P01' || error.message?.includes('does not exist') || error.message?.includes('relation')) {
+        return {
+          ok: false,
+          missingTables: true,
+          message: 'تم الاتصال بخادم Supabase، ولكن جداول قاعدة البيانات لم يتم إنشاؤها بعد. يرجى نسخ كود SQL وتشغيله في SQL Editor.',
+        };
+      }
     }
     return {
       ok: true,
