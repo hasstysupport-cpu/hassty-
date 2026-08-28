@@ -29,7 +29,7 @@ export const CommissionTrackingPage: React.FC<CommissionTrackingPageProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'overdue' | 'pending'>('all');
 
-  // Compute live commission rows from Firestore teacher accounts if direct commission collection is empty
+  // Compute live commission rows from Supabase teacher accounts if direct commission collection is empty
   const activeCommissions: TeacherCommissionTrackingItem[] = commissions.length > 0
     ? commissions
     : accounts

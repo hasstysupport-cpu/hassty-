@@ -17,9 +17,9 @@ import {
 import { Badge } from '../../components/common/Badge';
 import { TeacherStudentItem } from '../../types';
 import { useAuth } from '../../lib/AuthContext';
-import { fetchTeacherStudents } from '../../lib/firestoreService';
-import { db } from '../../lib/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { fetchTeacherStudents } from '../../lib/supabaseService';
+import { db } from '../../lib/supabaseCompat';
+import { doc, updateDoc } from '../../lib/supabaseCompat';
 
 interface TeacherPaymentsPageProps {
   onNavigate?: (path: string) => void;
@@ -82,7 +82,7 @@ export const TeacherPaymentsPage: React.FC<TeacherPaymentsPageProps> = ({ onNavi
       await updateDoc(ref, { paymentStatus: newStatus });
       setStudents(prev => prev.map(s => s.id === studentId ? { ...s, paymentStatus: newStatus as any } : s));
     } catch (err) {
-      console.error('Failed to update student payment status in Firestore:', err);
+      console.error('Failed to update student payment status in Supabase:', err);
     } finally {
       setUpdatingId(null);
     }
@@ -188,7 +188,7 @@ export const TeacherPaymentsPage: React.FC<TeacherPaymentsPageProps> = ({ onNavi
       {/* Student Payments Ledger Table */}
       <div className="bg-white border border-[#E5E7EB] rounded-3xl p-6 sm:p-8 space-y-5 shadow-xs">
         <div className="flex items-center justify-between">
-          <h3 className="text-base font-bold text-[#1E3A8A]">سجل اشتراكات الطلاب المباشر من Firestore</h3>
+          <h3 className="text-base font-bold text-[#1E3A8A]">سجل اشتراكات الطلاب المباشر من Supabase</h3>
           <span className="text-xs text-[#6B7280]">
             إجمالي الطلاب المسجلين: <strong className="text-[#10B981]">{totalStudents}</strong> (مسدد: {paidStudentsCount})
           </span>

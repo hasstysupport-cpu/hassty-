@@ -191,3 +191,37 @@ CREATE POLICY "Allow public insert makeups" ON public.makeup_requests FOR INSERT
 
 CREATE POLICY "Allow public read reports" ON public.safety_reports FOR SELECT USING (true);
 CREATE POLICY "Allow public insert reports" ON public.safety_reports FOR INSERT WITH CHECK (true);
+
+-- 11. LEGACY APP DOCUMENTS (Supabase replacement for all former Firestore collections)
+CREATE TABLE IF NOT EXISTS public.app_documents (
+  collection_name TEXT NOT NULL,
+  document_id TEXT NOT NULL,
+  data JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (collection_name, document_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_app_documents_collection ON public.app_documents(collection_name);
+CREATE INDEX IF NOT EXISTS idx_app_documents_updated_at ON public.app_documents(updated_at DESC);
+ALTER TABLE public.app_documents ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "authenticated_read_app_documents" ON public.app_documents;
+DROP POLICY IF EXISTS "authenticated_write_app_documents" ON public.app_documents;
+CREATE POLICY "authenticated_read_app_documents" ON public.app_documents
+  FOR SELECT TO authenticated USING (true);
+CREATE POLICY "authenticated_write_app_documents" ON public.app_documents
+  FOR ALL TO authenticated
+  USING (true) WITH CHECK (true);
+
+CREATE OR REPLACE FUNCTION public.set_app_documents_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_app_documents_updated_at ON public.app_documents;
+CREATE TRIGGER trg_app_documents_updated_at
+BEFORE UPDATE ON public.app_documents
+FOR EACH ROW EXECUTE FUNCTION public.set_app_documents_updated_at();

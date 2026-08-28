@@ -10,8 +10,8 @@ import {
   where,
   onSnapshot,
   Timestamp
-} from 'firebase/firestore';
-import { db } from './firebase';
+} from './firestoreCompat';
+import { db } from './firestoreCompat';
 import { getCleanAvatarUrl } from './avatarHelper';
 
 export interface ParentLinkRequest {
@@ -62,7 +62,7 @@ export function normalizeStudentCode(raw: string): string {
 }
 
 /**
- * Search for a student in Firestore by QR code, UID, or phone
+ * Search for a student in Supabase by QR code, UID, or phone
  */
 export async function findStudentByCodeOrPhone(codeOrPhone: string): Promise<any | null> {
   const cleanQuery = normalizeStudentCode(codeOrPhone);

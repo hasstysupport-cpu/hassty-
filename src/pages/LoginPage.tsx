@@ -102,7 +102,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       if (storedErr) {
         const parsed = JSON.parse(storedErr);
         if (parsed.code === 'auth/unauthorized-domain') {
-          setErrorMessage('نطاق الموقع غير معتمد في Firebase Auth Authorized Domains.');
+          setErrorMessage('نطاق الموقع غير معتمد في Supabase Auth Authorized Domains.');
         } else {
           setErrorMessage(parsed.message || 'تعذر استكمال تسجيل الدخول عبر Google.');
         }
@@ -133,7 +133,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       if (err?.code === 'auth/popup-closed-by-user') {
         setErrorMessage('تم إغلاق نافذة تسجيل الدخول عبر Google قبل الاكتمال.');
       } else if (err?.code === 'auth/unauthorized-domain') {
-        setErrorMessage('نطاق الموقع غير مضاف في Firebase Auth Authorized Domains. يرجى الدخول بالبريد وكلمة المرور.');
+        setErrorMessage('نطاق الموقع غير مضاف في Supabase Auth Authorized Domains. يرجى الدخول بالبريد وكلمة المرور.');
       } else if (err?.code === 'auth/popup-blocked') {
         setErrorMessage('حجب المتصفح النافذة المنبثقة. يرجى السماح بالنوافذ المنبثقة للمتابعة.');
       } else {
@@ -274,7 +274,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           setStoredToken(res.token);
         }
 
-        // Mark verified in Firestore if not already
+        // Mark verified in Supabase if not already
         if (pendingSession.uid) {
           await markEmailAsVerified(pendingSession.uid);
         }
@@ -329,7 +329,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   };
 
   /**
-   * Handle Real Firebase Password Reset Email
+   * Handle Real Supabase Password Reset Email
    */
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -17,8 +17,8 @@ import {
 } from 'lucide-react';
 import { TutorProfile } from '../../types';
 import { Badge } from '../../components/common/Badge';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
+import { collection, query, where, getDocs } from '../../lib/supabaseCompat';
+import { db } from '../../lib/supabaseCompat';
 import { useAuth } from '../../lib/AuthContext';
 
 interface StudentTutorsPageProps {

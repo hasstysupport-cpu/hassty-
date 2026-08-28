@@ -29,7 +29,7 @@ import {
   dbResolveReport,
   dbDismissReport,
   dbMarkCommissionPaid
-} from '../../lib/adminFirestoreService';
+} from '../../lib/adminSupabaseService';
 import {
   OFFICIAL_ADMIN_EMAIL,
   isCurrentAdminSessionValid,
@@ -37,8 +37,8 @@ import {
   saveAdminSession,
 } from '../../lib/securityConfig';
 import { Loader2, AlertTriangle, RefreshCw, Database, LogIn, ShieldCheck } from 'lucide-react';
-import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-import { auth } from '../../lib/firebase';
+import { signInWithPopup, GoogleAuthProvider } from '../../lib/supabaseAuthCompat';
+import { auth } from '../../lib/supabaseAuthCompat';
 
 interface HasstyAdminAppProps {
   onSwitchToPublicApp?: () => void;
@@ -72,7 +72,7 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
     return () => clearInterval(checkInterval);
   }, [isAuthenticated]);
 
-  // Application Real-time Firestore States
+  // Application Real-time Supabase States
   const [accounts, setAccounts] = useState<AdminUserAccount[]>([]);
   const [verificationRequests, setVerificationRequests] = useState<any[]>([]);
   const [safetyReports, setSafetyReports] = useState<any[]>([]);
@@ -101,9 +101,9 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
             setIsDbLoading(false);
           },
           (err) => {
-            console.error('Firestore Users Sync Error:', err);
+            console.error('Supabase Users Sync Error:', err);
             setDbConnectionStatus('failed');
-            setDbErrorMessage('فشل الاتصال بقاعدة البيانات (Firestore) — تعذر جلب سجلات المستخدمين');
+            setDbErrorMessage('فشل الاتصال بقاعدة البيانات (Supabase) — تعذر جلب سجلات المستخدمين');
             setIsDbLoading(false);
           }
         );
@@ -113,7 +113,7 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
             setVerificationRequests(data);
           },
           (err) => {
-            console.error('Firestore Verifications Sync Error:', err);
+            console.error('Supabase Verifications Sync Error:', err);
             setDbConnectionStatus('failed');
           }
         );
@@ -123,7 +123,7 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
             setSafetyReports(data);
           },
           (err) => {
-            console.error('Firestore Reports Sync Error:', err);
+            console.error('Supabase Reports Sync Error:', err);
             setDbConnectionStatus('failed');
           }
         );
@@ -133,12 +133,12 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
             setCommissions(data);
           },
           (err) => {
-            console.error('Firestore Commissions Sync Error:', err);
+            console.error('Supabase Commissions Sync Error:', err);
             setDbConnectionStatus('failed');
           }
         );
       } catch (err: any) {
-        console.warn('Firestore subscription init warning:', err);
+        console.warn('Supabase subscription init warning:', err);
         setDbConnectionStatus('failed');
         setDbErrorMessage(err?.message || 'فشل الاتصال بقاعدة البيانات — يرجى التأكد من اتصال الإنترنت');
         setIsDbLoading(false);
@@ -183,7 +183,7 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
     clearAdminSession();
   };
 
-  // Badge & Accounts Handlers with Live Firestore DB Writes
+  // Badge & Accounts Handlers with Live Supabase DB Writes
   const handleUpdateAccountBadge = async (accountId: string, newBadge: AccountBadgeType) => {
     // Optimistic UI update
     setAccounts((prev) =>
@@ -192,7 +192,7 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
     try {
       await dbUpdateAccountBadge(accountId, newBadge);
     } catch (e) {
-      console.error('Failed to update account badge in Firestore:', e);
+      console.error('Failed to update account badge in Supabase:', e);
     }
   };
 
@@ -208,7 +208,7 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
     try {
       await dbToggleAccountStatus(accountId, target.status);
     } catch (e) {
-      console.error('Failed to toggle status in Firestore:', e);
+      console.error('Failed to toggle status in Supabase:', e);
     }
   };
 
@@ -218,11 +218,11 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
     try {
       await dbDeleteAccount(accountId);
     } catch (e) {
-      console.error('Failed to delete account in Firestore:', e);
+      console.error('Failed to delete account in Supabase:', e);
     }
   };
 
-  // Verification Queue Handlers with Live Firestore DB Writes
+  // Verification Queue Handlers with Live Supabase DB Writes
   const handleApproveTeacherVerification = async (requestId: string) => {
     const targetReq = verificationRequests.find((r) => r.id === requestId);
     if (!targetReq) return;
@@ -257,7 +257,7 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
     try {
       await dbApproveVerification(requestId, targetReq.teacherId, adminEmail, teacherData);
     } catch (e) {
-      console.error('Failed to approve teacher verification in Firestore:', e);
+      console.error('Failed to approve teacher verification in Supabase:', e);
     }
   };
 
@@ -280,11 +280,11 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
     try {
       await dbRejectVerification(requestId, reason, adminEmail);
     } catch (e) {
-      console.error('Failed to reject teacher verification in Firestore:', e);
+      console.error('Failed to reject teacher verification in Supabase:', e);
     }
   };
 
-  // Safety Reports Handlers with Live Firestore DB Writes
+  // Safety Reports Handlers with Live Supabase DB Writes
   const handleSuspendTeacherFromReport = async (teacherId: string, reportId: string) => {
     // Optimistic UI update
     setSafetyReports((prev) =>
@@ -301,7 +301,7 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
     try {
       await dbSuspendTeacherFromReport(teacherId, reportId);
     } catch (e) {
-      console.error('Failed to suspend teacher from report in Firestore:', e);
+      console.error('Failed to suspend teacher from report in Supabase:', e);
     }
   };
 
@@ -314,7 +314,7 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
     try {
       await dbResolveReport(reportId);
     } catch (e) {
-      console.error('Failed to resolve safety report in Firestore:', e);
+      console.error('Failed to resolve safety report in Supabase:', e);
     }
   };
 
@@ -325,11 +325,11 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
     try {
       await dbDismissReport(reportId);
     } catch (e) {
-      console.error('Failed to dismiss safety report in Firestore:', e);
+      console.error('Failed to dismiss safety report in Supabase:', e);
     }
   };
 
-  // Commission Handler with Live Firestore DB Writes
+  // Commission Handler with Live Supabase DB Writes
   const handleMarkCommissionPaid = async (id: string) => {
     // Optimistic UI update
     setCommissions((prev) =>
@@ -347,7 +347,7 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
     try {
       await dbMarkCommissionPaid(id);
     } catch (e) {
-      console.error('Failed to mark commission paid in Firestore:', e);
+      console.error('Failed to mark commission paid in Supabase:', e);
     }
   };
 
@@ -398,7 +398,7 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
                   فشل الاتصال بقاعدة البيانات (Database Connection Failed)
                 </h4>
                 <p className="text-xs text-red-700 mt-0.5">
-                  {dbErrorMessage || 'تعذر الاتصال بخوادم Firestore السحابية. يرجى التحقق من صلاحيات الدخول أو اتصال الإنترنت.'}
+                  {dbErrorMessage || 'تعذر الاتصال بخوادم Supabase السحابية. يرجى التحقق من صلاحيات الدخول أو اتصال الإنترنت.'}
                 </p>
               </div>
             </div>
@@ -428,7 +428,7 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({
         {isDbLoading ? (
           <div className="py-20 flex flex-col items-center justify-center gap-3 text-slate-500">
             <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-            <p className="text-sm font-bold">جاري المزامنة مع قاعدة بيانات حِصّتي السحابية (Firestore)...</p>
+            <p className="text-sm font-bold">جاري المزامنة مع قاعدة بيانات حِصّتي السحابية (Supabase)...</p>
           </div>
         ) : (
           <>

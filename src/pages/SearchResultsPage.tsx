@@ -21,8 +21,8 @@ import { EGYPT_GOVERNORATES, CITIES_BY_GOVERNORATE, SUBJECTS_DATA } from '../dat
 import { TutorProfile } from '../types';
 import { Badge } from '../components/common/Badge';
 import { LocationSelector } from '../components/common/LocationSelector';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { collection, getDocs, query, where } from '../lib/supabaseCompat';
+import { db } from '../lib/supabaseCompat';
 
 interface SearchResultsPageProps {
   initialSubject?: string;
@@ -50,7 +50,7 @@ export const SearchResultsPage: React.FC<SearchResultsPageProps> = ({
   const [loading, setLoading] = useState(true);
   const itemsPerPage = 6;
 
-  // Fetch real teachers from Firestore
+  // Fetch real teachers from Supabase
   useEffect(() => {
     async function loadTeachers() {
       setLoading(true);
@@ -90,7 +90,7 @@ export const SearchResultsPage: React.FC<SearchResultsPageProps> = ({
 
         setTutors(realTeachers);
       } catch (err) {
-        console.error('Error fetching teachers from firestore:', err);
+        console.error('Error fetching teachers from supabase:', err);
         setTutors([]);
       } finally {
         setLoading(false);

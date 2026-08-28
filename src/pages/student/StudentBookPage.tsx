@@ -13,8 +13,8 @@ import {
   BookOpen
 } from 'lucide-react';
 import { Badge } from '../../components/common/Badge';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
+import { collection, query, where, getDocs } from '../../lib/supabaseCompat';
+import { db } from '../../lib/supabaseCompat';
 import { TutorProfile } from '../../types';
 
 export const StudentBookPage: React.FC = () => {

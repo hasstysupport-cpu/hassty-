@@ -1,4 +1,4 @@
-import { db } from './firebase';
+import { db } from './firestoreCompat';
 import { 
   collection, 
   doc, 
@@ -11,7 +11,7 @@ import {
   query, 
   where, 
   onSnapshot 
-} from 'firebase/firestore';
+} from './firestoreCompat';
 import { 
   TutorProfile, 
   TeacherGroupItem, 

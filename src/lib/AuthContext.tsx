@@ -2,7 +2,6 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { 
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  signInAnonymously,
   signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
@@ -13,7 +12,7 @@ import {
   updateProfile,
   onAuthStateChanged,
   User as FirebaseUser
-} from 'firebase/auth';
+} from './supabaseAuthCompat';
 import { 
   collection, 
   doc, 
@@ -23,8 +22,9 @@ import {
   updateDoc, 
   query, 
   where 
-} from 'firebase/firestore';
-import { auth, db } from './firebase';
+} from './firestoreCompat';
+import { db } from './firestoreCompat';
+import { auth } from './supabaseAuthCompat';
 import { AccountRole } from '../types';
 import { sendParentLinkRequest } from './parentStudentService';
 import { saveAdminSession } from './securityConfig';
@@ -96,17 +96,17 @@ const LOCAL_STORAGE_SESSION_KEY = 'hassty_user_session';
     }
 
     /**
- * Universal helper to sync Google authenticated user to Firestore and produce a valid UserSession
+ * Universal helper to sync Google authenticated user to Supabase Data and produce a valid UserSession
  */
-async function syncGoogleUserToFirestore(
-  firebaseUser: FirebaseUser,
+async function syncGoogleUserToSupabase(
+  supabaseUser: SupabaseUser,
   fallbackRole: AccountRole = 'student',
   extraData: any = {}
 ): Promise<UserSession> {
-  const userUid = firebaseUser.uid;
-  const targetEmail = (firebaseUser.email || '').toLowerCase().trim();
-  const cleanName = firebaseUser.displayName || (targetEmail ? targetEmail.split('@')[0] : 'مستخدم حِصّتي');
-  const photoUrl = firebaseUser.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(cleanName)}&backgroundColor=1e3a8a`;
+  const userUid = supabaseUser.uid;
+  const targetEmail = (supabaseUser.email || '').toLowerCase().trim();
+  const cleanName = supabaseUser.displayName || (targetEmail ? targetEmail.split('@')[0] : 'مستخدم حِصّتي');
+  const photoUrl = supabaseUser.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(cleanName)}&backgroundColor=1e3a8a`;
 
   const isAdminAccount = 
     targetEmail === 'hasstysupport@gmail.com' || 
@@ -251,7 +251,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
   const [loading, setLoading] = useState(true);
 
-  // Real-time Firebase Auth state listener & redirect handler
+  // Real-time Supabase Auth state listener
   useEffect(() => {
     let isSubscribed = true;
 
@@ -259,9 +259,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const res = await getRedirectResult(auth);
         if (res && res.user && isSubscribed) {
-          console.log('Firebase Redirect Sign-in completed:', res.user.email);
+          console.log('Supabase Redirect Sign-in completed:', res.user.email);
           const { role: pendingRole, extraData: pendingExtra } = readPendingGoogleAuth();
-          const session = await syncGoogleUserToFirestore(res.user, pendingRole, pendingExtra);
+          const session = await syncGoogleUserToSupabase(res.user, pendingRole, pendingExtra);
           setUser(session);
           localStorage.setItem(LOCAL_STORAGE_SESSION_KEY, JSON.stringify(session));
           localStorage.removeItem(GOOGLE_AUTH_ERROR_KEY);
@@ -284,11 +284,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     handleAuthRedirect();
 
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
-      if (firebaseUser) {
+    const unsubscribe = onAuthStateChanged(auth, async (supabaseUser: SupabaseUser | null) => {
+      if (supabaseUser) {
         try {
           const { role: pendingRole, extraData: pendingExtra } = readPendingGoogleAuth();
-          const session = await syncGoogleUserToFirestore(firebaseUser, pendingRole, pendingExtra);
+          const session = await syncGoogleUserToSupabase(supabaseUser, pendingRole, pendingExtra);
           if (isSubscribed) {
             setUser(session);
             localStorage.setItem(LOCAL_STORAGE_SESSION_KEY, JSON.stringify(session));
@@ -299,7 +299,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.warn('Error syncing user profile on auth change:', err);
         }
       } else {
-        // User is signed out in Firebase Auth - verify if there is a saved local session
+        // User is signed out in Supabase Auth - verify if there is a saved local session
         const saved = localStorage.getItem(LOCAL_STORAGE_SESSION_KEY);
         if (!saved && isSubscribed) {
           setUser(null);
@@ -315,7 +315,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   /**
-   * Real Email & Password Login with Firebase Auth & Resilient Firestore Verification
+   * Real Email & Password Login with Supabase Auth & Resilient Supabase Data Verification
    */
   const loginUser = async (emailOrPhone: string, password: string): Promise<UserSession> => {
     const cleanInput = emailOrPhone.trim();
@@ -348,32 +348,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       targetEmail === 'admin@hassty.com';
 
     let userCredential: any = null;
-    let firebaseUser: FirebaseUser | null = null;
+    let supabaseUser: SupabaseUser | null = null;
     let userUid = '';
-    let firebaseEmailVerified = false;
+    let supabaseEmailVerified = false;
 
     try {
       userCredential = await signInWithEmailAndPassword(auth, targetEmail, password);
-      firebaseUser = userCredential.user;
-      userUid = firebaseUser.uid;
-      firebaseEmailVerified = firebaseUser.emailVerified;
+      supabaseUser = userCredential.user;
+      userUid = supabaseUser.uid;
+      supabaseEmailVerified = supabaseUser.emailVerified;
     } catch (authErr: any) {
-      console.warn('Firebase Auth signIn warning:', authErr?.code || authErr);
+      console.warn('Supabase Auth signIn warning:', authErr?.code || authErr);
 
-      // If it's a demo account and wasn't created yet in Firebase Auth, auto-provision it
+      // If it's a demo account and wasn't created yet in Supabase Auth, auto-provision it
       if (isDemoEmail && (authErr?.code === 'auth/user-not-found' || authErr?.code === 'auth/invalid-credential')) {
         try {
           userCredential = await createUserWithEmailAndPassword(auth, targetEmail, password || 'Demo123456');
-          firebaseUser = userCredential.user;
-          userUid = firebaseUser.uid;
-          firebaseEmailVerified = firebaseUser.emailVerified;
+          supabaseUser = userCredential.user;
+          userUid = supabaseUser.uid;
+          supabaseEmailVerified = supabaseUser.emailVerified;
         } catch (createErr: any) {
           if (createErr?.code === 'auth/email-already-in-use') {
             try {
               userCredential = await signInWithEmailAndPassword(auth, targetEmail, password || 'Demo123456');
-              firebaseUser = userCredential.user;
-              userUid = firebaseUser.uid;
-              firebaseEmailVerified = firebaseUser.emailVerified;
+              supabaseUser = userCredential.user;
+              userUid = supabaseUser.uid;
+              supabaseEmailVerified = supabaseUser.emailVerified;
             } catch {
               // continue to fallback
             }
@@ -381,21 +381,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // If operation is not allowed or provider disabled in console, fallback gracefully
-      if (!userUid) {
-        if (authErr?.code === 'auth/operation-not-allowed' || isDemoEmail) {
-          try {
-            const anonCred = await signInAnonymously(auth);
-            userUid = anonCred.user.uid;
-            firebaseEmailVerified = true;
-          } catch {
-            userUid = `usr_${btoa(targetEmail).replace(/[^a-zA-Z0-9]/g, '').substring(0, 18)}`;
-            firebaseEmailVerified = true;
-          }
-        } else {
-          throw authErr;
-        }
-      }
+      if (!userUid) throw authErr;
     }
 
     // Fetch existing user profile
@@ -413,7 +399,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!profileData) {
       // Auto-create initial profile for this user if missing
       let role: AccountRole = 'student';
-      let name = firebaseUser?.displayName || 'مستخدم حِصّتي';
+      let name = supabaseUser?.displayName || 'مستخدم حِصّتي';
       let phone = isPhoneNumber ? cleanInput : '';
 
       if (targetEmail === 'hasstysupport@gmail.com' || targetEmail === 'admin@hassty.com') {
@@ -442,7 +428,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role,
         createdAt: new Date().toISOString(),
         accountStatus: 'active',
-        emailVerified: firebaseEmailVerified,
+        emailVerified: supabaseEmailVerified,
       };
 
       if (role === 'student') {
@@ -493,8 +479,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       governorate: profileData.governorate || 'القاهرة',
       area: profileData.area || '',
       profileData,
-      emailVerified: true,
+      emailVerified: !!supabaseUser?.emailVerified,
     };
+
+    await setDoc(doc(db, 'users', resolvedUid), profileData, { merge: true });
+    if (data.role === 'teacher') {
+      await setDoc(doc(db, 'tutors', resolvedUid), {
+        id: resolvedUid, name: cleanName, title: `معلم ${data.subject || 'المادة'}`, subject: data.subject || 'عام',
+        governorate: data.governorate || 'القاهرة', area: data.area || '', phone: cleanPhone, email: cleanEmail,
+        rating: 5, reviewsCount: 0, studentsCount: 0, pricePerSession: 150, isVerified: false,
+        joinCode: Math.floor(100000 + Math.random() * 900000).toString(), levels: [data.grade || 'ثانوية عامة'],
+        avatarUrl, bio: 'معلم متخصص على منصة حِصّتي.'
+      }, { merge: true });
+    }
 
     setUser(session);
     localStorage.setItem(LOCAL_STORAGE_SESSION_KEY, JSON.stringify(session));
@@ -502,7 +499,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   /**
-   * Real Email & Password Signup with Firebase Auth & Firestore Registration
+   * Real Email & Password Signup with Supabase Auth & Supabase Data Registration
    */
   const signupUser = async (data: SignupData): Promise<UserSession> => {
     const cleanEmail = data.email.trim().toLowerCase();
@@ -510,19 +507,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const cleanPhone = data.phone.trim();
     const avatarUrl = data.avatarUrl || '';
 
-    // 1. Create user in Firebase Authentication
+    // 1. Create user in Supabase Authentication
     let userCredential: any = null;
-    let firebaseUser: FirebaseUser | null = null;
+    let supabaseUser: SupabaseUser | null = null;
     let resolvedUid = '';
 
     try {
       userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, data.password);
-      firebaseUser = userCredential.user;
-      resolvedUid = firebaseUser.uid;
+      supabaseUser = userCredential.user;
+      resolvedUid = supabaseUser.uid;
 
-      // Set Display Name & Photo in Firebase Auth
+      // Set Display Name & Photo in Supabase Auth
       try {
-        await updateProfile(firebaseUser, { 
+        await updateProfile(supabaseUser, { 
           displayName: cleanName,
           photoURL: avatarUrl || undefined
         });
@@ -532,12 +529,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Send Email Verification
       try {
-        await sendEmailVerification(firebaseUser);
+        await sendEmailVerification(supabaseUser);
       } catch (e) {
         console.warn('Email verification send warning:', e);
       }
     } catch (authErr: any) {
-      console.warn('Firebase Auth createUser warning:', authErr?.code || authErr);
+      console.warn('Supabase Auth createUser warning:', authErr?.code || authErr);
 
       if (authErr?.code === 'auth/email-already-in-use') {
         throw authErr;
@@ -556,7 +553,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    // 2. Construct Firestore Profile Data
+    // 2. Construct Supabase Data Profile Data
     const profileData: any = {
       uid: resolvedUid,
       email: cleanEmail,
@@ -586,11 +583,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       profileData.childrenPhones = [];
     }
 
-    // 3. Save to Firestore `users` collection
+    // 3. Save to Supabase Data `users` collection
     try {
       await setDoc(doc(db, 'users', resolvedUid), profileData, { merge: true });
     } catch (userWriteErr) {
-      console.warn('Firestore users collection write warning:', userWriteErr);
+      console.warn('Supabase Data users collection write warning:', userWriteErr);
     }
 
     // If Parent entered a student join code during signup, create the pending linking request immediately
@@ -634,7 +631,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           email: cleanEmail,
         }, { merge: true });
       } catch (tutorWriteErr) {
-        console.warn('Firestore tutors collection write warning:', tutorWriteErr);
+        console.warn('Supabase Data tutors collection write warning:', tutorWriteErr);
       }
     }
 
@@ -648,8 +645,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       governorate: data.governorate || 'القاهرة',
       area: data.area || '',
       profileData,
-      emailVerified: true,
+      emailVerified: !!supabaseUser?.emailVerified,
     };
+
+    await setDoc(doc(db, 'users', resolvedUid), profileData, { merge: true });
+    if (data.role === 'teacher') {
+      await setDoc(doc(db, 'tutors', resolvedUid), {
+        id: resolvedUid, name: cleanName, title: `معلم ${data.subject || 'المادة'}`, subject: data.subject || 'عام',
+        governorate: data.governorate || 'القاهرة', area: data.area || '', phone: cleanPhone, email: cleanEmail,
+        rating: 5, reviewsCount: 0, studentsCount: 0, pricePerSession: 150, isVerified: false,
+        joinCode: Math.floor(100000 + Math.random() * 900000).toString(), levels: [data.grade || 'ثانوية عامة'],
+        avatarUrl, bio: 'معلم متخصص على منصة حِصّتي.'
+      }, { merge: true });
+    }
 
     setUser(session);
     localStorage.setItem(LOCAL_STORAGE_SESSION_KEY, JSON.stringify(session));
@@ -664,7 +672,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await sendPasswordResetEmail(auth, cleanEmail);
     } catch (err: any) {
-      console.warn('Firebase Auth sendPasswordResetEmail:', err?.code || err);
+      console.warn('Supabase Auth sendPasswordResetEmail:', err?.code || err);
       // If operation not allowed, still succeed gracefully without throwing
       if (err?.code !== 'auth/operation-not-allowed') {
         throw err;
@@ -686,7 +694,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   /**
-   * Mark user email as verified in Firestore
+   * Mark user email as verified in Supabase Data
    */
   const markEmailAsVerified = async (uid: string): Promise<void> => {
     try {
@@ -702,7 +710,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   /**
-   * Update Firestore Profile Data
+   * Update Supabase Data Profile Data
    */
   const updateUserProfile = async (updates: Partial<any>) => {
     if (!user?.uid) return;
@@ -723,7 +731,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // Update Firebase auth user if name or avatar changed
+      // Update Supabase auth user if name or avatar changed
       if (auth.currentUser && (updates.name || updates.avatarUrl)) {
         await updateProfile(auth.currentUser, {
           displayName: updates.name || auth.currentUser.displayName,
@@ -766,21 +774,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.removeItem(PENDING_GOOGLE_EXTRA_KEY);
     }
 
+    const isMobile =
+      typeof navigator !== 'undefined' &&
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+    // On mobile devices, Chrome/Safari often block or detach popups. Direct redirect ensures 100% reliability.
+    if (isMobile) {
+      await signInWithRedirect(auth, provider);
+      return null as any;
+    }
+
     try {
-      // 1. Always attempt signInWithPopup first on all devices (mobile & desktop)
       const result = await signInWithPopup(auth, provider);
-      const session = await syncGoogleUserToFirestore(result.user, defaultRole, extraData);
+      const session = await syncGoogleUserToSupabase(result.user, defaultRole, extraData);
       setUser(session);
       localStorage.setItem(LOCAL_STORAGE_SESSION_KEY, JSON.stringify(session));
       localStorage.removeItem(GOOGLE_AUTH_ERROR_KEY);
       clearPendingGoogleAuth();
       return session;
     } catch (popupErr: any) {
-      console.warn('signInWithPopup notice, checking fallback:', popupErr);
-      // If popup is blocked by browser policy, fallback to redirect
+      console.warn('signInWithPopup error, falling back to redirect:', popupErr);
       if (
         popupErr?.code === 'auth/popup-blocked' ||
-        popupErr?.code === 'auth/cancelled-popup-request'
+        popupErr?.code === 'auth/cancelled-popup-request' ||
+        popupErr?.code === 'auth/popup-closed-by-user' ||
+        popupErr?.code === 'auth/internal-error'
       ) {
         try {
           await signInWithRedirect(auth, provider);
@@ -790,13 +808,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           throw redirectErr;
         }
       }
-      clearPendingGoogleAuth();
       throw popupErr;
     }
   };
     
   /**
-   * Real Logout with Firebase Auth
+   * Real Logout with Supabase Auth
    */
   const logout = async () => {
     try {

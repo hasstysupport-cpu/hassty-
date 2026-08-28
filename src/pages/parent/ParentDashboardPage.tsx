@@ -70,7 +70,7 @@ export const ParentDashboardPage: React.FC<ParentDashboardPageProps> = ({
   const [reportDetails, setReportDetails] = useState('');
   const [reportSubmitted, setReportSubmitted] = useState(false);
 
-  // Real-time Firestore subscription to this parent's link requests
+  // Real-time Supabase subscription to this parent's link requests
   useEffect(() => {
     if (!user?.uid) return;
     const unsubscribe = subscribeToParentRequests(user.uid, (reqs) => {

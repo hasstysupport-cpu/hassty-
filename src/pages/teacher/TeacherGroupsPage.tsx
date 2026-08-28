@@ -23,7 +23,7 @@ import { Badge } from '../../components/common/Badge';
 import { Modal } from '../../components/common/Modal';
 import { calculateTeacherCommission, formatTimeArabic } from '../../lib/scheduleSync';
 import { useAuth } from '../../lib/AuthContext';
-import { fetchTeacherGroups, createTeacherGroup, fetchTeacherStudents } from '../../lib/firestoreService';
+import { fetchTeacherGroups, createTeacherGroup, fetchTeacherStudents } from '../../lib/supabaseService';
 
 const ALL_EGYPT_GRADES = [
   'الصف الأول الإعدادي',
@@ -237,7 +237,7 @@ export const TeacherGroupsPage: React.FC = () => {
     { id: 'slot-2', day: 'Tuesday', dayArabic: 'الثلاثاء', startTime: '16:30', endTime: '18:30' },
   ]);
 
-  // Fetch real groups and students from Firestore
+  // Fetch real groups and students from Supabase
   useEffect(() => {
     async function loadData() {
       const teacherId = user?.uid || 'teacher-1';
@@ -346,7 +346,7 @@ export const TeacherGroupsPage: React.FC = () => {
         commissionRate,
       });
     } catch (createErr) {
-      console.warn('Firestore createGroup fallback:', createErr);
+      console.warn('Supabase createGroup fallback:', createErr);
     }
 
     setGroups([...groups, newGroup]);

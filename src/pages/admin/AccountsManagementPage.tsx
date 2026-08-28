@@ -33,7 +33,7 @@ import { AdminUserAccount, AccountRole, AccountBadgeType } from '../../types';
 import { AccountBadge } from '../../components/admin/AccountBadge';
 import { getCleanAvatarUrl, optimizeProfileImage } from '../../lib/avatarHelper';
 import { LocationSelector } from '../../components/common/LocationSelector';
-import { dbUpdateAccountFullProfile } from '../../lib/adminFirestoreService';
+import { dbUpdateAccountFullProfile } from '../../lib/adminSupabaseService';
 
 interface AccountsManagementPageProps {
   accounts: AdminUserAccount[];
@@ -815,7 +815,7 @@ export const AccountsManagementPage: React.FC<AccountsManagementPageProps> = ({
                   ) : (
                     <>
                       <Save className="w-4 h-4" />
-                      <span>حفظ التعديلات في Firestore</span>
+                      <span>حفظ التعديلات في Supabase</span>
                     </>
                   )}
                 </button>

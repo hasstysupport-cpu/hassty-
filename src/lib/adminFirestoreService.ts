@@ -9,8 +9,8 @@ import {
   query, 
   orderBy,
   writeBatch
-} from 'firebase/firestore';
-import { db } from './firebase';
+} from './firestoreCompat';
+import { db } from './firestoreCompat';
 import { 
   AdminUserAccount, 
   TeacherVerificationRequest, 
@@ -31,14 +31,14 @@ const REPORTS_COLLECTION = 'safety_reports';
 const COMMISSIONS_COLLECTION = 'commissions';
 
 /**
- * Initializes Firestore collections with structured real-world data if they are empty.
+ * Initializes Supabase collections with structured real-world data if they are empty.
  */
 export async function seedAdminDatabaseIfEmpty() {
   // Real database mode - no automatic mock seeding
 }
 
 /**
- * Subscribes to real-time Users collection in Firestore
+ * Subscribes to real-time Users collection in Supabase
  */
 export function subscribeToUsers(
   callback: (users: AdminUserAccount[]) => void,
@@ -75,14 +75,14 @@ export function subscribeToUsers(
     });
     callback(accounts);
   }, (err) => {
-    console.error('Firestore subscribeToUsers error:', err);
+    console.error('Supabase subscribeToUsers error:', err);
     if (onError) onError(err);
     callback([]);
   });
 }
 
 /**
- * Subscribes to real-time Verification Requests in Firestore
+ * Subscribes to real-time Verification Requests in Supabase
  */
 export function subscribeToVerifications(
   callback: (reqs: TeacherVerificationRequest[]) => void,
@@ -100,14 +100,14 @@ export function subscribeToVerifications(
     }));
     callback(list);
   }, (err) => {
-    console.error('Firestore subscribeToVerifications error:', err);
+    console.error('Supabase subscribeToVerifications error:', err);
     if (onError) onError(err);
     callback([]);
   });
 }
 
 /**
- * Subscribes to real-time Safety Reports in Firestore
+ * Subscribes to real-time Safety Reports in Supabase
  */
 export function subscribeToReports(
   callback: (reps: AdminSafetyReport[]) => void,
@@ -125,14 +125,14 @@ export function subscribeToReports(
     }));
     callback(list);
   }, (err) => {
-    console.error('Firestore subscribeToReports error:', err);
+    console.error('Supabase subscribeToReports error:', err);
     if (onError) onError(err);
     callback([]);
   });
 }
 
 /**
- * Subscribes to real-time Commission records in Firestore
+ * Subscribes to real-time Commission records in Supabase
  */
 export function subscribeToCommissions(
   callback: (comms: TeacherCommissionTrackingItem[]) => void,
@@ -150,7 +150,7 @@ export function subscribeToCommissions(
     }));
     callback(list);
   }, (err) => {
-    console.error('Firestore subscribeToCommissions error:', err);
+    console.error('Supabase subscribeToCommissions error:', err);
     if (onError) onError(err);
     callback([]);
   });

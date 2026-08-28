@@ -22,8 +22,8 @@ import {
   ChevronLeft,
   MessageSquareQuote
 } from 'lucide-react';
-import { applyActionCode, sendEmailVerification, reload } from 'firebase/auth';
-import { auth } from '../lib/firebase';
+import { sendEmailVerification, reload, verifyOtp } from '../lib/supabaseAuthCompat';
+import { auth } from '../lib/supabaseAuthCompat';
 import { useAuth } from '../lib/AuthContext';
 import { 
   sendServerVerificationOtp, 
@@ -48,7 +48,7 @@ export const VerifyEmailPage: React.FC<VerifyEmailPageProps> = ({
   const [activationLink, setActivationLink] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isSending, setIsSending] = useState<boolean>(false);
-  const [isFirebaseChecking, setIsFirebaseChecking] = useState<boolean>(false);
+  const [isSupabaseChecking, setIsSupabaseChecking] = useState<boolean>(false);
   const [isWhatsAppSending, setIsWhatsAppSending] = useState<boolean>(false);
   const [resendTimer, setResendTimer] = useState<number>(60);
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -76,7 +76,7 @@ export const VerifyEmailPage: React.FC<VerifyEmailPageProps> = ({
   const formatErrorMsg = (err: any): string => {
     const raw = typeof err === 'string' ? err : err?.message || '';
     if (raw.includes('405') || raw.includes('Method Not Allowed')) {
-      return 'تم تفعيل كود الأمان بنجاح. يمكنك إدخال الرمز المكون من 6 أرقام أو استخدام رابط Firebase الرسمي.';
+      return 'تم تفعيل كود الأمان بنجاح. يمكنك إدخال الرمز المكون من 6 أرقام أو استخدام رابط Supabase الرسمي.';
     }
     if (raw.includes('network') || raw.includes('Failed to fetch')) {
       return 'تعذر الاتصال، يرجى التحقق من اتصال الإنترنت ثم إعادة المحاولة.';
@@ -85,12 +85,12 @@ export const VerifyEmailPage: React.FC<VerifyEmailPageProps> = ({
       return 'تم طلب عدة رموز مؤخراً. يرجى الانتظار دقيقة واحدة ثم إعادة المحاولة.';
     }
     if (raw.includes('invalid-action-code') || raw.includes('expired-action-code')) {
-      return 'رابط تفعيل Firebase منتهي الصلاحية أو تم استخدامه سابقاً. يمكنك طلب رابط جديد.';
+      return 'رابط تفعيل Supabase منتهي الصلاحية أو تم استخدامه سابقاً. يمكنك طلب رابط جديد.';
     }
     return raw || 'تعذر استكمال العملية، يرجى إعادة المحاولة.';
   };
 
-  // 1. Check URL parameters for direct activation link or Firebase Action code (?mode=verifyEmail&oobCode=...)
+  // 1. Check URL parameters for direct activation link or Supabase Action code (?mode=verifyEmail&oobCode=...)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
@@ -98,36 +98,42 @@ export const VerifyEmailPage: React.FC<VerifyEmailPageProps> = ({
     const oobCode = params.get('oobCode');
     const urlCode = params.get('code') || params.get('otp') || params.get('c');
 
-    // Handle Official Firebase Auth Action Link
+    // Handle Supabase email confirmation token hash
     if (oobCode && (mode === 'verifyEmail' || !mode)) {
-      async function handleFirebaseActionCode(code: string) {
+      // Legacy Supabase links are intentionally no longer trusted.
+      setErrorMessage('رابط التفعيل القديم لم يعد صالحًا. افتح رسالة التفعيل الجديدة من Supabase.');
+    }
+
+    const tokenHash = params.get('token_hash');
+    const tokenType = params.get('type') || 'email';
+    if (tokenHash) {
+      async function handleSupabaseToken(token: string) {
         setIsLoading(true);
         setErrorMessage('');
         try {
-          await applyActionCode(auth, code);
-          if (auth.currentUser) {
-            await reload(auth.currentUser);
-          }
+          await verifyOtp({ token_hash: token, type: tokenType });
+          await reload(auth.currentUser);
           if (user?.uid || auth.currentUser?.uid) {
             await markEmailAsVerified(user?.uid || auth.currentUser!.uid);
           }
           setIsVerified(true);
-          setSuccessMessage('🎉 تم تأكيد وتفعيل بريدك الإلكتروني بنجاح عبر Firebase!');
+          setSuccessMessage('🎉 تم تأكيد وتفعيل بريدك الإلكتروني بنجاح عبر Supabase!');
+          window.history.replaceState({}, document.title, '/verify-email');
           setTimeout(() => {
             if (onVerificationSuccess) onVerificationSuccess(targetRole);
             else if (targetRole === 'student') onNavigate('/student/dashboard');
             else if (targetRole === 'parent') onNavigate('/parent/dashboard');
             else if (targetRole === 'teacher') onNavigate('/teacher/dashboard');
             else onNavigate('/');
-          }, 1200);
-        } catch (fbErr: any) {
-          console.warn('Firebase applyActionCode error:', fbErr);
-          setErrorMessage(formatErrorMsg(fbErr));
+          }, 900);
+        } catch (err: any) {
+          console.warn('Supabase email verification error:', err);
+          setErrorMessage(formatErrorMsg(err));
         } finally {
           setIsLoading(false);
         }
       }
-      handleFirebaseActionCode(oobCode);
+      handleSupabaseToken(tokenHash);
       return;
     }
 
@@ -148,13 +154,13 @@ export const VerifyEmailPage: React.FC<VerifyEmailPageProps> = ({
       setIsSending(true);
       setErrorMessage('');
 
-      // If Firebase Auth currentUser is already marked verified, sync immediately
+      // If Supabase Auth currentUser is already marked verified, sync immediately
       if (auth.currentUser?.emailVerified) {
         if (user?.uid) {
           await markEmailAsVerified(user.uid);
         }
         setIsVerified(true);
-        setSuccessMessage('حسابك موثق بالفعل عبر Firebase!');
+        setSuccessMessage('حسابك موثق بالفعل عبر Supabase!');
         setIsSending(false);
         return;
       }
@@ -257,10 +263,10 @@ export const VerifyEmailPage: React.FC<VerifyEmailPageProps> = ({
     }
   };
 
-  // Send Direct Firebase Verification Email
-  const handleSendFirebaseVerificationLink = async () => {
-    if (!auth.currentUser) {
-      setErrorMessage('يرجى التأكد من تسجيل الدخول بحسابك لإرسال رابط تفعيل Firebase.');
+  // Send Direct Supabase Verification Email
+  const handleSendSupabaseVerificationLink = async () => {
+    if (!targetEmail) {
+      setErrorMessage('لم يتم العثور على البريد الإلكتروني للحساب.');
       return;
     }
     setIsSending(true);
@@ -268,19 +274,15 @@ export const VerifyEmailPage: React.FC<VerifyEmailPageProps> = ({
     setSuccessMessage('');
     try {
       const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://hassty.vercel.app';
-      const actionCodeSettings = {
-        url: `${currentOrigin}/verify-email?email=${encodeURIComponent(auth.currentUser.email || '')}`,
-        handleCodeInApp: true,
-      };
-      await sendEmailVerification(auth.currentUser, actionCodeSettings);
-      setSuccessMessage('✓ تم إرسال رابط التفعيل الرسمي من Firebase إلى بريدك الإلكتروني بنجاح.');
+      await sendEmailVerification({ email: targetEmail });
+      setSuccessMessage('✓ تم إرسال رابط التفعيل الرسمي من Supabase إلى بريدك الإلكتروني بنجاح.');
       setResendTimer(60);
     } catch (err: any) {
-      console.warn('Firebase sendEmailVerification error:', err);
-      // Fallback without actionCodeSettings if domain not whitelisted in Firebase Auth
+      console.warn('Supabase sendEmailVerification error:', err);
+      // Fallback without actionCodeSettings if domain not whitelisted in Supabase Auth
       try {
-        await sendEmailVerification(auth.currentUser);
-        setSuccessMessage('✓ تم إرسال رابط التفعيل الرسمي من Firebase إلى بريدك الإلكتروني بنجاح.');
+        await sendEmailVerification({ email: targetEmail });
+        setSuccessMessage('✓ تم إرسال رابط التفعيل الرسمي من Supabase إلى بريدك الإلكتروني بنجاح.');
         setResendTimer(60);
       } catch (fallbackErr: any) {
         setErrorMessage(formatErrorMsg(fallbackErr));
@@ -290,13 +292,13 @@ export const VerifyEmailPage: React.FC<VerifyEmailPageProps> = ({
     }
   };
 
-  // Check if User Verified in Firebase
-  const handleCheckFirebaseStatus = async () => {
+  // Check if User Verified in Supabase
+  const handleCheckSupabaseStatus = async () => {
     if (!auth.currentUser) {
-      setErrorMessage('لا يوجد مستخدم مسجل حالياً في Firebase');
+      setErrorMessage('لا يوجد مستخدم مسجل حالياً في Supabase');
       return;
     }
-    setIsFirebaseChecking(true);
+    setIsSupabaseChecking(true);
     setErrorMessage('');
     try {
       await reload(auth.currentUser);
@@ -305,7 +307,7 @@ export const VerifyEmailPage: React.FC<VerifyEmailPageProps> = ({
           await markEmailAsVerified(user.uid);
         }
         setIsVerified(true);
-        setSuccessMessage('✓ تم التحقق بنجاح من بريدك عبر Firebase!');
+        setSuccessMessage('✓ تم التحقق بنجاح من بريدك عبر Supabase!');
         setTimeout(() => {
           if (onVerificationSuccess) onVerificationSuccess(targetRole);
           else if (targetRole === 'student') onNavigate('/student/dashboard');
@@ -314,12 +316,12 @@ export const VerifyEmailPage: React.FC<VerifyEmailPageProps> = ({
           else onNavigate('/');
         }, 900);
       } else {
-        setErrorMessage('لم يتم تأكيد البريد بعد في Firebase. اضغط على الرابط في بريدك ثم اضغط فحص مرة أخرى.');
+        setErrorMessage('لم يتم تأكيد البريد بعد في Supabase. اضغط على الرابط في بريدك ثم اضغط فحص مرة أخرى.');
       }
     } catch (err: any) {
-      setErrorMessage('تعذر الاتصال بـ Firebase للتحقق.');
+      setErrorMessage('تعذر الاتصال بـ Supabase للتحقق.');
     } finally {
-      setIsFirebaseChecking(false);
+      setIsSupabaseChecking(false);
     }
   };
 
@@ -351,12 +353,12 @@ export const VerifyEmailPage: React.FC<VerifyEmailPageProps> = ({
     setSuccessMessage('');
     setOtpDigits(['', '', '', '', '', '']);
 
-    // Attempt Firebase verification send in parallel
+    // Attempt Supabase verification send in parallel
     if (auth.currentUser) {
       try {
-        await sendEmailVerification(auth.currentUser);
+        await sendEmailVerification({ email: targetEmail });
       } catch (e) {
-        console.warn('Firebase resend warning:', e);
+        console.warn('Supabase resend warning:', e);
       }
     }
 
@@ -413,7 +415,7 @@ export const VerifyEmailPage: React.FC<VerifyEmailPageProps> = ({
           setStoredToken(res.token);
         }
 
-        // Update Firestore & User Session state
+        // Update Supabase & User Session state
         if (user?.uid) {
           await markEmailAsVerified(user.uid);
         }
@@ -683,7 +685,7 @@ export const VerifyEmailPage: React.FC<VerifyEmailPageProps> = ({
             {/* List of Verification Services Cards */}
             <div className="space-y-3.5">
               
-              {/* Option 1: Official Firebase Verification Link */}
+              {/* Option 1: Official Supabase Verification Link */}
               <div className="p-4 bg-amber-50/70 hover:bg-amber-50 border border-amber-200/90 rounded-2xl transition-all space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -692,7 +694,7 @@ export const VerifyEmailPage: React.FC<VerifyEmailPageProps> = ({
                     </div>
                     <div>
                       <h3 className="text-xs font-black text-amber-950">
-                        رابط التفعيل المباشر من Firebase Auth
+                        رابط التفعيل المباشر من Supabase Auth
                       </h3>
                       <p className="text-[11px] text-amber-800">
                         تفعيل بنقرة واحدة من رسالة البريد الإلكتروني دون الحاجة لكتابة كود.
@@ -707,26 +709,26 @@ export const VerifyEmailPage: React.FC<VerifyEmailPageProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                   <button
                     type="button"
-                    onClick={handleSendFirebaseVerificationLink}
+                    onClick={handleSendSupabaseVerificationLink}
                     disabled={isSending || isVerified}
                     className="py-2.5 px-3 bg-white hover:bg-amber-100/80 border border-amber-300 text-amber-950 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 shadow-2xs active:scale-98"
                   >
                     {isSending ? <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-600" /> : <Send className="w-3.5 h-3.5 text-amber-600" />}
-                    <span>إرسال رابط Firebase الرسمي</span>
+                    <span>إرسال رابط Supabase الرسمي</span>
                   </button>
 
                   <button
                     type="button"
-                    onClick={handleCheckFirebaseStatus}
-                    disabled={isFirebaseChecking || isVerified}
+                    onClick={handleCheckSupabaseStatus}
+                    disabled={isSupabaseChecking || isVerified}
                     className="py-2.5 px-3 bg-white hover:bg-amber-100/80 border border-amber-300 text-amber-950 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 shadow-2xs active:scale-98"
                   >
-                    {isFirebaseChecking ? (
+                    {isSupabaseChecking ? (
                       <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-600" />
                     ) : (
                       <Check className="w-3.5 h-3.5 text-emerald-600" />
                     )}
-                    <span>فحص حالة البريد بـ Firebase</span>
+                    <span>فحص حالة البريد بـ Supabase</span>
                   </button>
                 </div>
               </div>

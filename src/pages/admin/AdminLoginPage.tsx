@@ -16,9 +16,10 @@ import {
   LogIn,
   KeyRound
 } from 'lucide-react';
-import { signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { auth, db } from '../../lib/firebase';
+import { signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider } from '../../lib/supabaseAuthCompat';
+import { doc, setDoc, getDoc } from '../../lib/supabaseCompat';
+import { db } from '../../lib/supabaseCompat';
+import { auth } from '../../lib/supabaseAuthCompat';
 import {
   OFFICIAL_ADMIN_EMAIL,
   SECRET_ADMIN_ROUTE,
@@ -83,7 +84,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
               lastLogin: new Date().toISOString(),
             }, { merge: true });
           } catch (dbErr) {
-            console.warn('Admin Firestore record save notice:', dbErr);
+            console.warn('Admin Supabase record save notice:', dbErr);
           }
 
           saveAdminSession({
@@ -168,12 +169,22 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
 
+      const isMobile =
+        typeof navigator !== 'undefined' &&
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+      if (isMobile) {
+        await signInWithRedirect(auth, provider);
+        return;
+      }
+
       let result;
       try {
         result = await signInWithPopup(auth, provider);
       } catch (popupErr: any) {
         if (
           popupErr?.code === 'auth/popup-blocked' ||
+          popupErr?.code === 'auth/popup-closed-by-user' ||
           popupErr?.code === 'auth/cancelled-popup-request'
         ) {
           await signInWithRedirect(auth, provider);
@@ -187,7 +198,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
       const adminName = user.displayName || 'مدير المنصة';
       const adminPhoto = user.photoURL || '';
 
-      // Create or update admin account in Firestore (admin_users & users collections)
+      // Create or update admin account in Supabase (admin_users & users collections)
       try {
         await setDoc(doc(db, 'admin_users', user.uid), {
           uid: user.uid,
@@ -211,7 +222,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
           lastLogin: new Date().toISOString(),
         }, { merge: true });
       } catch (dbErr) {
-        console.warn('Admin Firestore record save notice:', dbErr);
+        console.warn('Admin Supabase record save notice:', dbErr);
       }
 
       // Save admin session in storage
@@ -232,7 +243,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
       if (err?.code === 'auth/popup-closed-by-user') {
         setErrorMessage('تم إغلاق نافذة تسجيل الدخول قبل الاكتمال');
       } else if (err?.code === 'auth/unauthorized-domain') {
-        setErrorMessage('نطاق التطبيق يحتاج إضافة في Firebase Auth Console (Authorized Domains). يمكنك أيضاً استخدام كود التحقق المرسل للبريد.');
+        setErrorMessage('نطاق التطبيق يحتاج إضافة في Supabase Auth Console (Authorized Domains). يمكنك أيضاً استخدام كود التحقق المرسل للبريد.');
       } else if (err?.code === 'auth/popup-blocked') {
         setErrorMessage('المتصفح حظر النافذة المنبثقة. يرجى السماح بالنوافذ المنبثقة أو فتح التطبيق في تبويب جديد.');
       } else {

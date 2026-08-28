@@ -84,7 +84,7 @@ export const StudentProfilePage: React.FC = () => {
   };
 
   /**
-   * Save All Profile Changes to Firestore
+   * Save All Profile Changes to Supabase
    */
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();

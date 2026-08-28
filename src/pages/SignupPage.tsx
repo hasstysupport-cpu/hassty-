@@ -124,7 +124,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({
       if (storedErr) {
         const parsed = JSON.parse(storedErr);
         if (parsed.code === 'auth/unauthorized-domain') {
-          setErrorMessage('نطاق الموقع غير معتمد في Firebase Auth Authorized Domains.');
+          setErrorMessage('نطاق الموقع غير معتمد في Supabase Auth Authorized Domains.');
         } else {
           setErrorMessage(parsed.message || 'تعذر استكمال تسجيل الدخول عبر Google.');
         }
@@ -164,7 +164,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({
       if (err?.code === 'auth/popup-closed-by-user') {
         setErrorMessage('تم إغلاق نافذة تسجيل الدخول عبر Google قبل إكمال التسجيل.');
       } else if (err?.code === 'auth/unauthorized-domain') {
-        setErrorMessage('نطاق الموقع يحتاج إلى إدراجه في Firebase Console (Authorized Domains). يمكنك التسجيل بالبريد وكلمة المرور.');
+        setErrorMessage('نطاق الموقع يحتاج إلى إدراجه في Supabase Console (Authorized Domains). يمكنك التسجيل بالبريد وكلمة المرور.');
       } else if (err?.code === 'auth/popup-blocked') {
         setErrorMessage('المتصفح حظر النافذة المنبثقة. يرجى السماح بالنوافذ المنبثقة.');
       } else {
@@ -228,7 +228,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({
   };
 
   /**
-   * Submit Real Firebase Email/Password & Profile Registration
+   * Submit Real Supabase Email/Password & Profile Registration
    */
   const handleSubmitRegistration = async (e: React.FormEvent) => {
     e.preventDefault();

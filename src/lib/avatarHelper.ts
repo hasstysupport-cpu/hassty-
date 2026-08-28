@@ -46,7 +46,7 @@ export function getCleanAvatarUrl(avatarUrl?: string | null, role: string = 'stu
 
 /**
  * Optimizes an uploaded image file into a compressed Base64 Data URL (e.g. 400x400 JPEG)
- * Suitable for instant display, offline storage, and direct saving in Firestore.
+ * Suitable for instant display, offline storage, and direct saving in Supabase.
  */
 export async function optimizeProfileImage(file: File, maxSize: number = 400): Promise<string> {
   return new Promise((resolve, reject) => {

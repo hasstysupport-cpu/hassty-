@@ -3,8 +3,8 @@ import { createPortal } from 'react-dom';
 import { X, Search, MapPin, Star, ShieldCheck, Check, QrCode, Calendar, Users, Phone, ArrowLeft, Loader2 } from 'lucide-react';
 import { EGYPT_GOVERNORATES, SUBJECTS_DATA } from '../data/mockData';
 import { TutorProfile } from '../types';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { collection, query, where, getDocs } from '../lib/supabaseCompat';
+import { db } from '../lib/supabaseCompat';
 
 interface TutorDiscoveryModalProps {
   isOpen: boolean;
@@ -37,7 +37,7 @@ export const TutorDiscoveryModal: React.FC<TutorDiscoveryModalProps> = ({
     if (initialGovernorate) setSelectedGovernorate(initialGovernorate);
   }, [initialSubject, initialGovernorate]);
 
-  // Load teachers from Firestore
+  // Load teachers from Supabase
   useEffect(() => {
     if (!isOpen) return;
     async function loadTeachers() {

@@ -22,8 +22,8 @@ import {
 import { TutorProfile } from '../types';
 import { Badge } from '../components/common/Badge';
 import { BookingModal } from '../components/BookingModal';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { doc, getDoc } from '../lib/supabaseCompat';
+import { db } from '../lib/supabaseCompat';
 
 interface TeacherProfilePageProps {
   tutorId: string;

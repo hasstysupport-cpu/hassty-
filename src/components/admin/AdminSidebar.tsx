@@ -172,7 +172,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
               <div className="p-2 rounded-lg bg-blue-950/80 border border-blue-800 flex items-center gap-1.5 text-emerald-400 font-bold">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                 <Database className="w-3 h-3 text-emerald-400" />
-                <span className="truncate">Firestore: {dbConnectionStatus === 'connected' ? 'متصل' : 'جار الاتصال'}</span>
+                <span className="truncate">Supabase: {dbConnectionStatus === 'connected' ? 'متصل' : 'جار الاتصال'}</span>
               </div>
               <div className="p-2 rounded-lg bg-blue-950/80 border border-blue-800 flex items-center gap-1.5 text-blue-300 font-mono">
                 <Lock className="w-3 h-3 text-emerald-400" />
