@@ -75,6 +75,7 @@ export async function getDoc(ref: any): Promise<SupabaseDoc> {
 
   if (isSupabaseConfigured && supabase) {
     try {
+      // 1. Try app_documents
       const { data, error } = await supabase
         .from('app_documents')
         .select('*')
@@ -82,12 +83,40 @@ export async function getDoc(ref: any): Promise<SupabaseDoc> {
         .eq('document_id', docId)
         .maybeSingle();
 
-      if (!error && data) {
-        // update local cache
+      if (!error && data && data.data) {
         const local = getLocalCollection(collName);
-        local[docId] = data.data || {};
+        local[docId] = data.data;
         saveLocalCollection(collName, local);
         return makeDoc(data);
+      }
+
+      // 2. If 'users', try 'profiles' table directly
+      if (collName === 'users') {
+        const { data: prof, error: profErr } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', docId)
+          .maybeSingle();
+
+        if (!profErr && prof) {
+          const mappedUser = {
+            id: prof.id,
+            name: prof.full_name || prof.name || 'مستخدم حِصّتي',
+            phone: prof.phone || '',
+            email: prof.email || '',
+            role: prof.role || 'student',
+            governorate: prof.governorate || 'القاهرة',
+            area: prof.city || prof.area || '',
+            grade: prof.grade || '',
+            qrCode: prof.qr_code || '',
+            avatarUrl: prof.avatar_url || '',
+            createdAt: prof.created_at,
+          };
+          const local = getLocalCollection(collName);
+          local[docId] = mappedUser;
+          saveLocalCollection(collName, local);
+          return makeDoc({ document_id: prof.id, data: mappedUser });
+        }
       }
     } catch (e) {
       console.warn('Supabase getDoc fallback to local cache:', e);
@@ -110,51 +139,92 @@ export async function getDocs(
 ): Promise<{ docs: SupabaseDoc[]; empty: boolean; forEach: (fn: (d: SupabaseDoc) => void) => void }> {
   const queryObj: SupabaseQuery = q.collectionName ? q : emptyQuery(q.collectionName || q.collection_name);
   const collName = queryObj.collectionName;
-  let rows: any[] = [];
+  let rowsMap = new Map<string, any>();
 
   if (isSupabaseConfigured && supabase) {
     try {
+      // 1. Fetch from app_documents
       const { data, error } = await supabase
         .from('app_documents')
         .select('*')
         .eq('collection_name', collName);
 
-      if (!error && data) {
-        rows = data;
-        // Sync local cache
-        const local: Record<string, any> = {};
+      if (!error && data && data.length > 0) {
         for (const row of data) {
-          if (row.document_id) local[row.document_id] = row.data || {};
+          if (row.document_id) {
+            rowsMap.set(row.document_id, {
+              document_id: row.document_id,
+              collection_name: collName,
+              data: row.data || {},
+              created_at: row.created_at,
+            });
+          }
         }
-        if (Object.keys(local).length > 0) {
-          saveLocalCollection(collName, local);
+      }
+
+      // 2. Fetch from native relational table if applicable
+      if (collName === 'users') {
+        const { data: profs, error: profErr } = await supabase
+          .from('profiles')
+          .select('*');
+
+        if (!profErr && profs && profs.length > 0) {
+          for (const p of profs) {
+            const existing = rowsMap.get(p.id);
+            const mapped = {
+              id: p.id,
+              name: p.full_name || p.name || existing?.data?.name || 'مستخدم',
+              phone: p.phone || existing?.data?.phone || '',
+              email: p.email || existing?.data?.email || '',
+              role: p.role || existing?.data?.role || 'student',
+              grade: p.grade || existing?.data?.grade || '',
+              governorate: p.governorate || existing?.data?.governorate || 'القاهرة',
+              area: p.city || p.area || existing?.data?.area || '',
+              qrCode: p.qr_code || existing?.data?.qrCode || '',
+              avatarUrl: p.avatar_url || existing?.data?.avatarUrl || '',
+              createdAt: p.created_at || existing?.data?.createdAt || new Date().toISOString(),
+              status: existing?.data?.status || 'active',
+              badge: existing?.data?.badge || 'none',
+              studentsCount: existing?.data?.studentsCount || 0,
+              totalRevenue: existing?.data?.totalRevenue || 0,
+              parentPhone: existing?.data?.parentPhone || '',
+            };
+            rowsMap.set(p.id, {
+              document_id: p.id,
+              collection_name: 'users',
+              data: mapped,
+              created_at: p.created_at,
+            });
+          }
         }
-      } else {
-        // Fallback to local
-        const local = getLocalCollection(collName);
-        rows = Object.entries(local).map(([id, val]) => ({
-          document_id: id,
-          collection_name: collName,
-          data: val,
-        }));
+      }
+
+      // Sync local cache
+      const local: Record<string, any> = {};
+      rowsMap.forEach((v, k) => {
+        local[k] = v.data;
+      });
+      if (Object.keys(local).length > 0) {
+        saveLocalCollection(collName, local);
       }
     } catch (e) {
       console.warn('Supabase getDocs exception, using local:', e);
-      const local = getLocalCollection(collName);
-      rows = Object.entries(local).map(([id, val]) => ({
+    }
+  }
+
+  // If no rows from Supabase, merge local cache
+  if (rowsMap.size === 0) {
+    const local = getLocalCollection(collName);
+    Object.entries(local).forEach(([id, val]) => {
+      rowsMap.set(id, {
         document_id: id,
         collection_name: collName,
         data: val,
-      }));
-    }
-  } else {
-    const local = getLocalCollection(collName);
-    rows = Object.entries(local).map(([id, val]) => ({
-      document_id: id,
-      collection_name: collName,
-      data: val,
-    }));
+      });
+    });
   }
+
+  let rows = Array.from(rowsMap.values());
 
   for (const f of queryObj.filters) {
     rows = rows.filter((r: any) => {
@@ -190,16 +260,39 @@ export async function setDoc(ref: any, payload: any, options?: { merge?: boolean
   // 2. Sync to Supabase if configured
   if (isSupabaseConfigured && supabase) {
     try {
+      // Upsert into app_documents
       await supabase.from('app_documents').upsert(
         {
           collection_name: collName,
           document_id: docId,
           data,
+          updated_at: new Date().toISOString(),
         },
         { onConflict: 'collection_name,document_id' }
       );
+
+      // If 'users', also sync to 'profiles' table
+      if (collName === 'users') {
+        const phone = data.phone || `010${Math.floor(10000000 + Math.random() * 90000000)}`;
+        await supabase.from('profiles').upsert(
+          {
+            id: docId,
+            full_name: data.name || 'مستخدم',
+            phone,
+            email: data.email || null,
+            role: data.role || 'student',
+            governorate: data.governorate || 'القاهرة',
+            city: data.area || '',
+            grade: data.grade || null,
+            qr_code: data.qrCode || null,
+            avatar_url: data.avatarUrl || null,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'id' }
+        );
+      }
     } catch (e) {
-      console.warn('Supabase setDoc failed, local copy kept:', e);
+      console.warn('Supabase setDoc sync error, local copy saved:', e);
     }
   }
 }
@@ -269,9 +362,24 @@ export function onSnapshot(
         )
         .subscribe();
 
+      let profilesChannel: any = null;
+      if (collName === 'users') {
+        profilesChannel = supabase
+          .channel(`compat_profiles:${Date.now()}`)
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'profiles' },
+            () => {
+              load();
+            }
+          )
+          .subscribe();
+      }
+
       return () => {
         cancelled = true;
         if (channel && supabase) supabase.removeChannel(channel);
+        if (profilesChannel && supabase) supabase.removeChannel(profilesChannel);
       };
     } catch (e) {
       console.warn('Realtime channel creation warning:', e);
