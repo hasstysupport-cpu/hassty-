@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   QrCode,
   Users,
@@ -116,6 +116,24 @@ export const SignupPage: React.FC<SignupPageProps> = ({
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Check if a redirect error occurred
+  useEffect(() => {
+    try {
+      const storedErr = localStorage.getItem('hassty_google_auth_error');
+      if (storedErr) {
+        const parsed = JSON.parse(storedErr);
+        if (parsed.code === 'auth/unauthorized-domain') {
+          setErrorMessage('نطاق الموقع غير معتمد في Firebase Auth Authorized Domains.');
+        } else {
+          setErrorMessage(parsed.message || 'تعذر استكمال تسجيل الدخول عبر Google.');
+        }
+        localStorage.removeItem('hassty_google_auth_error');
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   const handleStep1Select = (selected: AccountRole) => {
     setRole(selected);

@@ -95,6 +95,24 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     }
   }, [authStep]);
 
+  // Check if a redirect error occurred
+  useEffect(() => {
+    try {
+      const storedErr = localStorage.getItem('hassty_google_auth_error');
+      if (storedErr) {
+        const parsed = JSON.parse(storedErr);
+        if (parsed.code === 'auth/unauthorized-domain') {
+          setErrorMessage('نطاق الموقع غير معتمد في Firebase Auth Authorized Domains.');
+        } else {
+          setErrorMessage(parsed.message || 'تعذر استكمال تسجيل الدخول عبر Google.');
+        }
+        localStorage.removeItem('hassty_google_auth_error');
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
   /**
    * Handle One-Click Google Login
    */

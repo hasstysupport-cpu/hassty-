@@ -253,52 +253,65 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Real-time Firebase Auth state listener & redirect handler
   useEffect(() => {
-      // Process the result after Google redirects back to this page. This is the
-      // reliable fallback for browsers that close or block the auth popup.
-      getRedirectResult(auth)
-        .then(async (res) => {
-          if (res && res.user) {
-            console.log('Firebase Redirect Sign-in completed:', res.user.email);
-            const { role: pendingRole, extraData: pendingExtra } = readPendingGoogleAuth();
-            const session = await syncGoogleUserToFirestore(res.user, pendingRole, pendingExtra);
-            setUser(session);
-            localStorage.setItem(LOCAL_STORAGE_SESSION_KEY, JSON.stringify(session));
-            localStorage.removeItem(GOOGLE_AUTH_ERROR_KEY);
-            clearPendingGoogleAuth();
-          }
-        })
-        .catch((err) => {
-          console.warn('Redirect result notice:', err);
-          localStorage.setItem(GOOGLE_AUTH_ERROR_KEY, JSON.stringify({
-            code: err?.code || 'auth/unknown-error',
-            message: err?.message || 'Google sign-in could not be completed.',
-          }));
-          clearPendingGoogleAuth();
-        });
+    let isSubscribed = true;
 
-        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+    async function handleAuthRedirect() {
+      try {
+        const res = await getRedirectResult(auth);
+        if (res && res.user && isSubscribed) {
+          console.log('Firebase Redirect Sign-in completed:', res.user.email);
+          const { role: pendingRole, extraData: pendingExtra } = readPendingGoogleAuth();
+          const session = await syncGoogleUserToFirestore(res.user, pendingRole, pendingExtra);
+          setUser(session);
+          localStorage.setItem(LOCAL_STORAGE_SESSION_KEY, JSON.stringify(session));
+          localStorage.removeItem(GOOGLE_AUTH_ERROR_KEY);
+          clearPendingGoogleAuth();
+        }
+      } catch (err: any) {
+        console.warn('Redirect result notice:', err);
+        if (isSubscribed) {
+          localStorage.setItem(
+            GOOGLE_AUTH_ERROR_KEY,
+            JSON.stringify({
+              code: err?.code || 'auth/unknown-error',
+              message: err?.message || 'تعذر استكمال تسجيل الدخول عبر Google.',
+            })
+          );
+          clearPendingGoogleAuth();
+        }
+      }
+    }
+
+    handleAuthRedirect();
+
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
-          try {
-            const { role: pendingRole, extraData: pendingExtra } = readPendingGoogleAuth();
-            const session = await syncGoogleUserToFirestore(firebaseUser, pendingRole, pendingExtra);
+        try {
+          const { role: pendingRole, extraData: pendingExtra } = readPendingGoogleAuth();
+          const session = await syncGoogleUserToFirestore(firebaseUser, pendingRole, pendingExtra);
+          if (isSubscribed) {
             setUser(session);
             localStorage.setItem(LOCAL_STORAGE_SESSION_KEY, JSON.stringify(session));
             localStorage.removeItem(GOOGLE_AUTH_ERROR_KEY);
             clearPendingGoogleAuth();
-          } catch (err) {
-            console.warn('Error syncing user profile on auth change:', err);
           }
-          } else {
+        } catch (err) {
+          console.warn('Error syncing user profile on auth change:', err);
+        }
+      } else {
         // User is signed out in Firebase Auth - verify if there is a saved local session
         const saved = localStorage.getItem(LOCAL_STORAGE_SESSION_KEY);
-        if (!saved) {
+        if (!saved && isSubscribed) {
           setUser(null);
         }
       }
-      setLoading(false);
+      if (isSubscribed) setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      isSubscribed = false;
+      unsubscribe();
+    };
   }, []);
 
   /**
@@ -741,47 +754,55 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * Google Authentication for Users, Teachers, Parents and Students
    */
   const loginWithGoogle = async (defaultRole: AccountRole = 'student', extraData: any = {}): Promise<UserSession> => {
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: 'select_account' });
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
 
-      // Preserve the selected role and signup details if Google needs a redirect.
-      localStorage.setItem(PENDING_GOOGLE_ROLE_KEY, defaultRole);
+    // Preserve the selected role and signup details if Google needs a redirect.
+    localStorage.setItem(PENDING_GOOGLE_ROLE_KEY, defaultRole);
+    localStorage.removeItem(GOOGLE_AUTH_ERROR_KEY);
+    if (extraData && Object.keys(extraData).length > 0) {
+      localStorage.setItem(PENDING_GOOGLE_EXTRA_KEY, JSON.stringify(extraData));
+    } else {
+      localStorage.removeItem(PENDING_GOOGLE_EXTRA_KEY);
+    }
+
+    const isMobile =
+      typeof navigator !== 'undefined' &&
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+    // On mobile devices, Chrome/Safari often block or detach popups. Direct redirect ensures 100% reliability.
+    if (isMobile) {
+      await signInWithRedirect(auth, provider);
+      return null as any;
+    }
+
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const session = await syncGoogleUserToFirestore(result.user, defaultRole, extraData);
+      setUser(session);
+      localStorage.setItem(LOCAL_STORAGE_SESSION_KEY, JSON.stringify(session));
       localStorage.removeItem(GOOGLE_AUTH_ERROR_KEY);
-      if (extraData && Object.keys(extraData).length > 0) {
-        localStorage.setItem(PENDING_GOOGLE_EXTRA_KEY, JSON.stringify(extraData));
-      } else {
-        localStorage.removeItem(PENDING_GOOGLE_EXTRA_KEY);
-      }
-
-      try {
-        const result = await signInWithPopup(auth, provider);
-        const session = await syncGoogleUserToFirestore(result.user, defaultRole, extraData);
-        setUser(session);
-        localStorage.setItem(LOCAL_STORAGE_SESSION_KEY, JSON.stringify(session));
-        localStorage.removeItem(GOOGLE_AUTH_ERROR_KEY);
-        clearPendingGoogleAuth();
-        return session;
-      } catch (popupErr: any) {
-        console.warn('signInWithPopup error, testing redirect:', popupErr);
-        if (
-          popupErr?.code === 'auth/popup-blocked' ||
-          popupErr?.code === 'auth/cancelled-popup-request' ||
-          popupErr?.code === 'auth/popup-closed-by-user' ||
-          popupErr?.code === 'auth/internal-error'
-        ) {
-          // In embedded browsers the popup may close right after account selection.
-          // Retry with redirect on every device instead of treating it as a cancel.
-          try {
-            await signInWithRedirect(auth, provider);
-            return null as any;
-          } catch (redirectErr) {
-            clearPendingGoogleAuth();
-            throw redirectErr;
-          }
+      clearPendingGoogleAuth();
+      return session;
+    } catch (popupErr: any) {
+      console.warn('signInWithPopup error, falling back to redirect:', popupErr);
+      if (
+        popupErr?.code === 'auth/popup-blocked' ||
+        popupErr?.code === 'auth/cancelled-popup-request' ||
+        popupErr?.code === 'auth/popup-closed-by-user' ||
+        popupErr?.code === 'auth/internal-error'
+      ) {
+        try {
+          await signInWithRedirect(auth, provider);
+          return null as any;
+        } catch (redirectErr) {
+          clearPendingGoogleAuth();
+          throw redirectErr;
         }
-        throw popupErr;
       }
-    };
+      throw popupErr;
+    }
+  };
     
   /**
    * Real Logout with Firebase Auth
