@@ -95,7 +95,7 @@ const LOCAL_STORAGE_SESSION_KEY = 'hassty_user_session';
     return { role, extraData };
     }
 
-/**
+    /**
  * Universal helper to sync Google authenticated user to Firestore and produce a valid UserSession
  */
 async function syncGoogleUserToFirestore(
@@ -253,7 +253,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Real-time Firebase Auth state listener & redirect handler
   useEffect(() => {
-    // Process the result after Google redirects back to this page. This is the
+      // Process the result after Google redirects back to this page. This is the
       // reliable fallback for browsers that close or block the auth popup.
       getRedirectResult(auth)
         .then(async (res) => {
@@ -278,24 +278,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
-        try {
-          const pendingRole = (localStorage.getItem('hassty_pending_role') as AccountRole) || 'student';
-          let pendingExtra: any = {};
           try {
-            const rawExtra = localStorage.getItem('hassty_pending_extra');
-            if (rawExtra) pendingExtra = JSON.parse(rawExtra);
-          } catch {
-            // ignore
+            const { role: pendingRole, extraData: pendingExtra } = readPendingGoogleAuth();
+            const session = await syncGoogleUserToFirestore(firebaseUser, pendingRole, pendingExtra);
+            setUser(session);
+            localStorage.setItem(LOCAL_STORAGE_SESSION_KEY, JSON.stringify(session));
+            localStorage.removeItem(GOOGLE_AUTH_ERROR_KEY);
+            clearPendingGoogleAuth();
+          } catch (err) {
+            console.warn('Error syncing user profile on auth change:', err);
           }
-
-          const session = await syncGoogleUserToFirestore(firebaseUser, pendingRole, pendingExtra);
-          setUser(session);
-          localStorage.setItem(LOCAL_STORAGE_SESSION_KEY, JSON.stringify(session));
-          clearPendingGoogleAuth();
-        } catch (err) {
-          console.warn('Error syncing user profile on auth change:', err);
-        }
-      } else {
+          } else {
         // User is signed out in Firebase Auth - verify if there is a saved local session
         const saved = localStorage.getItem(LOCAL_STORAGE_SESSION_KEY);
         if (!saved) {
@@ -748,24 +741,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * Google Authentication for Users, Teachers, Parents and Students
    */
   const loginWithGoogle = async (defaultRole: AccountRole = 'student', extraData: any = {}): Promise<UserSession> => {
-    const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: 'select_account' });
-    
-    // Store pending role & extra data in localStorage in case of redirect or page reload
-    localStorage.setItem('hassty_pending_role', defaultRole);
-    if (extraData && Object.keys(extraData).length > 0) {
-      localStorage.setItem('hassty_pending_extra', JSON.stringify(extraData));
-    }
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
 
-    try {
-      const result = await signInWithPopup(auth, provider);
-      const session = await syncGoogleUserToFirestore(result.user, defaultRole, extraData);
-      setUser(session);
-      localStorage.setItem(LOCAL_STORAGE_SESSION_KEY, JSON.stringify(session));
+      // Preserve the selected role and signup details if Google needs a redirect.
+      localStorage.setItem(PENDING_GOOGLE_ROLE_KEY, defaultRole);
       localStorage.removeItem(GOOGLE_AUTH_ERROR_KEY);
-      clearPendingGoogleAuth();
-      return session;
-    } catch (popupErr: any) {
+      if (extraData && Object.keys(extraData).length > 0) {
+        localStorage.setItem(PENDING_GOOGLE_EXTRA_KEY, JSON.stringify(extraData));
+      } else {
+        localStorage.removeItem(PENDING_GOOGLE_EXTRA_KEY);
+      }
+
+      try {
+        const result = await signInWithPopup(auth, provider);
+        const session = await syncGoogleUserToFirestore(result.user, defaultRole, extraData);
+        setUser(session);
+        localStorage.setItem(LOCAL_STORAGE_SESSION_KEY, JSON.stringify(session));
+        localStorage.removeItem(GOOGLE_AUTH_ERROR_KEY);
+        clearPendingGoogleAuth();
+        return session;
+      } catch (popupErr: any) {
         console.warn('signInWithPopup error, testing redirect:', popupErr);
         if (
           popupErr?.code === 'auth/popup-blocked' ||
@@ -773,8 +769,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           popupErr?.code === 'auth/popup-closed-by-user' ||
           popupErr?.code === 'auth/internal-error'
         ) {
-          // A popup can close immediately after Google account selection in an
-          // embedded browser. Retry with redirect on every device, not only mobile.
+          // In embedded browsers the popup may close right after account selection.
+          // Retry with redirect on every device instead of treating it as a cancel.
           try {
             await signInWithRedirect(auth, provider);
             return null as any;
@@ -785,8 +781,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         throw popupErr;
       }
-  };
-
+    };
+    
   /**
    * Real Logout with Firebase Auth
    */
