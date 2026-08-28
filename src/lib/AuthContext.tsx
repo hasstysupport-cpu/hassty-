@@ -74,6 +74,26 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const LOCAL_STORAGE_SESSION_KEY = 'hassty_user_session';
+    const PENDING_GOOGLE_ROLE_KEY = 'hassty_pending_role';
+    const PENDING_GOOGLE_EXTRA_KEY = 'hassty_pending_extra';
+    const GOOGLE_AUTH_ERROR_KEY = 'hassty_google_auth_error';
+
+    function clearPendingGoogleAuth() {
+    localStorage.removeItem(PENDING_GOOGLE_ROLE_KEY);
+    localStorage.removeItem(PENDING_GOOGLE_EXTRA_KEY);
+    }
+
+    function readPendingGoogleAuth() {
+    const role = (localStorage.getItem(PENDING_GOOGLE_ROLE_KEY) as AccountRole) || 'student';
+    let extraData: any = {};
+    try {
+      const rawExtra = localStorage.getItem(PENDING_GOOGLE_EXTRA_KEY);
+      if (rawExtra) extraData = JSON.parse(rawExtra);
+    } catch {
+      // Ignore malformed data from an interrupted previous attempt.
+    }
+    return { role, extraData };
+    }
 
 /**
  * Universal helper to sync Google authenticated user to Firestore and produce a valid UserSession
@@ -233,31 +253,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Real-time Firebase Auth state listener & redirect handler
   useEffect(() => {
-    // Process redirect result if page was reloaded from a redirect login (e.g. mobile)
-    getRedirectResult(auth)
-      .then(async (res) => {
-        if (res && res.user) {
-          console.log('Firebase Redirect Sign-in completed:', res.user.email);
-          const pendingRole = (localStorage.getItem('hassty_pending_role') as AccountRole) || 'student';
-          let pendingExtra: any = {};
-          try {
-            const rawExtra = localStorage.getItem('hassty_pending_extra');
-            if (rawExtra) pendingExtra = JSON.parse(rawExtra);
-          } catch {
-            // ignore
+    // Process the result after Google redirects back to this page. This is the
+      // reliable fallback for browsers that close or block the auth popup.
+      getRedirectResult(auth)
+        .then(async (res) => {
+          if (res && res.user) {
+            console.log('Firebase Redirect Sign-in completed:', res.user.email);
+            const { role: pendingRole, extraData: pendingExtra } = readPendingGoogleAuth();
+            const session = await syncGoogleUserToFirestore(res.user, pendingRole, pendingExtra);
+            setUser(session);
+            localStorage.setItem(LOCAL_STORAGE_SESSION_KEY, JSON.stringify(session));
+            localStorage.removeItem(GOOGLE_AUTH_ERROR_KEY);
+            clearPendingGoogleAuth();
           }
-          const session = await syncGoogleUserToFirestore(res.user, pendingRole, pendingExtra);
-          setUser(session);
-          localStorage.setItem(LOCAL_STORAGE_SESSION_KEY, JSON.stringify(session));
-          localStorage.removeItem('hassty_pending_role');
-          localStorage.removeItem('hassty_pending_extra');
-        }
-      })
-      .catch((err) => {
-        console.warn('Redirect result notice:', err);
-      });
+        })
+        .catch((err) => {
+          console.warn('Redirect result notice:', err);
+          localStorage.setItem(GOOGLE_AUTH_ERROR_KEY, JSON.stringify({
+            code: err?.code || 'auth/unknown-error',
+            message: err?.message || 'Google sign-in could not be completed.',
+          }));
+          clearPendingGoogleAuth();
+        });
 
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
         try {
           const pendingRole = (localStorage.getItem('hassty_pending_role') as AccountRole) || 'student';
@@ -272,8 +291,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const session = await syncGoogleUserToFirestore(firebaseUser, pendingRole, pendingExtra);
           setUser(session);
           localStorage.setItem(LOCAL_STORAGE_SESSION_KEY, JSON.stringify(session));
-          localStorage.removeItem('hassty_pending_role');
-          localStorage.removeItem('hassty_pending_extra');
+          clearPendingGoogleAuth();
         } catch (err) {
           console.warn('Error syncing user profile on auth change:', err);
         }
@@ -739,29 +757,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem('hassty_pending_extra', JSON.stringify(extraData));
     }
 
-    const isMobile = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-
     try {
       const result = await signInWithPopup(auth, provider);
       const session = await syncGoogleUserToFirestore(result.user, defaultRole, extraData);
       setUser(session);
       localStorage.setItem(LOCAL_STORAGE_SESSION_KEY, JSON.stringify(session));
-      localStorage.removeItem('hassty_pending_role');
-      localStorage.removeItem('hassty_pending_extra');
+      localStorage.removeItem(GOOGLE_AUTH_ERROR_KEY);
+      clearPendingGoogleAuth();
       return session;
     } catch (popupErr: any) {
-      console.warn('signInWithPopup error, testing redirect:', popupErr);
-      if (
-        popupErr?.code === 'auth/popup-blocked' ||
-        popupErr?.code === 'auth/cancelled-popup-request' ||
-        (isMobile && popupErr?.code === 'auth/popup-closed-by-user')
-      ) {
-        // Attempt redirect on mobile or blocked popup
-        await signInWithRedirect(auth, provider);
-        return null as any;
+        console.warn('signInWithPopup error, testing redirect:', popupErr);
+        if (
+          popupErr?.code === 'auth/popup-blocked' ||
+          popupErr?.code === 'auth/cancelled-popup-request' ||
+          popupErr?.code === 'auth/popup-closed-by-user' ||
+          popupErr?.code === 'auth/internal-error'
+        ) {
+          // A popup can close immediately after Google account selection in an
+          // embedded browser. Retry with redirect on every device, not only mobile.
+          try {
+            await signInWithRedirect(auth, provider);
+            return null as any;
+          } catch (redirectErr) {
+            clearPendingGoogleAuth();
+            throw redirectErr;
+          }
+        }
+        throw popupErr;
       }
-      throw popupErr;
-    }
   };
 
   /**
