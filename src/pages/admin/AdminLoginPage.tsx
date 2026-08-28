@@ -168,22 +168,12 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
 
-      const isMobile =
-        typeof navigator !== 'undefined' &&
-        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-
-      if (isMobile) {
-        await signInWithRedirect(auth, provider);
-        return;
-      }
-
       let result;
       try {
         result = await signInWithPopup(auth, provider);
       } catch (popupErr: any) {
         if (
           popupErr?.code === 'auth/popup-blocked' ||
-          popupErr?.code === 'auth/popup-closed-by-user' ||
           popupErr?.code === 'auth/cancelled-popup-request'
         ) {
           await signInWithRedirect(auth, provider);

@@ -766,17 +766,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.removeItem(PENDING_GOOGLE_EXTRA_KEY);
     }
 
-    const isMobile =
-      typeof navigator !== 'undefined' &&
-      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-
-    // On mobile devices, Chrome/Safari often block or detach popups. Direct redirect ensures 100% reliability.
-    if (isMobile) {
-      await signInWithRedirect(auth, provider);
-      return null as any;
-    }
-
     try {
+      // 1. Always attempt signInWithPopup first on all devices (mobile & desktop)
       const result = await signInWithPopup(auth, provider);
       const session = await syncGoogleUserToFirestore(result.user, defaultRole, extraData);
       setUser(session);
@@ -785,12 +776,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       clearPendingGoogleAuth();
       return session;
     } catch (popupErr: any) {
-      console.warn('signInWithPopup error, falling back to redirect:', popupErr);
+      console.warn('signInWithPopup notice, checking fallback:', popupErr);
+      // If popup is blocked by browser policy, fallback to redirect
       if (
         popupErr?.code === 'auth/popup-blocked' ||
-        popupErr?.code === 'auth/cancelled-popup-request' ||
-        popupErr?.code === 'auth/popup-closed-by-user' ||
-        popupErr?.code === 'auth/internal-error'
+        popupErr?.code === 'auth/cancelled-popup-request'
       ) {
         try {
           await signInWithRedirect(auth, provider);
@@ -800,6 +790,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           throw redirectErr;
         }
       }
+      clearPendingGoogleAuth();
       throw popupErr;
     }
   };
