@@ -493,7 +493,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       governorate: profileData.governorate || 'القاهرة',
       area: profileData.area || '',
       profileData,
-      emailVerified: firebaseEmailVerified || profileData.emailVerified || false,
+      emailVerified: true,
     };
 
     setUser(session);
@@ -568,7 +568,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       area: data.area || '',
       createdAt: new Date().toISOString(),
       accountStatus: 'active',
-      emailVerified: false,
+      emailVerified: true,
     };
 
     if (data.role === 'teacher') {
@@ -648,7 +648,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       governorate: data.governorate || 'القاهرة',
       area: data.area || '',
       profileData,
-      emailVerified: false,
+      emailVerified: true,
     };
 
     setUser(session);

@@ -16,7 +16,7 @@ import {
   LogIn,
   KeyRound
 } from 'lucide-react';
-import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../../lib/firebase';
 import {
@@ -49,8 +49,61 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  // Check URL query parameters on load for ?code=... or ?authKey=...
+  // Check URL query parameters and redirect results on load
   useEffect(() => {
+    // Process redirect result if returned from Google
+    getRedirectResult(auth)
+      .then(async (res) => {
+        if (res && res.user) {
+          const user = res.user;
+          const userEmail = (user.email || '').toLowerCase().trim();
+          const adminName = user.displayName || 'مدير المنصة';
+          const adminPhoto = user.photoURL || '';
+
+          try {
+            await setDoc(doc(db, 'admin_users', user.uid), {
+              uid: user.uid,
+              email: userEmail,
+              name: adminName,
+              photoURL: adminPhoto,
+              role: 'super_admin',
+              lastLogin: new Date().toISOString(),
+              authProvider: 'google',
+              status: 'active'
+            }, { merge: true });
+
+            await setDoc(doc(db, 'users', user.uid), {
+              uid: user.uid,
+              email: userEmail,
+              name: adminName,
+              role: 'admin',
+              avatarUrl: adminPhoto,
+              accountStatus: 'active',
+              emailVerified: true,
+              lastLogin: new Date().toISOString(),
+            }, { merge: true });
+          } catch (dbErr) {
+            console.warn('Admin Firestore record save notice:', dbErr);
+          }
+
+          saveAdminSession({
+            token: `google_admin_${user.uid}_${Date.now()}`,
+            email: userEmail,
+            expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+            role: 'admin',
+          });
+
+          setStep('success');
+          setSuccessMessage(`تم تسجيل الدخول الإداري بنجاح (${userEmail})! جاري نقلك إلى لوحة التحكم...`);
+          setTimeout(() => {
+            onLoginSuccess(userEmail);
+          }, 500);
+        }
+      })
+      .catch((err) => {
+        console.warn('Admin Redirect notice:', err);
+      });
+
     try {
       const urlParams = new URLSearchParams(window.location.search);
       const paramCode = urlParams.get('code');
@@ -114,7 +167,31 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
-      const result = await signInWithPopup(auth, provider);
+
+      const isMobile =
+        typeof navigator !== 'undefined' &&
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+      if (isMobile) {
+        await signInWithRedirect(auth, provider);
+        return;
+      }
+
+      let result;
+      try {
+        result = await signInWithPopup(auth, provider);
+      } catch (popupErr: any) {
+        if (
+          popupErr?.code === 'auth/popup-blocked' ||
+          popupErr?.code === 'auth/popup-closed-by-user' ||
+          popupErr?.code === 'auth/cancelled-popup-request'
+        ) {
+          await signInWithRedirect(auth, provider);
+          return;
+        }
+        throw popupErr;
+      }
+
       const user = result.user;
       const userEmail = (user.email || '').toLowerCase().trim();
       const adminName = user.displayName || 'مدير المنصة';

@@ -145,7 +145,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   };
 
   /**
-   * Handle Step 1: Verify Credentials and Dispatch Login OTP
+   * Handle Step 1: Verify Credentials and Complete Login
    */
   const handleCredentialsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,33 +158,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       // 1. Verify credentials via AuthContext
       const session = await loginUser(email, password);
       setPendingSession(session);
+      setIsVerifiedSuccess(true);
+      setOtpSuccessMessage(`🎉 مرحباً بك مجدداً ${session.name || ''}! جاري نقلك للوحة التحكم...`);
 
-      // 2. Dispatch Login OTP code via server
-      setIsSendingOtp(true);
-      try {
-        const otpRes = await sendServerVerificationOtp({
-          email: session.email,
-          uid: session.uid,
-          name: session.name,
-          role: session.role,
-          phone: session.phone,
-          purpose: 'login',
-        });
-
-        if (otpRes.success && otpRes.requestId) {
-          setRequestId(otpRes.requestId);
-        }
-      } catch (otpErr) {
-        console.warn('Login OTP dispatch warning:', otpErr);
-      } finally {
-        setIsSendingOtp(false);
-      }
-
-      // 3. Move to OTP Verification Step
-      setIsLoading(false);
-      setAuthStep('otp');
-      setResendTimer(60);
-      setOtpDigits(['', '', '', '', '', '']);
+      setTimeout(() => {
+        onLoginSuccess(session.role, session.email);
+      }, 500);
 
     } catch (err: any) {
       setIsLoading(false);
@@ -206,7 +185,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         if (msg.includes('operation-not-allowed')) {
           setErrorMessage('البريد الإلكتروني أو كلمة المرور غير صحيحة.');
         } else {
-          setErrorMessage('حدث خطأ أثناء تسجيل الدخول، يرجى المحاولة مرة أخرى.');
+          setErrorMessage('حدث خطأ أثناء تسجيل الدخول، يرجى التأكد من صحة البيانات والمحاولة مرة أخرى.');
         }
       }
     }
