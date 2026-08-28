@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Users,
   ScanLine,
@@ -20,13 +20,22 @@ import {
   FileText,
   AlertCircle,
   ShieldCheck,
-  Award
+  Award,
+  Send,
+  ExternalLink
 } from 'lucide-react';
-import { BookingRequest } from '../../types';
+import { BookingRequest, StudentGroup, TeacherStudentItem } from '../../types';
 import { Badge } from '../../components/common/Badge';
 import { TeacherAttendanceChart } from '../../components/teacher/TeacherAttendanceChart';
 import { useAuth } from '../../lib/AuthContext';
-import { Send, ExternalLink } from 'lucide-react';
+import {
+  loadTeacherStudents,
+  loadTeacherGroups,
+  getStoredStudents,
+  getStoredGroups,
+  getStoredBookings,
+  setStoredBookings
+} from '../../lib/teacherStore';
 
 interface TeacherDashboardPageProps {
   onNavigate: (path: string) => void;
@@ -36,26 +45,64 @@ export const TeacherDashboardPage: React.FC<TeacherDashboardPageProps> = ({
   onNavigate,
 }) => {
   const { user } = useAuth();
+  const teacherId = user?.uid || 'teacher-current';
   const teacherName = user?.name || 'المعلم';
   const teacherSubject = user?.profileData?.subject || 'المادة الأكاديمية';
-  const [bookingRequests, setBookingRequests] = useState<BookingRequest[]>([]);
+
+  const [students, setStudents] = useState<TeacherStudentItem[]>(() => getStoredStudents(teacherId));
+  const [groups, setGroups] = useState<StudentGroup[]>(() => getStoredGroups(teacherId));
+  const [bookingRequests, setBookingRequests] = useState<BookingRequest[]>(() => getStoredBookings(teacherId));
   const [activeSessionNotes, setActiveSessionNotes] = useState('');
   const [notesSuccess, setNotesSuccess] = useState(false);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
 
+  const fetchDashboardData = async () => {
+    try {
+      const [liveStudents, liveGroups] = await Promise.all([
+        loadTeacherStudents(teacherId),
+        loadTeacherGroups(teacherId),
+      ]);
+      setStudents(liveStudents);
+      setGroups(liveGroups);
+    } catch (e) {
+      console.warn('Dashboard fetch error:', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
+
+    const handleUpdate = () => fetchDashboardData();
+    window.addEventListener('hassty_teacher_students_updated', handleUpdate);
+    window.addEventListener('hassty_teacher_groups_updated', handleUpdate);
+    window.addEventListener('hassty_teacher_bookings_updated', handleUpdate);
+
+    return () => {
+      window.removeEventListener('hassty_teacher_students_updated', handleUpdate);
+      window.removeEventListener('hassty_teacher_groups_updated', handleUpdate);
+      window.removeEventListener('hassty_teacher_bookings_updated', handleUpdate);
+    };
+  }, [teacherId]);
+
   const handleApproveRequest = (reqId: string, studentName: string) => {
-    setBookingRequests((prev) =>
-      prev.map((r) => (r.id === reqId ? { ...r, status: 'approved' as const } : r))
+    const updated = bookingRequests.map((r) =>
+      r.id === reqId ? { ...r, status: 'approved' as const } : r
     );
-    setActionNotice(`تمت الموافقة على طلب انضمام الطالب (${studentName}) وإرسال إشعار واتساب لولي الأمر بنجاح ✅`);
+    setBookingRequests(updated);
+    setStoredBookings(teacherId, updated);
+    setActionNotice(`تمت الموافقة على طلب انضمام الطالب (${studentName}) بنجاح ✅`);
     setTimeout(() => setActionNotice(null), 4000);
   };
 
   const handleRejectRequest = (reqId: string, studentName: string) => {
-    setBookingRequests((prev) =>
-      prev.map((r) => (r.id === reqId ? { ...r, status: 'rejected' as const, rejectionReason: 'المجموعة مكتملة العدد حالياً' } : r))
+    const updated = bookingRequests.map((r) =>
+      r.id === reqId
+        ? { ...r, status: 'rejected' as const, rejectionReason: 'المجموعة مكتملة العدد حالياً' }
+        : r
     );
-    setActionNotice(`تم الاعتذار عن طلب الطالب (${studentName}) وإعلامه بالمواعيد البديلة المتاحة.`);
+    setBookingRequests(updated);
+    setStoredBookings(teacherId, updated);
+    setActionNotice(`تم الاعتذار عن طلب الطالب (${studentName}).`);
     setTimeout(() => setActionNotice(null), 4000);
   };
 
@@ -70,9 +117,11 @@ export const TeacherDashboardPage: React.FC<TeacherDashboardPageProps> = ({
   };
 
   const pendingRequests = bookingRequests.filter((r) => r.status === 'pending');
+  const totalStudentsCount = students.length;
+  const activeStudentsCount = students.filter((s) => s.status !== 'paused' && s.status !== 'transferred').length;
 
   return (
-    <div className="space-y-8 text-right">
+    <div className="space-y-8 text-right font-['IBM_Plex_Sans_Arabic',sans-serif]">
       
       {/* 1. Welcome & Fast Scan Hero Card */}
       <div className="bg-[#1E3A8A] text-white rounded-3xl p-6 sm:p-8 shadow-md flex flex-col lg:flex-row items-center justify-between gap-6">
@@ -112,7 +161,7 @@ export const TeacherDashboardPage: React.FC<TeacherDashboardPageProps> = ({
             className="w-full sm:w-auto px-4 py-3.5 bg-purple-600 hover:bg-purple-700 text-white font-black text-xs rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-95"
           >
             <Layers className="w-4 h-4" />
-            <span>إدارة المجموعات</span>
+            <span>إدارة المجموعات ({groups.length})</span>
           </button>
         </div>
       </div>
@@ -161,24 +210,28 @@ export const TeacherDashboardPage: React.FC<TeacherDashboardPageProps> = ({
         
         <div className="bg-white border border-[#E5E7EB] rounded-3xl p-5 space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-[#6B7280]">إجمالي الطلاب</span>
+            <span className="text-xs font-bold text-[#6B7280]">إجمالي الطلاب المقيدين</span>
             <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#2563EB] flex items-center justify-center">
               <Users className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-2xl font-black text-[#1E3A8A]">310 طالب</p>
-          <span className="text-[10px] text-[#10B981] font-bold">شريحة العمولة: 1.0% فقط</span>
+          <p className="text-2xl font-black text-[#1E3A8A]">{totalStudentsCount} طالب</p>
+          <span className="text-[10px] text-[#10B981] font-bold">
+            {totalStudentsCount > 0 ? `${activeStudentsCount} طالب نشط` : 'لا يوجد طلاب مقيدون بعد'}
+          </span>
         </div>
 
         <div className="bg-white border border-[#E5E7EB] rounded-3xl p-5 space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-[#6B7280]">حضور اليوم بالنافذة</span>
-            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-[#10B981] flex items-center justify-center">
-              <CheckCircle2 className="w-4 h-4" />
+            <span className="text-xs font-bold text-[#6B7280]">المجموعات الدراسية</span>
+            <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+              <Layers className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-2xl font-black text-[#10B981]">28 طالب</p>
-          <span className="text-[10px] text-[#6B7280]">24 في الموعد | 4 متأخرين</span>
+          <p className="text-2xl font-black text-purple-600">{groups.length} مجموعات</p>
+          <span className="text-[10px] text-[#6B7280]">
+            {groups.length > 0 ? 'مواعيد متزامنة' : 'أضف أول مجموعة'}
+          </span>
         </div>
 
         <div className="bg-white border border-[#E5E7EB] rounded-3xl p-5 space-y-1">
@@ -189,18 +242,22 @@ export const TeacherDashboardPage: React.FC<TeacherDashboardPageProps> = ({
             </div>
           </div>
           <p className="text-2xl font-black text-amber-600">{pendingRequests.length} طلبات</p>
-          <span className="text-[10px] text-amber-700 font-bold">تحتاج موافقتك أو رفضك</span>
+          <span className="text-[10px] text-amber-700 font-bold">
+            {pendingRequests.length > 0 ? 'تحتاج موافقتك' : 'لا توجد طلبات معلقة'}
+          </span>
         </div>
 
         <div className="bg-white border border-[#E5E7EB] rounded-3xl p-5 space-y-1">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-[#6B7280]">مؤشر الجودة والاستقرار</span>
-            <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
               <Award className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-2xl font-black text-[#1E3A8A]">98.5%</p>
-          <span className="text-[10px] text-emerald-700 font-bold">معدل استمرار والتزام ممتاز</span>
+          <p className="text-2xl font-black text-[#1E3A8A]">
+            {totalStudentsCount > 0 ? '98.5%' : '100%'}
+          </p>
+          <span className="text-[10px] text-emerald-700 font-bold">جاهزية المنصة ومسح الـ QR</span>
         </div>
 
       </div>

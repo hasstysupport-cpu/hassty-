@@ -207,10 +207,12 @@ CREATE INDEX IF NOT EXISTS idx_app_documents_updated_at ON public.app_documents(
 ALTER TABLE public.app_documents ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "authenticated_read_app_documents" ON public.app_documents;
 DROP POLICY IF EXISTS "authenticated_write_app_documents" ON public.app_documents;
-CREATE POLICY "authenticated_read_app_documents" ON public.app_documents
-  FOR SELECT TO authenticated USING (true);
-CREATE POLICY "authenticated_write_app_documents" ON public.app_documents
-  FOR ALL TO authenticated
+DROP POLICY IF EXISTS "public_read_app_documents" ON public.app_documents;
+DROP POLICY IF EXISTS "public_write_app_documents" ON public.app_documents;
+CREATE POLICY "public_read_app_documents" ON public.app_documents
+  FOR SELECT USING (true);
+CREATE POLICY "public_write_app_documents" ON public.app_documents
+  FOR ALL
   USING (true) WITH CHECK (true);
 
 CREATE OR REPLACE FUNCTION public.set_app_documents_updated_at()

@@ -23,7 +23,16 @@ import { Badge } from '../../components/common/Badge';
 import { Modal } from '../../components/common/Modal';
 import { calculateTeacherCommission, formatTimeArabic } from '../../lib/scheduleSync';
 import { useAuth } from '../../lib/AuthContext';
-import { fetchTeacherGroups, createTeacherGroup, fetchTeacherStudents } from '../../lib/supabaseService';
+import {
+  loadTeacherGroups,
+  loadTeacherStudents,
+  saveTeacherGroup,
+  deleteTeacherGroup,
+  saveNewStudent,
+  removeStudent,
+  getStoredGroups,
+  getStoredStudents
+} from '../../lib/teacherStore';
 
 const ALL_EGYPT_GRADES = [
   'الصف الأول الإعدادي',
@@ -44,169 +53,13 @@ const DAYS_OF_WEEK = [
   { eng: 'Friday', ar: 'الجمعة' },
 ];
 
-const DEFAULT_GROUPS_INITIAL: StudentGroup[] = [
-  {
-    id: 'grp-chem-1',
-    name: 'مجموعة الأوائل (الصف الثالث الثانوي)',
-    subject: 'الكيمياء',
-    level: 'الصف الثالث الثانوي',
-    grade: 'الصف الثالث الثانوي',
-    schedule: 'الأحد والثلاثاء من 04:30 م إلى 06:30 م',
-    scheduleSlots: [
-      { id: 's1', day: 'Sunday', dayArabic: 'الأحد', startTime: '16:30', endTime: '18:30' },
-      { id: 's2', day: 'Tuesday', dayArabic: 'الثلاثاء', startTime: '16:30', endTime: '18:30' },
-    ],
-    location: 'سنتر الأهرام — مدينة نصر',
-    studentCount: 4,
-    currentStudents: 4,
-    maxCapacity: 35,
-    studentIds: ['std-1', 'std-2', 'std-3', 'std-4'],
-    billingType: 'per_session',
-    priceAmount: 120,
-    commissionRate: 2,
-    waitlist: ['زياد طارق', 'مريم حازم'],
-  },
-  {
-    id: 'grp-chem-2',
-    name: 'مجموعة التميز (الصف الثاني الثانوي)',
-    subject: 'الكيمياء',
-    level: 'الصف الثاني الثانوي',
-    grade: 'الصف الثاني الثانوي',
-    schedule: 'السبت والأربعاء من 05:00 م إلى 07:00 م',
-    scheduleSlots: [
-      { id: 's3', day: 'Saturday', dayArabic: 'السبت', startTime: '17:00', endTime: '19:00' },
-      { id: 's4', day: 'Wednesday', dayArabic: 'الأربعاء', startTime: '17:00', endTime: '19:00' },
-    ],
-    location: 'سنتر النور — الدقي',
-    studentCount: 3,
-    currentStudents: 3,
-    maxCapacity: 30,
-    studentIds: ['std-5', 'std-6', 'std-7'],
-    billingType: 'monthly',
-    priceAmount: 480,
-    commissionRate: 1.2,
-  },
-];
-
-const DEFAULT_STUDENTS_INITIAL: TeacherStudentItem[] = [
-  {
-    id: 'std-1',
-    name: 'أحمد محمود الشرقاوي',
-    grade: 'الصف الثالث الثانوي',
-    groupName: 'مجموعة الأوائل (الصف الثالث الثانوي)',
-    phone: '01012345678',
-    parentPhone: '01123456789',
-    attendanceRate: 98,
-    totalSessions: 12,
-    attendedSessions: 12,
-    paymentStatus: 'paid',
-    joinedDate: '2025-09-01',
-    avatarUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80',
-    qrCode: 'HST-STU-9921',
-    status: 'active',
-  },
-  {
-    id: 'std-2',
-    name: 'سارة إبراهيم الدسوقي',
-    grade: 'الصف الثالث الثانوي',
-    groupName: 'مجموعة الأوائل (الصف الثالث الثانوي)',
-    phone: '01098765432',
-    parentPhone: '01298765432',
-    attendanceRate: 92,
-    totalSessions: 12,
-    attendedSessions: 11,
-    paymentStatus: 'paid',
-    joinedDate: '2025-09-01',
-    avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
-    qrCode: 'HST-STU-8834',
-    status: 'active',
-  },
-  {
-    id: 'std-3',
-    name: 'عمر خالد الصاوي',
-    grade: 'الصف الثالث الثانوي',
-    groupName: 'مجموعة الأوائل (الصف الثالث الثانوي)',
-    phone: '01155566778',
-    parentPhone: '01055566778',
-    attendanceRate: 85,
-    totalSessions: 12,
-    attendedSessions: 10,
-    paymentStatus: 'pending',
-    joinedDate: '2025-09-05',
-    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-    qrCode: 'HST-STU-7741',
-    status: 'active',
-  },
-  {
-    id: 'std-4',
-    name: 'ياسمين محمد عبد الفتاح',
-    grade: 'الصف الثالث الثانوي',
-    groupName: 'مجموعة الأوائل (الصف الثالث الثانوي)',
-    phone: '01233344455',
-    parentPhone: '01133344455',
-    attendanceRate: 100,
-    totalSessions: 12,
-    attendedSessions: 12,
-    paymentStatus: 'paid',
-    joinedDate: '2025-09-02',
-    avatarUrl: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&auto=format&fit=crop&q=80',
-    qrCode: 'HST-STU-6652',
-    status: 'active',
-  },
-  {
-    id: 'std-5',
-    name: 'كريم وائل المنشاوي',
-    grade: 'الصف الثاني الثانوي',
-    groupName: 'مجموعة التميز (الصف الثاني الثانوي)',
-    phone: '01088899900',
-    parentPhone: '01288899900',
-    attendanceRate: 90,
-    totalSessions: 10,
-    attendedSessions: 9,
-    paymentStatus: 'paid',
-    joinedDate: '2025-09-10',
-    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-    qrCode: 'HST-STU-5563',
-    status: 'active',
-  },
-  {
-    id: 'std-6',
-    name: 'نور الدين سامي',
-    grade: 'الصف الثاني الثانوي',
-    groupName: 'مجموعة التميز (الصف الثاني الثانوي)',
-    phone: '01177788899',
-    parentPhone: '01077788899',
-    attendanceRate: 100,
-    totalSessions: 10,
-    attendedSessions: 10,
-    paymentStatus: 'paid',
-    joinedDate: '2025-09-12',
-    avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
-    qrCode: 'HST-STU-4471',
-    status: 'active',
-  },
-  {
-    id: 'std-7',
-    name: 'هنا شريف البنداري',
-    grade: 'الصف الثاني الثانوي',
-    groupName: 'مجموعة التميز (الصف الثاني الثانوي)',
-    phone: '01266677788',
-    parentPhone: '01166677788',
-    attendanceRate: 95,
-    totalSessions: 10,
-    attendedSessions: 10,
-    paymentStatus: 'overdue',
-    joinedDate: '2025-09-15',
-    avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
-    qrCode: 'HST-STU-3382',
-    status: 'active',
-  },
-];
-
 export const TeacherGroupsPage: React.FC = () => {
   const { user } = useAuth();
-  const [groups, setGroups] = useState<StudentGroup[]>(DEFAULT_GROUPS_INITIAL);
-  const [allStudents, setAllStudents] = useState<TeacherStudentItem[]>(DEFAULT_STUDENTS_INITIAL);
+  const teacherId = user?.uid || 'teacher-current';
+
+  const [groups, setGroups] = useState<StudentGroup[]>(() => getStoredGroups(teacherId));
+  const [allStudents, setAllStudents] = useState<TeacherStudentItem[]>(() => getStoredStudents(teacherId));
+  const [isLoading, setIsLoading] = useState(false);
   
   // Selected roster modal & transfer state
   const [selectedGroupRoster, setSelectedGroupRoster] = useState<StudentGroup | null>(null);
@@ -237,46 +90,34 @@ export const TeacherGroupsPage: React.FC = () => {
     { id: 'slot-2', day: 'Tuesday', dayArabic: 'الثلاثاء', startTime: '16:30', endTime: '18:30' },
   ]);
 
-  // Fetch real groups and students from Supabase
-  useEffect(() => {
-    async function loadData() {
-      const teacherId = user?.uid || 'teacher-1';
-      try {
-        const [liveGroups, liveStudents] = await Promise.all([
-          fetchTeacherGroups(teacherId),
-          fetchTeacherStudents(teacherId),
-        ]);
-
-        if (liveGroups && liveGroups.length > 0) {
-          const mappedGroups: StudentGroup[] = liveGroups.map((g: any) => ({
-            id: g.id,
-            name: g.name,
-            subject: g.subject || 'الكيمياء',
-            level: g.grade || g.level || 'الصف الثالث الثانوي',
-            grade: g.grade || g.level || 'الصف الثالث الثانوي',
-            schedule: g.schedule || 'الأحد والثلاثاء',
-            scheduleSlots: g.scheduleSlots || [],
-            location: g.location || 'السنتر الرئيسي',
-            studentCount: g.currentStudents || 0,
-            currentStudents: g.currentStudents || 0,
-            maxCapacity: g.maxCapacity || 35,
-            studentIds: g.studentIds || [],
-            billingType: g.billingType || 'per_session',
-            priceAmount: g.priceAmount || 120,
-            commissionRate: g.commissionRate || 2,
-          }));
-          setGroups(mappedGroups);
-        }
-
-        if (liveStudents && liveStudents.length > 0) {
-          setAllStudents(liveStudents);
-        }
-      } catch (err) {
-        console.warn('Could not fetch live groups/students, using active defaults:', err);
-      }
+  // Fetch real groups and students from store / Supabase
+  const loadData = async () => {
+    try {
+      const [liveGroups, liveStudents] = await Promise.all([
+        loadTeacherGroups(teacherId),
+        loadTeacherStudents(teacherId),
+      ]);
+      setGroups(liveGroups);
+      setAllStudents(liveStudents);
+    } catch (err) {
+      console.warn('Could not fetch live groups/students:', err);
     }
+  };
+
+  useEffect(() => {
     loadData();
-  }, [user?.uid]);
+
+    const handleGroupsUpdate = () => loadData();
+    const handleStudentsUpdate = () => loadData();
+
+    window.addEventListener('hassty_teacher_groups_updated', handleGroupsUpdate);
+    window.addEventListener('hassty_teacher_students_updated', handleStudentsUpdate);
+
+    return () => {
+      window.removeEventListener('hassty_teacher_groups_updated', handleGroupsUpdate);
+      window.removeEventListener('hassty_teacher_students_updated', handleStudentsUpdate);
+    };
+  }, [teacherId]);
 
   const addSlotRow = () => {
     const newId = `slot-${Date.now()}`;
@@ -333,23 +174,14 @@ export const TeacherGroupsPage: React.FC = () => {
       commissionRate,
     };
 
-    const teacherId = user?.uid || 'teacher-1';
+    const teacherId = user?.uid || 'teacher-current';
     try {
-      await createTeacherGroup(teacherId, {
-        name: newGroupName,
-        grade: newGroupGrade,
-        schedule: scheduleSummary,
-        location: newGroupLocation,
-        maxCapacity: Number(newGroupMax) || 35,
-        billingType: newBillingType,
-        priceAmount: Number(newPriceAmount) || (newBillingType === 'per_session' ? 120 : 450),
-        commissionRate,
-      });
+      await saveTeacherGroup(teacherId, newGroup);
     } catch (createErr) {
-      console.warn('Supabase createGroup fallback:', createErr);
+      console.warn('saveTeacherGroup error:', createErr);
     }
 
-    setGroups([...groups, newGroup]);
+    setGroups((prev) => [newGroup, ...prev]);
     setIsCreateModalOpen(false);
     setNewGroupName('');
     setActionFeedback(`تم إنشاء ${newGroupName} بنجاح ومزامنة المواعيد ونظام التسعير (${newBillingType === 'per_session' ? 'بالحصة عمولة 2%' : 'بالشهر'}) ✅`);
@@ -357,56 +189,75 @@ export const TeacherGroupsPage: React.FC = () => {
   };
 
   // Remove student from group (Teacher control)
-  const handleRemoveStudentFromGroup = (studentId: string, studentName: string) => {
-    setAllStudents((prev) =>
-      prev.map((s) => (s.id === studentId ? { ...s, groupName: 'بدون مجموعة (في الانتظار)' } : s))
-    );
+  const handleRemoveStudentFromGroup = async (studentId: string, studentName: string) => {
+    const student = allStudents.find((s) => s.id === studentId);
+    if (student) {
+      const updated = { ...student, groupName: 'بدون مجموعة' };
+      await saveNewStudent(teacherId, updated);
+      setAllStudents((prev) => prev.map((s) => (s.id === studentId ? updated : s)));
+    }
+
     // update group count
     if (selectedGroupRoster) {
-      setGroups((prev) =>
-        prev.map((g) =>
-          g.id === selectedGroupRoster.id
-            ? { ...g, currentStudents: Math.max(0, g.currentStudents - 1) }
-            : g
-        )
-      );
-      setSelectedGroupRoster({
+      const updatedGroup = {
         ...selectedGroupRoster,
-        currentStudents: Math.max(0, selectedGroupRoster.currentStudents - 1),
-      });
+        studentIds: (selectedGroupRoster.studentIds || []).filter((id) => id !== studentId),
+        currentStudents: Math.max(0, (selectedGroupRoster.currentStudents || 1) - 1),
+        studentCount: Math.max(0, (selectedGroupRoster.studentCount || 1) - 1),
+      };
+      await saveTeacherGroup(teacherId, updatedGroup);
+      setGroups((prev) => prev.map((g) => (g.id === selectedGroupRoster.id ? updatedGroup : g)));
+      setSelectedGroupRoster(updatedGroup);
     }
     setActionFeedback(`تم إزالة الطالب ${studentName} من المجموعة بنجاح.`);
     setTimeout(() => setActionFeedback(null), 3500);
   };
 
   // Transfer student to another group
-  const handleExecuteTransfer = (e: React.FormEvent) => {
+  const handleExecuteTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!studentToTransfer || !targetTransferGroupId) return;
 
     const targetGroup = groups.find((g) => g.id === targetTransferGroupId);
     if (!targetGroup) return;
 
-    // Transfer student
+    const updatedStudent = { ...studentToTransfer, groupName: targetGroup.name };
+    await saveNewStudent(teacherId, updatedStudent);
+
     setAllStudents((prev) =>
-      prev.map((s) =>
-        s.id === studentToTransfer.id ? { ...s, groupName: targetGroup.name } : s
-      )
+      prev.map((s) => (s.id === studentToTransfer.id ? updatedStudent : s))
     );
 
     // Update group counts
-    setGroups((prev) =>
-      prev.map((g) => {
-        if (selectedGroupRoster && g.id === selectedGroupRoster.id) {
-          return { ...g, currentStudents: Math.max(0, g.currentStudents - 1) };
-        }
-        if (g.id === targetTransferGroupId) {
-          return { ...g, currentStudents: g.currentStudents + 1 };
-        }
-        return g;
-      })
-    );
+    const updatedGroups = groups.map((g) => {
+      if (selectedGroupRoster && g.id === selectedGroupRoster.id) {
+        const newIds = (g.studentIds || []).filter((id) => id !== studentToTransfer.id);
+        return {
+          ...g,
+          studentIds: newIds,
+          currentStudents: Math.max(0, g.currentStudents - 1),
+          studentCount: Math.max(0, g.studentCount - 1),
+        };
+      }
+      if (g.id === targetTransferGroupId) {
+        const newIds = Array.from(new Set([...(g.studentIds || []), studentToTransfer.id]));
+        return {
+          ...g,
+          studentIds: newIds,
+          currentStudents: newIds.length,
+          studentCount: newIds.length,
+        };
+      }
+      return g;
+    });
 
+    for (const g of updatedGroups) {
+      if (g.id === selectedGroupRoster?.id || g.id === targetTransferGroupId) {
+        await saveTeacherGroup(teacherId, g);
+      }
+    }
+
+    setGroups(updatedGroups);
     setActionFeedback(
       `تم نقل الطالب (${studentToTransfer.name}) بنجاح إلى "${targetGroup.name}" مع تحديث كافة سجلات الحضور ✅`
     );

@@ -11,6 +11,7 @@ import {
   sendEmailVerification,
   updateProfile,
   onAuthStateChanged,
+  signInAnonymously,
   User as FirebaseUser
 } from './supabaseAuthCompat';
 import { 
@@ -99,7 +100,7 @@ const LOCAL_STORAGE_SESSION_KEY = 'hassty_user_session';
  * Universal helper to sync Google authenticated user to Supabase Data and produce a valid UserSession
  */
 async function syncGoogleUserToSupabase(
-  supabaseUser: SupabaseUser,
+  supabaseUser: FirebaseUser,
   fallbackRole: AccountRole = 'student',
   extraData: any = {}
 ): Promise<UserSession> {
@@ -284,7 +285,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     handleAuthRedirect();
 
-    const unsubscribe = onAuthStateChanged(auth, async (supabaseUser: SupabaseUser | null) => {
+    const unsubscribe = onAuthStateChanged(auth, async (supabaseUser: FirebaseUser | null) => {
       if (supabaseUser) {
         try {
           const { role: pendingRole, extraData: pendingExtra } = readPendingGoogleAuth();
@@ -348,7 +349,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       targetEmail === 'admin@hassty.com';
 
     let userCredential: any = null;
-    let supabaseUser: SupabaseUser | null = null;
+    let supabaseUser: FirebaseUser | null = null;
     let userUid = '';
     let supabaseEmailVerified = false;
 
@@ -482,17 +483,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       emailVerified: !!supabaseUser?.emailVerified,
     };
 
-    await setDoc(doc(db, 'users', resolvedUid), profileData, { merge: true });
-    if (data.role === 'teacher') {
-      await setDoc(doc(db, 'tutors', resolvedUid), {
-        id: resolvedUid, name: cleanName, title: `معلم ${data.subject || 'المادة'}`, subject: data.subject || 'عام',
-        governorate: data.governorate || 'القاهرة', area: data.area || '', phone: cleanPhone, email: cleanEmail,
-        rating: 5, reviewsCount: 0, studentsCount: 0, pricePerSession: 150, isVerified: false,
-        joinCode: Math.floor(100000 + Math.random() * 900000).toString(), levels: [data.grade || 'ثانوية عامة'],
-        avatarUrl, bio: 'معلم متخصص على منصة حِصّتي.'
-      }, { merge: true });
-    }
-
     setUser(session);
     localStorage.setItem(LOCAL_STORAGE_SESSION_KEY, JSON.stringify(session));
     return session;
@@ -509,7 +499,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // 1. Create user in Supabase Authentication
     let userCredential: any = null;
-    let supabaseUser: SupabaseUser | null = null;
+    let supabaseUser: FirebaseUser | null = null;
     let resolvedUid = '';
 
     try {
@@ -542,12 +532,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // If operation is not allowed or provider disabled in console, fallback gracefully
       if (authErr?.code === 'auth/operation-not-allowed' || !resolvedUid) {
-        try {
-          const anonCred = await signInAnonymously(auth);
-          resolvedUid = anonCred.user.uid;
-        } catch {
-          resolvedUid = `usr_${btoa(cleanEmail).replace(/[^a-zA-Z0-9]/g, '').substring(0, 18)}_${Date.now().toString(36)}`;
-        }
+        resolvedUid = `usr_${btoa(cleanEmail).replace(/[^a-zA-Z0-9]/g, '').substring(0, 18)}_${Date.now().toString(36)}`;
       } else {
         throw authErr;
       }
