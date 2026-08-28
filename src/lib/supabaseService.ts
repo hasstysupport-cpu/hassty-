@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabase';
-import { StudentGroup, AttendanceRecord } from '../types';
+import { StudentGroup, AttendanceRecord, TeacherStudentItem } from '../types';
 
 export const dbService = {
   // Check if connected
@@ -132,3 +132,66 @@ export const dbService = {
     }
   },
 };
+
+
+export async function fetchTeacherGroups(teacherId: string): Promise<StudentGroup[]> {
+  return (await dbService.getGroups(teacherId)) || [];
+}
+
+export async function createTeacherGroup(
+  teacherId: string,
+  groupData: {
+    name: string;
+    grade: string;
+    schedule: string;
+    location: string;
+    maxCapacity?: number;
+    billingType?: 'per_session' | 'monthly';
+    priceAmount?: number;
+    commissionRate?: number;
+  }
+): Promise<any> {
+  return dbService.createGroup({
+    name: groupData.name,
+    grade: groupData.grade,
+    schedule: groupData.schedule,
+    location: groupData.location,
+    maxStudents: groupData.maxCapacity || 30,
+    tutorId: teacherId,
+  });
+}
+
+export async function fetchTeacherStudents(teacherId: string): Promise<TeacherStudentItem[]> {
+  if (!supabase) return [];
+  try {
+    const groups = (await dbService.getGroups(teacherId)) || [];
+    const groupIds = groups.map((group) => group.id).filter(Boolean);
+    if (groupIds.length === 0) return [];
+    const { data, error } = await supabase
+      .from('group_enrollments')
+      .select('*')
+      .in('group_id', groupIds)
+      .order('enrolled_at', { ascending: false });
+    if (error || !data) return [];
+    const groupNames = new Map(groups.map((group) => [group.id, group.name]));
+    return data.map((row: any) => ({
+      id: row.student_id || row.id,
+      name: row.student_name || 'طالب',
+      avatarUrl: row.avatar_url || '',
+      grade: row.grade || '',
+      phone: row.student_phone || '',
+      parentPhone: row.parent_phone || '',
+      qrCode: row.qr_code || '',
+      groupName: groupNames.get(row.group_id) || '',
+      attendanceRate: Number(row.attendance_rate ?? 100),
+      totalSessions: Number(row.total_sessions ?? 0),
+      attendedSessions: Number(row.attended_sessions ?? 0),
+      paymentStatus: row.payment_status || 'pending',
+      joinedDate: row.enrolled_at ? String(row.enrolled_at).split('T')[0] : '',
+      status: row.status === 'suspended' ? 'paused' : row.status === 'left' ? 'transferred' : 'active',
+    }));
+  } catch (error) {
+    console.warn('Supabase fetchTeacherStudents error:', error);
+    return [];
+  }
+}

@@ -54,6 +54,12 @@ export async function sendEmailVerification(user:any) {
   const { error } = await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo: `${window.location.origin}/verify-email` } });
   if (error) throw error;
 }
+export async function verifyOtp(params: any) {
+  if (!supabase) throw new Error('Supabase is not configured');
+  const { data, error } = await supabase.auth.verifyOtp(params);
+  if (error) throw error;
+  return data;
+}
 export async function reload(_user:any) { return currentUser(); }
 export async function updateProfile(user:any, patch:any) {
   if (!supabase) throw new Error('Supabase is not configured');
