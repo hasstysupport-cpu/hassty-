@@ -324,6 +324,13 @@ export const SignupPage: React.FC<SignupPageProps> = ({
         {step === 1 && (
           <div className="bg-white border border-[#E5E7EB] rounded-3xl p-6 sm:p-8 shadow-xs space-y-4 animate-step-prev">
             
+            {errorMessage && (
+              <div className="p-3.5 bg-red-50 border border-red-200 rounded-2xl text-xs font-bold text-red-800 flex items-start gap-2 animate-fadeIn">
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                <div className="flex-1">{errorMessage}</div>
+              </div>
+            )}
+
             {/* Quick Google Sign Up Block */}
             <div className="p-4 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 border border-blue-200/70 rounded-2xl space-y-2.5">
               <div className="flex items-center justify-between">
@@ -346,7 +353,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({
                   className="py-2.5 px-2 bg-white hover:bg-blue-600 hover:text-white text-[#1E3A8A] border border-blue-200 rounded-xl text-xs font-bold transition-all shadow-xs flex flex-col items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
                 >
                   <span className="text-sm">👨‍🎓</span>
-                  <span>طالب بـ Google</span>
+                  <span>{isGoogleLoading ? 'جاري التحميل...' : 'طالب بـ Google'}</span>
                 </button>
                 <button
                   type="button"
@@ -355,7 +362,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({
                   className="py-2.5 px-2 bg-white hover:bg-[#1E3A8A] hover:text-white text-[#1E3A8A] border border-blue-200 rounded-xl text-xs font-bold transition-all shadow-xs flex flex-col items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
                 >
                   <span className="text-sm">👨‍👧</span>
-                  <span>ولي أمر بـ Google</span>
+                  <span>{isGoogleLoading ? 'جاري التحميل...' : 'ولي أمر بـ Google'}</span>
                 </button>
                 <button
                   type="button"
@@ -364,7 +371,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({
                   className="py-2.5 px-2 bg-white hover:bg-emerald-600 hover:text-white text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold transition-all shadow-xs flex flex-col items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
                 >
                   <span className="text-sm">👨‍🏫</span>
-                  <span>معلم بـ Google</span>
+                  <span>{isGoogleLoading ? 'جاري التحميل...' : 'معلم بـ Google'}</span>
                 </button>
               </div>
             </div>

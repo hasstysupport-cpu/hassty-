@@ -75,6 +75,151 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const LOCAL_STORAGE_SESSION_KEY = 'hassty_user_session';
 
+/**
+ * Universal helper to sync Google authenticated user to Firestore and produce a valid UserSession
+ */
+async function syncGoogleUserToFirestore(
+  firebaseUser: FirebaseUser,
+  fallbackRole: AccountRole = 'student',
+  extraData: any = {}
+): Promise<UserSession> {
+  const userUid = firebaseUser.uid;
+  const targetEmail = (firebaseUser.email || '').toLowerCase().trim();
+  const cleanName = firebaseUser.displayName || (targetEmail ? targetEmail.split('@')[0] : 'مستخدم حِصّتي');
+  const photoUrl = firebaseUser.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(cleanName)}&backgroundColor=1e3a8a`;
+
+  const isAdminAccount = 
+    targetEmail === 'hasstysupport@gmail.com' || 
+    targetEmail === 'admin@hassty.com' ||
+    targetEmail.includes('admin@');
+
+  const userDocRef = doc(db, 'users', userUid);
+  let profileData: any = null;
+  try {
+    const userSnap = await getDoc(userDocRef);
+    if (userSnap.exists()) {
+      profileData = userSnap.data();
+    } else {
+      const emailQuery = query(collection(db, 'users'), where('email', '==', targetEmail));
+      const emailSnap = await getDocs(emailQuery);
+      if (!emailSnap.empty) {
+        profileData = emailSnap.docs[0].data();
+      }
+    }
+  } catch (e) {
+    console.warn('Error reading Google user doc:', e);
+  }
+
+  let resolvedRole: AccountRole = profileData?.role || (isAdminAccount ? 'admin' : fallbackRole);
+
+  if (!profileData) {
+    profileData = {
+      uid: userUid,
+      email: targetEmail,
+      name: cleanName,
+      phone: extraData.phone || '',
+      role: resolvedRole,
+      avatarUrl: photoUrl,
+      governorate: extraData.governorate || 'القاهرة',
+      area: extraData.area || '',
+      createdAt: new Date().toISOString(),
+      accountStatus: 'active',
+      emailVerified: true,
+      isVerified: true,
+      lastLogin: new Date().toISOString(),
+      ...extraData,
+    };
+
+    if (resolvedRole === 'student') {
+      profileData.grade = extraData.grade || 'الصف الثالث الثانوي';
+      profileData.parentPhone = extraData.parentPhone || '';
+      profileData.qrCode = `HASSTY-${userUid.substring(0, 8).toUpperCase()}`;
+    } else if (resolvedRole === 'teacher') {
+      profileData.subject = extraData.subject || 'عام';
+      profileData.experienceYears = extraData.experience || '5 سنوات';
+      profileData.rating = 5.0;
+      profileData.reviewsCount = 0;
+      profileData.studentsCount = 0;
+    }
+
+    try {
+      await setDoc(userDocRef, profileData, { merge: true });
+
+      if (resolvedRole === 'admin') {
+        await setDoc(doc(db, 'admin_users', userUid), {
+          uid: userUid,
+          email: targetEmail,
+          name: cleanName,
+          photoURL: photoUrl,
+          role: 'super_admin',
+          lastLogin: new Date().toISOString(),
+          authProvider: 'google',
+          status: 'active'
+        }, { merge: true });
+      }
+
+      if (resolvedRole === 'teacher') {
+        await setDoc(doc(db, 'tutors', userUid), {
+          id: userUid,
+          name: cleanName,
+          title: `معلم ${extraData.subject || 'المادة'}`,
+          subject: extraData.subject || 'عام',
+          governorate: extraData.governorate || 'القاهرة',
+          area: extraData.area || 'مدينة نصر',
+          rating: 5.0,
+          reviewsCount: 0,
+          studentsCount: 0,
+          pricePerSession: 150,
+          isVerified: true,
+          joinCode: Math.floor(100000 + Math.random() * 900000).toString(),
+          levels: [extraData.grade || 'ثانوية عامة'],
+          avatarUrl: photoUrl,
+          bio: `معلم متخصص معتمد على منصة حِصّتي.`,
+          phone: extraData.phone || '',
+          email: targetEmail,
+        }, { merge: true });
+      }
+    } catch (writeErr) {
+      console.warn('Initial Google profile creation warning:', writeErr);
+    }
+  } else {
+    // update lastLogin on existing doc
+    try {
+      await setDoc(userDocRef, {
+        lastLogin: new Date().toISOString(),
+        emailVerified: true,
+        avatarUrl: photoUrl || profileData.avatarUrl
+      }, { merge: true });
+    } catch (e) {
+      console.warn('Update last login notice:', e);
+    }
+  }
+
+  const session: UserSession = {
+    uid: userUid,
+    email: targetEmail,
+    phone: profileData.phone || '',
+    role: resolvedRole,
+    name: profileData.name || cleanName,
+    avatarUrl: profileData.avatarUrl || photoUrl,
+    governorate: profileData.governorate || 'القاهرة',
+    area: profileData.area || '',
+    profileData,
+    emailVerified: true,
+  };
+
+  if (resolvedRole === 'admin') {
+    saveAdminSession({
+      token: `google_admin_${userUid}_${Date.now()}`,
+      email: targetEmail,
+      expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+      role: 'admin',
+    });
+  }
+
+  return session;
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserSession | null>(() => {
     try {
@@ -93,6 +238,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .then(async (res) => {
         if (res && res.user) {
           console.log('Firebase Redirect Sign-in completed:', res.user.email);
+          const pendingRole = (localStorage.getItem('hassty_pending_role') as AccountRole) || 'student';
+          let pendingExtra: any = {};
+          try {
+            const rawExtra = localStorage.getItem('hassty_pending_extra');
+            if (rawExtra) pendingExtra = JSON.parse(rawExtra);
+          } catch {
+            // ignore
+          }
+          const session = await syncGoogleUserToFirestore(res.user, pendingRole, pendingExtra);
+          setUser(session);
+          localStorage.setItem(LOCAL_STORAGE_SESSION_KEY, JSON.stringify(session));
+          localStorage.removeItem('hassty_pending_role');
+          localStorage.removeItem('hassty_pending_extra');
         }
       })
       .catch((err) => {
@@ -102,52 +260,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
         try {
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-          let profileData: any = {};
-          let name = firebaseUser.displayName || 'مستخدم حِصّتي';
-          let phone = '';
-
-          const userEmail = (firebaseUser.email || '').toLowerCase().trim();
-          const isAdmin = 
-            userEmail === 'hasstysupport@gmail.com' || 
-            userEmail === 'admin@hassty.com' || 
-            userEmail.includes('admin@');
-
-          let role: AccountRole = isAdmin ? 'admin' : 'student';
-
-          if (userDoc.exists()) {
-            profileData = userDoc.data();
-            role = (profileData.role as AccountRole) || (isAdmin ? 'admin' : 'student');
-            name = profileData.name || name;
-            phone = profileData.phone || '';
+          const pendingRole = (localStorage.getItem('hassty_pending_role') as AccountRole) || 'student';
+          let pendingExtra: any = {};
+          try {
+            const rawExtra = localStorage.getItem('hassty_pending_extra');
+            if (rawExtra) pendingExtra = JSON.parse(rawExtra);
+          } catch {
+            // ignore
           }
 
-          const session: UserSession = {
-            uid: firebaseUser.uid,
-            email: userEmail,
-            phone,
-            role,
-            name,
-            avatarUrl: profileData.avatarUrl || firebaseUser.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}&backgroundColor=1e3a8a`,
-            governorate: profileData.governorate || 'القاهرة',
-            area: profileData.area || '',
-            profileData,
-            emailVerified: true,
-          };
-
-          if (role === 'admin') {
-            saveAdminSession({
-              token: `google_admin_${firebaseUser.uid}_${Date.now()}`,
-              email: userEmail,
-              expiresAt: Date.now() + 24 * 60 * 60 * 1000,
-              role: 'admin',
-            });
-          }
-
+          const session = await syncGoogleUserToFirestore(firebaseUser, pendingRole, pendingExtra);
           setUser(session);
           localStorage.setItem(LOCAL_STORAGE_SESSION_KEY, JSON.stringify(session));
+          localStorage.removeItem('hassty_pending_role');
+          localStorage.removeItem('hassty_pending_extra');
         } catch (err) {
-          console.warn('Error fetching Firestore user profile on auth change:', err);
+          console.warn('Error syncing user profile on auth change:', err);
         }
       } else {
         // User is signed out in Firebase Auth - verify if there is a saved local session
@@ -604,146 +732,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginWithGoogle = async (defaultRole: AccountRole = 'student', extraData: any = {}): Promise<UserSession> => {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
-    const result = await signInWithPopup(auth, provider);
-    const firebaseUser = result.user;
-    const userUid = firebaseUser.uid;
-    const targetEmail = (firebaseUser.email || '').toLowerCase().trim();
-    const cleanName = firebaseUser.displayName || (targetEmail ? targetEmail.split('@')[0] : 'مستخدم حِصّتي');
-    const photoUrl = firebaseUser.photoURL || '';
+    
+    // Store pending role & extra data in localStorage in case of redirect or page reload
+    localStorage.setItem('hassty_pending_role', defaultRole);
+    if (extraData && Object.keys(extraData).length > 0) {
+      localStorage.setItem('hassty_pending_extra', JSON.stringify(extraData));
+    }
 
-    // Check if user document already exists in Firestore by UID or by email
-    const userDocRef = doc(db, 'users', userUid);
-    let profileData: any = null;
+    const isMobile = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
     try {
-      const userSnap = await getDoc(userDocRef);
-      if (userSnap.exists()) {
-        profileData = userSnap.data();
-      } else {
-        const emailQuery = query(collection(db, 'users'), where('email', '==', targetEmail));
-        const emailSnap = await getDocs(emailQuery);
-        if (!emailSnap.empty) {
-          profileData = emailSnap.docs[0].data();
-        }
+      const result = await signInWithPopup(auth, provider);
+      const session = await syncGoogleUserToFirestore(result.user, defaultRole, extraData);
+      setUser(session);
+      localStorage.setItem(LOCAL_STORAGE_SESSION_KEY, JSON.stringify(session));
+      localStorage.removeItem('hassty_pending_role');
+      localStorage.removeItem('hassty_pending_extra');
+      return session;
+    } catch (popupErr: any) {
+      console.warn('signInWithPopup error, testing redirect:', popupErr);
+      if (
+        popupErr?.code === 'auth/popup-blocked' ||
+        popupErr?.code === 'auth/cancelled-popup-request' ||
+        (isMobile && popupErr?.code === 'auth/popup-closed-by-user')
+      ) {
+        // Attempt redirect on mobile or blocked popup
+        await signInWithRedirect(auth, provider);
+        return null as any;
       }
-    } catch (e) {
-      console.warn('Error reading Google user doc:', e);
+      throw popupErr;
     }
-
-    const isAdminAccount = 
-      targetEmail === 'hasstysupport@gmail.com' || 
-      targetEmail === 'admin@hassty.com' ||
-      targetEmail.includes('admin@');
-
-    let resolvedRole: AccountRole = profileData?.role || (isAdminAccount ? 'admin' : defaultRole);
-
-    if (!profileData) {
-      profileData = {
-        uid: userUid,
-        email: targetEmail,
-        name: cleanName,
-        phone: extraData.phone || '',
-        role: resolvedRole,
-        avatarUrl: photoUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(cleanName)}&backgroundColor=1e3a8a`,
-        governorate: extraData.governorate || 'القاهرة',
-        area: extraData.area || '',
-        createdAt: new Date().toISOString(),
-        accountStatus: 'active',
-        emailVerified: true,
-        isVerified: true,
-        lastLogin: new Date().toISOString(),
-        ...extraData,
-      };
-
-      if (resolvedRole === 'student') {
-        profileData.grade = extraData.grade || 'الصف الثالث الثانوي';
-        profileData.parentPhone = extraData.parentPhone || '';
-        profileData.qrCode = `HASSTY-${userUid.substring(0, 8).toUpperCase()}`;
-      } else if (resolvedRole === 'teacher') {
-        profileData.subject = extraData.subject || 'عام';
-        profileData.experienceYears = extraData.experience || '5 سنوات';
-        profileData.rating = 5.0;
-        profileData.reviewsCount = 0;
-        profileData.studentsCount = 0;
-      }
-
-      try {
-        await setDoc(userDocRef, profileData, { merge: true });
-
-        if (resolvedRole === 'admin') {
-          await setDoc(doc(db, 'admin_users', userUid), {
-            uid: userUid,
-            email: targetEmail,
-            name: cleanName,
-            photoURL: photoUrl,
-            role: 'super_admin',
-            lastLogin: new Date().toISOString(),
-            authProvider: 'google',
-            status: 'active'
-          }, { merge: true });
-        }
-
-        if (resolvedRole === 'teacher') {
-          await setDoc(doc(db, 'tutors', userUid), {
-            id: userUid,
-            name: cleanName,
-            title: `معلم ${extraData.subject || 'المادة'}`,
-            subject: extraData.subject || 'عام',
-            governorate: extraData.governorate || 'القاهرة',
-            area: extraData.area || 'مدينة نصر',
-            rating: 5.0,
-            reviewsCount: 0,
-            studentsCount: 0,
-            pricePerSession: 150,
-            isVerified: true,
-            joinCode: Math.floor(100000 + Math.random() * 900000).toString(),
-            levels: [extraData.grade || 'ثانوية عامة'],
-            avatarUrl: photoUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(cleanName)}&backgroundColor=1e3a8a`,
-            bio: `معلم متخصص معتمد على منصة حِصّتي.`,
-            phone: extraData.phone || '',
-            email: targetEmail,
-          }, { merge: true });
-        }
-      } catch (writeErr) {
-        console.warn('Initial Google profile creation warning:', writeErr);
-      }
-    } else {
-      // Update lastLogin on existing doc
-      try {
-        await setDoc(userDocRef, {
-          lastLogin: new Date().toISOString(),
-          emailVerified: true,
-          avatarUrl: photoUrl || profileData.avatarUrl
-        }, { merge: true });
-      } catch {
-        // ignore
-      }
-    }
-
-    const session: UserSession = {
-      uid: userUid,
-      email: targetEmail,
-      phone: profileData.phone || '',
-      role: resolvedRole,
-      name: profileData.name || cleanName,
-      avatarUrl: profileData.avatarUrl || photoUrl,
-      governorate: profileData.governorate || 'القاهرة',
-      area: profileData.area || '',
-      profileData,
-      emailVerified: true,
-    };
-
-    if (resolvedRole === 'admin') {
-      saveAdminSession({
-        token: `google_admin_${userUid}_${Date.now()}`,
-        email: targetEmail,
-        expiresAt: Date.now() + 24 * 60 * 60 * 1000,
-        role: 'admin',
-      });
-    }
-
-    setUser(session);
-    localStorage.setItem(LOCAL_STORAGE_SESSION_KEY, JSON.stringify(session));
-    return session;
   };
 
   /**
