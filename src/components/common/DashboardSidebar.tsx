@@ -1,7 +1,5 @@
 import React from 'react';
-import {
-  LayoutDashboard, QrCode, Users, Calendar, Receipt, ClipboardCheck, BellRing, Layers, ScanLine, UserCog, Star, LogOut, Home, MessageCircle, BookOpen, BarChart3
-} from 'lucide-react';
+import { LayoutDashboard, QrCode, Users, Calendar, Receipt, ClipboardCheck, BellRing, Layers, ScanLine, UserCog, Star, LogOut, Home, MessageCircle, BookOpen, BarChart3, UserCheck } from 'lucide-react';
 import { AccountRole } from '../../types';
 import { useAuth } from '../../lib/AuthContext';
 import { getCleanAvatarUrl } from '../../lib/avatarHelper';
@@ -44,6 +42,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ currentRole,
     { name: 'الطلاب', path: '/teacher/students', icon: Users },
     { name: 'المجموعات', path: '/teacher/groups', icon: Layers },
     { name: 'ماسح الحضور (QR)', path: '/teacher/scan', icon: ScanLine, highlight: true },
+    { name: 'إدارة الحضور', path: '/teacher/attendance', icon: UserCheck },
     { name: 'المدفوعات والعمولة', path: '/teacher/payments', icon: Receipt },
     { name: 'المواعيد المتاحة', path: '/teacher/availability', icon: Calendar },
     { name: 'تعديل البروفايل العام', path: '/teacher/profile', icon: UserCog },
