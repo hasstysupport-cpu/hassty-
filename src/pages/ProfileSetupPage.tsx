@@ -2,13 +2,16 @@ import React, { useMemo, useState } from 'react';
 import { ArrowLeft, BookOpen, CheckCircle2, GraduationCap, MapPin, Phone, Save, UserRound, Users, Briefcase, Sparkles } from 'lucide-react';
 import { AccountRole } from '../types';
 import { useAuth } from '../lib/AuthContext';
+import { supabase } from '../lib/supabase';
 
 interface ProfileSetupPageProps {
   onComplete: (role: AccountRole) => void;
   onLogout?: () => void;
 }
 
-const roleCopy: Record<Exclude<AccountRole, 'admin'>, { title: string; subtitle: string; icon: React.ElementType }> = {
+type SetupRole = Exclude<AccountRole, 'admin'>;
+
+const roleCopy: Record<SetupRole, { title: string; subtitle: string; icon: React.ElementType }> = {
   student: { title: 'كمّل بياناتك كطالب', subtitle: 'خطوة واحدة ونجهز حسابك لاكتشاف المدرسين والحصص.', icon: GraduationCap },
   parent: { title: 'كمّل بيانات ولي الأمر', subtitle: 'أضف بياناتك حتى تتابع أبناءك وحضورهم ومدفوعاتهم.', icon: Users },
   teacher: { title: 'جهّز ملفك كمدرس', subtitle: 'بياناتك الأساسية هتظهر في ملفك بعد إكمال التسجيل، ثم يبدأ التحقق.', icon: Briefcase },
@@ -16,7 +19,8 @@ const roleCopy: Record<Exclude<AccountRole, 'admin'>, { title: string; subtitle:
 
 export const ProfileSetupPage: React.FC<ProfileSetupPageProps> = ({ onComplete, onLogout }) => {
   const { user, updateUserProfile } = useAuth();
-  const role = (user?.role === 'admin' ? 'student' : user?.role || 'student') as Exclude<AccountRole, 'admin'>;
+  const googleFirstLogin = typeof window !== 'undefined' && Boolean(localStorage.getItem('hassty_google_login_started_at'));
+  const [role, setRole] = useState<SetupRole>((user?.role === 'admin' ? 'student' : user?.role || 'student') as SetupRole);
   const Icon = roleCopy[role].icon;
 
   const [name, setName] = useState(user?.name || '');
@@ -40,6 +44,10 @@ export const ProfileSetupPage: React.FC<ProfileSetupPageProps> = ({ onComplete, 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user?.uid) {
+      setError('تعذر تحديد حسابك الحالي. سجّل الدخول مرة أخرى.');
+      return;
+    }
     if (!name.trim() || !phone.trim() || !governorate.trim() || !area.trim()) {
       setError('اكتب الاسم ورقم الموبايل والمحافظة والمنطقة عشان نكمل الحساب.');
       return;
@@ -55,15 +63,90 @@ export const ProfileSetupPage: React.FC<ProfileSetupPageProps> = ({ onComplete, 
 
     setIsSaving(true);
     setError('');
+
     try {
+      // Normal profile fields through the existing Supabase data layer.
       await updateUserProfile({
         name: name.trim(),
         phone: phone.trim(),
         governorate: governorate.trim(),
         area: area.trim(),
+        role,
         ...(role === 'student' ? { grade: grade.trim(), parentPhone: parentPhone.trim() } : {}),
         ...(role === 'teacher' ? { subject: subject.trim(), experienceYears: experience.trim(), bio: bio.trim() } : {}),
       });
+
+      // First-time Google onboarding is the one case where the provisional role must be replaced.
+      // Persist the role and role-specific profile directly in the canonical Supabase tables.
+      if (googleFirstLogin && supabase) {
+        const { data: existingProfile, error: profileReadError } = await supabase
+          .from('profiles')
+          .select('metadata,qr_code')
+          .eq('id', user.uid)
+          .maybeSingle();
+        if (profileReadError) throw profileReadError;
+
+        const metadata = {
+          ...((existingProfile?.metadata || {}) as Record<string, any>),
+          onboardingCompleted: true,
+          onboardingSource: 'google',
+          ...(role === 'student' ? { grade: grade.trim(), parentPhone: parentPhone.trim() } : {}),
+          ...(role === 'teacher' ? { subject: subject.trim(), experienceYears: experience.trim(), bio: bio.trim() } : {}),
+        };
+
+        const profilePayload: Record<string, any> = {
+          id: user.uid,
+          full_name: name.trim(),
+          phone: phone.trim(),
+          governorate: governorate.trim(),
+          city: area.trim(),
+          role,
+          account_status: 'active',
+          metadata,
+          updated_at: new Date().toISOString(),
+        };
+
+        if (role === 'student' && !existingProfile?.qr_code) {
+          profilePayload.qr_code = `HASSTY-${user.uid.substring(0, 8).toUpperCase()}`;
+        }
+
+        const { error: profileWriteError } = await supabase
+          .from('profiles')
+          .upsert(profilePayload, { onConflict: 'id' });
+        if (profileWriteError) throw profileWriteError;
+
+        if (role === 'teacher') {
+          const { error: tutorError } = await supabase
+            .from('tutor_profiles')
+            .upsert({
+              user_id: user.uid,
+              title: `معلم ${subject.trim()}`,
+              headline: `معلم ${subject.trim()}`,
+              bio: bio.trim() || null,
+              subjects: [subject.trim()],
+              grades: grade ? [grade.trim()] : [],
+              experience_years: Number.parseInt(experience.replace(/[^0-9]/g, ''), 10) || 0,
+              experience_years_text: experience.trim(),
+              governorate: governorate.trim(),
+              city: area.trim(),
+              is_verified: false,
+              verification_status: 'pending',
+              metadata: { onboardingCompleted: true, onboardingSource: 'google' },
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'user_id' });
+          if (tutorError) throw tutorError;
+        }
+
+        localStorage.removeItem('hassty_google_login_started_at');
+        localStorage.removeItem('hassty_google_profile_setup');
+
+        // AuthContext is intentionally refreshed by a full navigation so its role/session
+        // comes back from Supabase instead of the provisional student state.
+        const destination = role === 'teacher' ? '/teacher/dashboard' : role === 'parent' ? '/parent/dashboard' : '/student/dashboard';
+        window.location.assign(destination);
+        return;
+      }
+
       onComplete(role);
     } catch (err: any) {
       setError(err?.message || 'تعذر حفظ البيانات. جرّب مرة أخرى.');
@@ -80,8 +163,16 @@ export const ProfileSetupPage: React.FC<ProfileSetupPageProps> = ({ onComplete, 
           <div className="relative space-y-6">
             <div className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/15 px-3 py-1.5 text-xs font-bold">
               <Sparkles className="w-4 h-4" />
-              أول دخول
+              {googleFirstLogin ? 'أول تسجيل بحساب Google' : 'إكمال الحساب'}
             </div>
+
+            {googleFirstLogin && (
+              <div className="rounded-2xl bg-white/10 border border-white/15 p-4">
+                <p className="text-sm font-black">اختار نوع حسابك أولًا</p>
+                <p className="text-xs text-blue-100/80 mt-1 leading-6">مش هنفترض إنك طالب. اختار الدور اللي يناسبك قبل ما نكمل بيانات الحساب.</p>
+              </div>
+            )}
+
             <div className="w-16 h-16 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center">
               <Icon className="w-8 h-8" />
             </div>
@@ -113,13 +204,33 @@ export const ProfileSetupPage: React.FC<ProfileSetupPageProps> = ({ onComplete, 
                 <UserRound className="w-3.5 h-3.5" />
                 {user?.email}
               </div>
-              <h2 className="text-xl sm:text-2xl font-black text-slate-900 mt-3">بيانات الحساب الأساسية</h2>
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900 mt-3">{googleFirstLogin ? 'اختار دورك وكمّل حسابك' : 'بيانات الحساب الأساسية'}</h2>
               <p className="text-xs text-slate-500 mt-1">لن نطلب منك نفس البيانات مرة ثانية.</p>
             </div>
             {onLogout && <button onClick={onLogout} type="button" className="text-xs font-bold text-slate-500 hover:text-red-600">تسجيل الخروج</button>}
           </div>
 
           {error && <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 text-red-700 p-3.5 text-xs font-bold">{error}</div>}
+
+          {googleFirstLogin && (
+            <div className="grid grid-cols-3 gap-2 mb-6">
+              {(Object.keys(roleCopy) as SetupRole[]).map((candidate) => {
+                const CandidateIcon = roleCopy[candidate].icon;
+                const active = role === candidate;
+                return (
+                  <button
+                    key={candidate}
+                    type="button"
+                    onClick={() => setRole(candidate)}
+                    className={`rounded-2xl border-2 p-3 text-center transition-all ${active ? 'border-blue-600 bg-blue-50 text-blue-800 shadow-sm' : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-blue-300'}`}
+                  >
+                    <CandidateIcon className="w-5 h-5 mx-auto mb-1.5" />
+                    <span className="text-xs font-black">{candidate === 'student' ? 'طالب' : candidate === 'parent' ? 'ولي أمر' : 'مدرس'}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="grid sm:grid-cols-2 gap-4">
