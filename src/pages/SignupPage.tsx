@@ -116,6 +116,9 @@ export const SignupPage: React.FC<SignupPageProps> = ({
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [legalConsentAccepted, setLegalConsentAccepted] = useState<boolean>(() => {
+    try { return localStorage.getItem('hassty_signup_legal_consent_v1') === 'accepted'; } catch { return false; }
+  });
 
   // Check if a redirect error occurred
   useEffect(() => {
@@ -232,6 +235,10 @@ export const SignupPage: React.FC<SignupPageProps> = ({
    */
   const handleSubmitRegistration = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!legalConsentAccepted) {
+      setErrorMessage('يرجى الضغط على «أوافق وأتابع إنشاء الحساب» قبل إنشاء الحساب.');
+      return;
+    }
     if (!name.trim() || !email.trim() || !password || !phone.trim()) {
       setErrorMessage('يرجى ملء جميع الحقول المطلوبة.');
       return;
@@ -876,6 +883,33 @@ export const SignupPage: React.FC<SignupPageProps> = ({
                 ) : (
                   <>
                     <span>إنشاء الحساب فوراً</span>
+                    <ArrowLeft className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  try { localStorage.setItem('hassty_signup_legal_consent_v1', 'accepted'); } catch { /* ignore */ }
+                  setLegalConsentAccepted(true);
+                  setErrorMessage('');
+                }}
+                className={`w-full py-3.5 rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 ${
+                  legalConsentAccepted
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+                    : 'bg-white hover:bg-blue-50 text-[#2563EB] border-2 border-[#2563EB]'
+                }`}
+              >
+                {legalConsentAccepted ? (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>تمت الموافقة على الشروط ✓</span>
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>أوافق وأتابع إنشاء الحساب</span>
                     <ArrowLeft className="w-4 h-4" />
                   </>
                 )}

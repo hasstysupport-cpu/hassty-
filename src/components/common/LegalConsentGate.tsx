@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { ArrowLeft, CheckCircle2, ShieldCheck, UserCheck } from 'lucide-react';
 
 const CONSENT_KEY = 'hassty_signup_legal_consent_v1';
@@ -13,16 +13,11 @@ export const hasRecentSignupConsent = () => {
 };
 
 export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ onAccept, onNavigate }) => {
-  const [terms, setTerms] = useState(false);
-  const [privacy, setPrivacy] = useState(false);
-  const [acceptable, setAcceptable] = useState(false);
-  const [adultOrGuardian, setAdultOrGuardian] = useState(false);
-
-  const canContinue = useMemo(() => terms && privacy && acceptable && adultOrGuardian, [terms, privacy, acceptable, adultOrGuardian]);
+  const [accepted, setAccepted] = useState(false);
 
   const accept = () => {
-    if (!canContinue) return;
-    localStorage.setItem(CONSENT_KEY, 'accepted');
+    if (!accepted) return;
+    try { localStorage.setItem(CONSENT_KEY, 'accepted'); } catch { /* ignore storage errors */ }
     onAccept();
   };
 
@@ -33,44 +28,52 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ onAccept, on
           <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0"><ShieldCheck className="w-6 h-6" /></div>
           <div>
             <h1 className="text-2xl font-black text-[#1E3A8A]">قبل إنشاء حسابك</h1>
-            <p className="text-sm text-slate-500 mt-1 leading-6">نريد أن تكون الصورة واضحة من البداية: ما البيانات التي نستخدمها، لماذا نطلبها، وما حقوقك.</p>
+            <p className="text-sm text-slate-500 mt-1 leading-6">راجع موافقتك قبل التسجيل: الشروط، الخصوصية، الاستخدام المقبول، ومتطلبات السن والموافقة.</p>
           </div>
         </div>
 
         <div className="grid sm:grid-cols-3 gap-3 mb-6">
-          <button onClick={() => onNavigate('/legal/terms')} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-right hover:border-blue-300 transition"><div className="font-black text-sm">شروط الاستخدام</div><div className="text-xs text-slate-500 mt-1">الحجز، الحساب، المدرسون، المسؤوليات</div></button>
-          <button onClick={() => onNavigate('/legal/privacy')} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-right hover:border-blue-300 transition"><div className="font-black text-sm">سياسة الخصوصية</div><div className="text-xs text-slate-500 mt-1">البيانات، الهوية، الأطفال، الاحتفاظ</div></button>
-          <button onClick={() => onNavigate('/legal/acceptable')} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-right hover:border-blue-300 transition"><div className="font-black text-sm">الاستخدام المقبول</div><div className="text-xs text-slate-500 mt-1">الممنوعات وحماية المستخدمين</div></button>
+          <button type="button" onClick={() => onNavigate('/legal/terms')} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-right hover:border-blue-300 transition">
+            <div className="font-black text-sm">شروط الاستخدام</div>
+            <div className="text-xs text-slate-500 mt-1">الحجز، الحساب، المدرسون، المسؤوليات</div>
+          </button>
+          <button type="button" onClick={() => onNavigate('/legal/privacy')} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-right hover:border-blue-300 transition">
+            <div className="font-black text-sm">سياسة الخصوصية</div>
+            <div className="text-xs text-slate-500 mt-1">البيانات، الهوية، الأطفال، الاحتفاظ</div>
+          </button>
+          <button type="button" onClick={() => onNavigate('/legal/acceptable')} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-right hover:border-blue-300 transition">
+            <div className="font-black text-sm">الاستخدام المقبول</div>
+            <div className="text-xs text-slate-500 mt-1">الممنوعات وحماية المستخدمين</div>
+          </button>
         </div>
 
-        <div className="space-y-3">
-          <label className="flex items-start gap-3 p-4 rounded-2xl border border-slate-200 hover:bg-slate-50 cursor-pointer">
-            <input type="checkbox" checked={terms} onChange={e => setTerms(e.target.checked)} className="mt-1 w-4 h-4 accent-blue-600" />
-            <span className="text-sm leading-6">قرأت وأوافق على <button type="button" onClick={() => onNavigate('/legal/terms')} className="text-blue-600 font-black">شروط الاستخدام</button>.</span>
-          </label>
-          <label className="flex items-start gap-3 p-4 rounded-2xl border border-slate-200 hover:bg-slate-50 cursor-pointer">
-            <input type="checkbox" checked={privacy} onChange={e => setPrivacy(e.target.checked)} className="mt-1 w-4 h-4 accent-blue-600" />
-            <span className="text-sm leading-6">قرأت إشعار الخصوصية وفهمت أنواع البيانات التي نجمعها وأغراض استخدامها وحقوقي.</span>
-          </label>
-          <label className="flex items-start gap-3 p-4 rounded-2xl border border-slate-200 hover:bg-slate-50 cursor-pointer">
-            <input type="checkbox" checked={acceptable} onChange={e => setAcceptable(e.target.checked)} className="mt-1 w-4 h-4 accent-blue-600" />
-            <span className="text-sm leading-6">أوافق على <button type="button" onClick={() => onNavigate('/legal/acceptable')} className="text-blue-600 font-black">سياسة الاستخدام المقبول</button> وأتعهد بعدم انتحال الهوية أو إساءة استخدام المنصة أو بيانات الآخرين.</span>
-          </label>
-          <label className="flex items-start gap-3 p-4 rounded-2xl border border-amber-200 bg-amber-50/50 hover:bg-amber-50 cursor-pointer">
-            <input type="checkbox" checked={adultOrGuardian} onChange={e => setAdultOrGuardian(e.target.checked)} className="mt-1 w-4 h-4 accent-blue-600" />
-            <span className="text-sm leading-6"><strong>أقر بأنني أفهم متطلبات السن والموافقة:</strong> إذا كان الحساب يخص قاصرًا، فلن يُعامل هذا المربع وحده كبديل عن موافقة ولي الأمر المطلوبة قانونًا، وقد نطلب موافقة ولي الأمر أو نوقف بعض الخدمات حتى تكتمل الآلية المناسبة.</span>
-          </label>
-        </div>
+        <label className="flex items-start gap-3 p-4 rounded-2xl border border-slate-200 bg-slate-50/80 hover:bg-slate-50 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={accepted}
+            onChange={(e) => setAccepted(e.target.checked)}
+            className="mt-1 w-5 h-5 accent-blue-600 shrink-0 cursor-pointer"
+          />
+          <span className="text-sm leading-6 text-slate-700">
+            أقر بأنني قرأت وفهمت <button type="button" onClick={() => onNavigate('/legal/terms')} className="text-blue-600 font-black">شروط الاستخدام</button> و<button type="button" onClick={() => onNavigate('/legal/privacy')} className="text-blue-600 font-black">سياسة الخصوصية</button> و<button type="button" onClick={() => onNavigate('/legal/acceptable')} className="text-blue-600 font-black">سياسة الاستخدام المقبول</button>، وأفهم متطلبات السن والموافقة المطبقة على الحساب.
+          </span>
+        </label>
 
         <div className="mt-6 p-4 rounded-2xl bg-blue-50 border border-blue-100 text-xs text-blue-900 leading-6 flex gap-2">
           <UserCheck className="w-4 h-4 shrink-0 mt-0.5" />
-          <span>لو كنت تنشئ حسابًا لطفل صغير، الأفضل أن يبدأ ولي الأمر بحسابه أولًا. بيانات الأطفال لها متطلبات موافقة إضافية.</span>
+          <span>لو كان الحساب يخص قاصرًا، قد نطلب موافقة ولي الأمر أو نوقف بعض الخدمات حتى تكتمل الآلية المناسبة.</span>
         </div>
 
-        <button disabled={!canContinue} onClick={accept} className="w-full mt-6 py-3.5 rounded-xl bg-[#2563EB] text-white font-black disabled:opacity-40 disabled:cursor-not-allowed hover:bg-blue-700 transition flex items-center justify-center gap-2">
-          <span>أوافق وأتابع إنشاء الحساب</span><ArrowLeft className="w-4 h-4" />
+        <button
+          type="button"
+          disabled={!accepted}
+          onClick={accept}
+          className={`w-full mt-6 py-3.5 rounded-xl text-white font-black transition flex items-center justify-center gap-2 ${accepted ? 'bg-[#2563EB] hover:bg-blue-700 cursor-pointer' : 'bg-slate-300 cursor-not-allowed'}`}
+        >
+          <span>أوافق وأتابع إنشاء الحساب</span>
+          {accepted ? <CheckCircle2 className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
         </button>
-        <p className="text-[11px] text-slate-400 text-center mt-4">الموافقة على الشروط لا تعني التنازل عن أي حق لا يجوز التنازل عنه قانونًا.</p>
+        <p className="text-[11px] text-slate-400 text-center mt-4">الموافقة لا تعني التنازل عن أي حق لا يجوز التنازل عنه قانونًا.</p>
       </div>
     </div>
   );
