@@ -31,6 +31,8 @@ import { HasstyAdminApp } from './pages/admin/HasstyAdminApp';
 import { SECRET_ADMIN_ROUTE } from './lib/securityConfig';
 import { LegalPage, LegalSection } from './pages/LegalPage';
 import { NotificationsPage, CalendarPage, MessagesPage, AssignmentsPage, GradesPage, AttendanceOverviewPage } from './pages/PlatformFeaturesPages';
+import { TeacherAssignmentsPage } from './pages/teacher/TeacherAssignmentsPage';
+import { ParentGradesPage } from './pages/parent/ParentGradesPage';
 
 import { StudentDashboardPage } from './pages/student/StudentDashboardPage';
 import { StudentQRCardPage } from './pages/student/StudentQRCardPage';
@@ -126,11 +128,7 @@ export default function App() {
       }
       setIsCheckingProfile(true);
       try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('full_name,phone,governorate,city,grade,role,metadata')
-          .eq('id', user.uid)
-          .maybeSingle();
+        const { data, error } = await supabase.from('profiles').select('full_name,phone,governorate,city,grade,role,metadata').eq('id', user.uid).maybeSingle();
         if (error) throw error;
         const metadata = (data?.metadata || {}) as Record<string, any>;
         const role = (data?.role || user.role) as AccountRole;
@@ -180,30 +178,15 @@ export default function App() {
   if (isAdminAppRoute) return <HasstyAdminApp onSwitchToPublicApp={() => setCurrentPath('/')} initialToken={initialAdminToken} />;
 
   if (isSignupRoute && !isLoggedIn) {
-    return (
-      <div className="min-h-screen w-full bg-[#F8FAFF] text-[#1F2937] font-['IBM_Plex_Sans_Arabic',sans-serif] antialiased">
-        {!signupLegalAccepted ? (
-          <LegalConsentGate onAccept={() => setSignupLegalAccepted(true)} onNavigate={handleNavigate} />
-        ) : (
-          <SignupPage onNavigate={handleNavigate} onSignupSuccess={handleLogin} />
-        )}
-      </div>
-    );
+    return <div className="min-h-screen w-full bg-[#F8FAFF] text-[#1F2937] font-['IBM_Plex_Sans_Arabic',sans-serif] antialiased">{!signupLegalAccepted ? <LegalConsentGate onAccept={() => setSignupLegalAccepted(true)} onNavigate={handleNavigate} /> : <SignupPage onNavigate={handleNavigate} onSignupSuccess={handleLogin} />}</div>;
   }
 
   if (isLoggedIn && needsProfileSetup && !isUnverified && currentPath === '/setup-profile') {
-    return (
-      <div className="min-h-screen bg-[#F7FAFF] text-[#1F2937] font-['IBM_Plex_Sans_Arabic',sans-serif] antialiased">
-        <ProfileSetupPage onComplete={handleLogin} onLogout={handleLogout} />
-        <DevDisclaimerFloatingPill />
-      </div>
-    );
+    return <div className="min-h-screen bg-[#F7FAFF] text-[#1F2937] font-['IBM_Plex_Sans_Arabic',sans-serif] antialiased"><ProfileSetupPage onComplete={handleLogin} onLogout={handleLogout} /><DevDisclaimerFloatingPill /></div>;
   }
 
   const legalMatch = currentPath.match(/^\/legal\/(terms|privacy|teacher|cookies|acceptable|refund|rights)$/);
-  if (legalMatch) {
-    return <LegalPage section={legalMatch[1] as LegalSection} onNavigate={handleNavigate} />;
-  }
+  if (legalMatch) return <LegalPage section={legalMatch[1] as LegalSection} onNavigate={handleNavigate} />;
 
   return (
     <div className="min-h-screen bg-[#F8FAFF] text-[#1F2937] font-['IBM_Plex_Sans_Arabic',sans-serif] selection:bg-[#EFF6FF] selection:text-[#2563EB] flex flex-col antialiased">
@@ -236,7 +219,7 @@ export default function App() {
             {currentPath === '/parent/notifications' && <NotificationsPage onNavigate={handleNavigate} />}
             {currentPath === '/parent/calendar' && <CalendarPage />}
             {currentPath === '/parent/messages' && <MessagesPage />}
-            {currentPath === '/parent/grades' && <GradesPage />}
+            {currentPath === '/parent/grades' && <ParentGradesPage />}
             {currentPath === '/teacher/dashboard' && <TeacherDashboardPage onNavigate={handleNavigate} />}
             {currentPath === '/teacher/students' && <TeacherStudentsPage onNavigate={handleNavigate} />}
             {currentPath === '/teacher/groups' && <TeacherGroupsPage />}
@@ -248,7 +231,7 @@ export default function App() {
             {currentPath === '/teacher/notifications' && <NotificationsPage onNavigate={handleNavigate} />}
             {currentPath === '/teacher/calendar' && <CalendarPage />}
             {currentPath === '/teacher/messages' && <MessagesPage />}
-            {currentPath === '/teacher/assignments' && <AssignmentsPage />}
+            {currentPath === '/teacher/assignments' && <TeacherAssignmentsPage />}
           </main>
         </div>
       ) : (
