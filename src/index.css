@@ -303,6 +303,12 @@ button, a, input, select, textarea {
   }
 }
 
+/* Signup already has a dedicated full-screen legal consent gate.
+   Keep the legacy inline consent control hidden to avoid showing consent twice. */
+form button[type="submit"] + button[type="button"] {
+  display: none !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
