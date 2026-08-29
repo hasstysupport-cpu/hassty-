@@ -1,0 +1,133 @@
+name: One-time email signup RLS fix
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: contains(github.event.head_commit.message, 'fix: trigger email signup profile flow')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch signup flow
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('src/lib/AuthContext.tsx')
+          s = p.read_text(encoding='utf-8')
+
+          old = """        data: { full_name: cleanName, avatar_url: data.avatarUrl || null, role: data.role },"""
+          new = """        data: {
+          full_name: cleanName,
+          avatar_url: data.avatarUrl || null,
+          role: data.role,
+          phone: cleanPhone,
+          governorate: data.governorate || '',
+          city: data.area || '',
+          grade: data.grade || '',
+          subject: data.subject || '',
+          experience: data.experience || '',
+          parentPhone: data.parentPhone || '',
+        },"""
+          if old not in s:
+              raise SystemExit('signup metadata anchor not found')
+          s = s.replace(old, new, 1)
+
+          old = """    if (signUpError) throw signUpError;
+    if (!authData.user) throw new Error('لم يتم إنشاء الحساب.');
+
+    const metadata: Record<string, any> = {"""
+          new = """    if (signUpError) throw signUpError;
+    if (!authData.user) throw new Error('لم يتم إنشاء الحساب.');
+
+    const hasActiveSession = Boolean(authData.session);
+    const metadata: Record<string, any> = {"""
+          if old not in s:
+              raise SystemExit('session anchor not found')
+          s = s.replace(old, new, 1)
+
+          old = """    const profile = await upsertProfile(authData.user.id, {
+      email: cleanEmail,
+      full_name: cleanName,
+      phone: cleanPhone,
+      role: data.role,
+      avatar_url: data.avatarUrl || null,
+      governorate: data.governorate || null,
+      city: data.area || null,
+      grade: data.grade || null,
+      account_status: 'active',
+      metadata,
+    });
+
+    if (data.role === 'student') {
+      const qrCode = `HASSTY-${authData.user.id.replace(/-/g, '').slice(0, 10).toUpperCase()}`;
+      await upsertProfile(authData.user.id, { qr_code: qrCode, metadata: { ...metadata, qrCode } });
+    }
+
+    if (data.role === 'teacher') {"""
+          new = """    let profile = await getProfile(authData.user.id);
+    if (!profile && hasActiveSession) {
+      profile = await upsertProfile(authData.user.id, {
+        email: cleanEmail,
+        full_name: cleanName,
+        phone: cleanPhone,
+        role: data.role,
+        avatar_url: data.avatarUrl || null,
+        governorate: data.governorate || null,
+        city: data.area || null,
+        grade: data.grade || null,
+        account_status: 'active',
+        metadata,
+      });
+    }
+
+    if (!profile) {
+      // Email confirmation is required: the database trigger provisions the profile.
+      // Return a provisional session object without touching RLS-protected tables.
+      profile = {
+        id: authData.user.id,
+        email: cleanEmail,
+        full_name: cleanName,
+        phone: cleanPhone,
+        role: data.role,
+        avatar_url: data.avatarUrl || null,
+        governorate: data.governorate || null,
+        city: data.area || null,
+        grade: data.grade || null,
+        account_status: 'active',
+        badge: null,
+        qr_code: null,
+        metadata,
+      };
+    }
+
+    if (data.role === 'student' && hasActiveSession) {
+      const qrCode = `HASSTY-${authData.user.id.replace(/-/g, '').slice(0, 10).toUpperCase()}`;
+      await upsertProfile(authData.user.id, { qr_code: qrCode, metadata: { ...metadata, qrCode } });
+      profile = { ...profile, qr_code: qrCode, metadata: { ...metadata, qrCode } };
+    }
+
+    if (data.role === 'teacher' && hasActiveSession) {"""
+          if old not in s:
+              raise SystemExit('profile block anchor not found')
+          s = s.replace(old, new, 1)
+
+          p.write_text(s, encoding='utf-8')
+
+      - name: Commit source patch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/AuthContext.tsx .github/workflows/fix-email-signup-profile.yml
+          git commit -m "fix: apply email signup profile RLS patch" --allow-empty
+          git rm .github/workflows/fix-email-signup-profile.yml
+          git commit -m "chore: remove one-time signup fix workflow"
+          git push origin HEAD:main
