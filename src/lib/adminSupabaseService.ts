@@ -20,6 +20,7 @@ const COLLECTIONS = {
   verifications: 'verification_requests',
   reports: 'safety_reports',
   commissions: 'commissions',
+  tutors: 'tutors',
 } as const;
 
 function requireSupabase() {
@@ -204,6 +205,44 @@ export async function dbUpdateAccountBadge(accountId: string, newBadge: AccountB
       .update({ updated_at: new Date().toISOString() })
       .eq('id', accountId);
     if (error && error.code !== 'PGRST116') throw error;
+  }
+}
+
+export async function dbUpdateAccountFullProfile(
+  accountId: string,
+  updates: Partial<AdminUserAccount>,
+) {
+  const normalizedUpdates: Record<string, any> = { ...updates };
+  if (updates.badge !== undefined) {
+    normalizedUpdates.isVerified = updates.badge === 'verified';
+  }
+
+  await patchDocument(COLLECTIONS.users, accountId, normalizedUpdates);
+
+  const shouldSyncTutor =
+    updates.role === 'teacher' ||
+    updates.name !== undefined ||
+    updates.phone !== undefined ||
+    updates.subject !== undefined ||
+    updates.governorate !== undefined ||
+    updates.area !== undefined ||
+    updates.avatarUrl !== undefined ||
+    updates.badge !== undefined;
+
+  if (shouldSyncTutor) {
+    const tutorUpdates: Record<string, any> = {};
+    if (updates.name !== undefined) tutorUpdates.name = updates.name;
+    if (updates.phone !== undefined) tutorUpdates.phone = updates.phone;
+    if (updates.subject !== undefined) tutorUpdates.subject = updates.subject;
+    if (updates.governorate !== undefined) tutorUpdates.governorate = updates.governorate;
+    if (updates.area !== undefined) tutorUpdates.area = updates.area;
+    if (updates.avatarUrl !== undefined) tutorUpdates.avatarUrl = updates.avatarUrl;
+    if (updates.badge !== undefined) tutorUpdates.isVerified = updates.badge === 'verified';
+    if (updates.grade !== undefined) tutorUpdates.grade = updates.grade;
+
+    if (Object.keys(tutorUpdates).length > 0) {
+      await patchDocument(COLLECTIONS.tutors, accountId, tutorUpdates);
+    }
   }
 }
 
