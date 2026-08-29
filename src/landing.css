@@ -1,0 +1,112 @@
+/* HASSTY landing-page visual layer. Kept separate from the global stylesheet. */
+.hs-reveal {
+  opacity: 0;
+  transition: opacity 700ms cubic-bezier(0.16, 1, 0.3, 1), transform 700ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: var(--hs-reveal-delay, 0ms);
+  will-change: opacity, transform;
+}
+
+.hs-reveal-up { transform: translateY(28px); }
+.hs-reveal-down { transform: translateY(-28px); }
+.hs-reveal-left { transform: translateX(28px); }
+.hs-reveal-right { transform: translateX(-28px); }
+.hs-reveal-scale { transform: scale(0.96); }
+
+.hs-reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+.hs-proof-section {
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+}
+
+.hs-grid-fade {
+  background-image:
+    linear-gradient(rgba(37,99,235,0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(37,99,235,0.035) 1px, transparent 1px);
+  background-size: 34px 34px;
+  mask-image: linear-gradient(to bottom, transparent, black 18%, black 82%, transparent);
+}
+
+.hs-proof-card {
+  position: relative;
+  overflow: hidden;
+  min-height: 280px;
+  padding: 26px;
+  border: 1px solid #e6edf7;
+  border-radius: 26px;
+  background: rgba(255,255,255,0.92);
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.06);
+  transition: transform 260ms cubic-bezier(0.16,1,0.3,1), box-shadow 260ms ease, border-color 260ms ease;
+}
+
+.hs-proof-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 100% 0%, rgba(37,99,235,0.10), transparent 34%);
+  opacity: 0;
+  transition: opacity 260ms ease;
+}
+
+.hs-proof-card:hover {
+  transform: translateY(-6px);
+  border-color: #bfdbfe;
+  box-shadow: 0 22px 55px rgba(37,99,235,0.12);
+}
+
+.hs-proof-card:hover::before { opacity: 1; }
+
+.hs-proof-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 16px;
+  color: #2563eb;
+  background: linear-gradient(135deg, #eff6ff, #f8fbff);
+  border: 1px solid #dbeafe;
+  box-shadow: 0 8px 22px rgba(37,99,235,0.08);
+  transition: transform 260ms cubic-bezier(0.16,1,0.3,1), background 260ms ease;
+}
+
+.hs-proof-card:hover .hs-proof-icon {
+  transform: rotate(-4deg) scale(1.06);
+  background: linear-gradient(135deg, #dbeafe, #eff6ff);
+}
+
+.hs-home-shell > section {
+  position: relative;
+}
+
+.hs-home-shell > section:not(:first-child)::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: min(1100px, 82%);
+  height: 1px;
+  transform: translateX(-50%);
+  background: linear-gradient(90deg, transparent, rgba(148,163,184,0.18), transparent);
+}
+
+@media (max-width: 640px) {
+  .hs-proof-card {
+    min-height: 0;
+    padding: 22px;
+    border-radius: 22px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hs-reveal,
+  .hs-proof-card,
+  .hs-proof-icon {
+    transition: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+  }
+}
