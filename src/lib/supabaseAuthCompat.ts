@@ -22,20 +22,19 @@ export const auth: { currentUser: User | null } = { currentUser: null };
 
 export async function signInWithPopup(_auth: any, provider: any) {
   if (!supabase) throw new Error('Supabase is not configured');
-  const result = await supabase.auth.signInWithOAuth({
+  const { error } = await supabase.auth.signInWithOAuth({
     provider: provider?.provider || 'google',
     options: { redirectTo: `${window.location.origin}/` },
   });
-  if (result.error) throw result.error;
+  if (error) throw error;
   return { user: auth.currentUser };
 }
 
 export async function signInWithRedirect(_auth: any, provider: any) {
   if (!supabase) throw new Error('Supabase is not configured');
-  const redirectTo = `${window.location.origin}/`;
   const { error } = await supabase.auth.signInWithOAuth({
     provider: provider?.provider || 'google',
-    options: { redirectTo },
+    options: { redirectTo: `${window.location.origin}/` },
   });
   if (error) throw error;
   return null as any;
@@ -85,4 +84,20 @@ export async function sendEmailVerification(user: User) {
     options: { emailRedirectTo: `${window.location.origin}/verify-email` },
   });
   if (error) throw error;
+}
+
+export async function reload(_user: User) {
+  if (!supabase) return null;
+  const { data, error } = await supabase.auth.getUser();
+  if (error) throw error;
+  auth.currentUser = data.user ? mapUser(data.user) : null;
+  return auth.currentUser;
+}
+
+export async function verifyOtp(params: any) {
+  if (!supabase) throw new Error('Supabase is not configured');
+  const { data, error } = await supabase.auth.verifyOtp(params);
+  if (error) throw error;
+  auth.currentUser = data.user ? mapUser(data.user) : auth.currentUser;
+  return data;
 }
