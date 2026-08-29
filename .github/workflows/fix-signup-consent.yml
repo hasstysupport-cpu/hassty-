@@ -1,0 +1,153 @@
+name: Fix signup consent UX
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch-consent:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Patch consent UI
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          legal_path = Path('src/components/common/LegalConsentGate.tsx')
+          legal_path.write_text(r'''import React, { useState } from 'react';
+          import { ArrowLeft, CheckCircle2, ShieldCheck, UserCheck } from 'lucide-react';
+
+          const CONSENT_KEY = 'hassty_signup_legal_consent_v1';
+
+          interface LegalConsentGateProps {
+            onAccept: () => void;
+            onNavigate: (path: string) => void;
+          }
+
+          export const hasRecentSignupConsent = () => {
+            try { return localStorage.getItem(CONSENT_KEY) === 'accepted'; } catch { return false; }
+          };
+
+          export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ onAccept, onNavigate }) => {
+            const [accepted, setAccepted] = useState(false);
+
+            const accept = () => {
+              if (!accepted) return;
+              try { localStorage.setItem(CONSENT_KEY, 'accepted'); } catch { /* ignore storage errors */ }
+              onAccept();
+            };
+
+            return (
+              <div className="min-h-screen bg-[#F8FAFF] flex items-center justify-center px-4 py-10 text-right" dir="rtl">
+                <div className="w-full max-w-2xl bg-white border border-slate-200 rounded-3xl shadow-sm p-6 sm:p-9">
+                  <div className="flex items-start gap-4 mb-6">
+                    <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0"><ShieldCheck className="w-6 h-6" /></div>
+                    <div>
+                      <h1 className="text-2xl font-black text-[#1E3A8A]">قبل إنشاء حسابك</h1>
+                      <p className="text-sm text-slate-500 mt-1 leading-6">راجع موافقتك قبل التسجيل: الشروط، الخصوصية، الاستخدام المقبول، ومتطلبات السن والموافقة.</p>
+                    </div>
+                  </div>
+
+                  <div className="grid sm:grid-cols-3 gap-3 mb-6">
+                    <button type="button" onClick={() => onNavigate('/legal/terms')} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-right hover:border-blue-300 transition">
+                      <div className="font-black text-sm">شروط الاستخدام</div>
+                      <div className="text-xs text-slate-500 mt-1">الحجز، الحساب، المدرسون، المسؤوليات</div>
+                    </button>
+                    <button type="button" onClick={() => onNavigate('/legal/privacy')} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-right hover:border-blue-300 transition">
+                      <div className="font-black text-sm">سياسة الخصوصية</div>
+                      <div className="text-xs text-slate-500 mt-1">البيانات، الهوية، الأطفال، الاحتفاظ</div>
+                    </button>
+                    <button type="button" onClick={() => onNavigate('/legal/acceptable')} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-right hover:border-blue-300 transition">
+                      <div className="font-black text-sm">الاستخدام المقبول</div>
+                      <div className="text-xs text-slate-500 mt-1">الممنوعات وحماية المستخدمين</div>
+                    </button>
+                  </div>
+
+                  <label className="flex items-start gap-3 p-4 rounded-2xl border border-slate-200 bg-slate-50/80 hover:bg-slate-50 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={accepted}
+                      onChange={(e) => setAccepted(e.target.checked)}
+                      className="mt-1 w-5 h-5 accent-blue-600 shrink-0 cursor-pointer"
+                    />
+                    <span className="text-sm leading-6 text-slate-700">
+                      أقر بأنني قرأت وفهمت <button type="button" onClick={() => onNavigate('/legal/terms')} className="text-blue-600 font-black">شروط الاستخدام</button> و<button type="button" onClick={() => onNavigate('/legal/privacy')} className="text-blue-600 font-black">سياسة الخصوصية</button> و<button type="button" onClick={() => onNavigate('/legal/acceptable')} className="text-blue-600 font-black">سياسة الاستخدام المقبول</button>، وأفهم متطلبات السن والموافقة المطبقة على الحساب.
+                    </span>
+                  </label>
+
+                  <div className="mt-6 p-4 rounded-2xl bg-blue-50 border border-blue-100 text-xs text-blue-900 leading-6 flex gap-2">
+                    <UserCheck className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>لو كان الحساب يخص قاصرًا، قد نطلب موافقة ولي الأمر أو نوقف بعض الخدمات حتى تكتمل الآلية المناسبة.</span>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={!accepted}
+                    onClick={accept}
+                    className={`w-full mt-6 py-3.5 rounded-xl text-white font-black transition flex items-center justify-center gap-2 ${accepted ? 'bg-[#2563EB] hover:bg-blue-700 cursor-pointer' : 'bg-slate-300 cursor-not-allowed'}`}
+                  >
+                    <span>أوافق وأتابع إنشاء الحساب</span>
+                    {accepted ? <CheckCircle2 className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
+                  </button>
+                  <p className="text-[11px] text-slate-400 text-center mt-4">الموافقة لا تعني التنازل عن أي حق لا يجوز التنازل عنه قانونًا.</p>
+                </div>
+              </div>
+            );
+          };
+          ''', encoding='utf-8')
+
+          signup_path = Path('src/pages/SignupPage.tsx')
+          text = signup_path.read_text(encoding='utf-8')
+
+          if 'const [legalConsentAccepted' not in text:
+              marker = "  const [errorMessage, setErrorMessage] = useState('');"
+              insert = marker + "\n  const [legalConsentAccepted, setLegalConsentAccepted] = useState<boolean>(() => {\n    try { return localStorage.getItem('hassty_signup_legal_consent_v1') === 'accepted'; } catch { return false; }\n  });"
+              if marker not in text:
+                  raise SystemExit('SignupPage marker not found')
+              text = text.replace(marker, insert, 1)
+
+          guard = "    if (!legalConsentAccepted) {\n      setErrorMessage('يرجى الضغط على «أوافق وأتابع إنشاء الحساب» قبل إنشاء الحساب.');\n      return;\n    }\n"
+          submit_start = "  const handleSubmitRegistration = async (e: React.FormEvent) => {\n    e.preventDefault();\n"
+          if 'يرجى الضغط على «أوافق وأتابع إنشاء الحساب»' not in text:
+              if submit_start not in text:
+                  raise SystemExit('Signup submit handler marker not found')
+              text = text.replace(submit_start, submit_start + guard, 1)
+
+          submit_button = '''              <button\n                type="submit"\n                disabled={isLoading}\n                className="w-full py-3.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-sm rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-4"\n              >\n                {isLoading ? (\n                  <span>جاري إنشاء وتفعيل الحساب...</span>\n                ) : (\n                  <>\n                    <span>إنشاء الحساب فوراً</span>\n                    <ArrowLeft className="w-4 h-4" />\n                  </>\n                )}\n              </button>'''
+
+          consent_button = submit_button + '''\n\n              <button\n                type="button"\n                onClick={() => {\n                  try { localStorage.setItem('hassty_signup_legal_consent_v1', 'accepted'); } catch { /* ignore */ }\n                  setLegalConsentAccepted(true);\n                  setErrorMessage('');\n                }}\n                className={`w-full py-3.5 rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 ${\n                  legalConsentAccepted\n                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'\n                    : 'bg-white hover:bg-blue-50 text-[#2563EB] border-2 border-[#2563EB]'\n                }`}\n              >\n                {legalConsentAccepted ? (\n                  <>\n                    <CheckCircle2 className="w-4 h-4" />\n                    <span>تمت الموافقة على الشروط ✓</span>\n                  </>\n                ) : (\n                  <>\n                    <ShieldCheck className="w-4 h-4" />\n                    <span>أوافق وأتابع إنشاء الحساب</span>\n                    <ArrowLeft className="w-4 h-4" />\n                  </>\n                )}\n              </button>'''
+
+          if 'تمت الموافقة على الشروط ✓' not in text:
+              if submit_button not in text:
+                  raise SystemExit('Signup submit button block not found')
+              text = text.replace(submit_button, consent_button, 1)
+
+          signup_path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Validate
+        run: |
+          node --version
+          grep -q "تمت الموافقة على الشروط" src/pages/SignupPage.tsx
+          grep -q "أوافق وأتابع إنشاء الحساب" src/components/common/LegalConsentGate.tsx
+          grep -q "legalConsentAccepted" src/pages/SignupPage.tsx
+          git diff --check
+
+      - name: Commit changes and remove patch workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/fix-signup-consent.yml
+          git add src/components/common/LegalConsentGate.tsx src/pages/SignupPage.tsx
+          git commit -m "fix: repair signup consent flow and add consent button"
+          git push
