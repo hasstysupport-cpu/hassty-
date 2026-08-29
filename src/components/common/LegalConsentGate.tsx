@@ -47,17 +47,25 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ onAccept, on
           </button>
         </div>
 
-        <label className="flex items-start gap-3 p-4 rounded-2xl border border-slate-200 bg-slate-50/80 hover:bg-slate-50 cursor-pointer select-none">
+        <div className="flex items-start gap-3 p-4 rounded-2xl border border-slate-200 bg-slate-50/80 hover:bg-slate-50 select-none">
           <input
+            id="hassty-legal-consent"
             type="checkbox"
             checked={accepted}
             onChange={(e) => setAccepted(e.target.checked)}
             className="mt-1 w-5 h-5 accent-blue-600 shrink-0 cursor-pointer"
+            aria-label="الموافقة على شروط استخدام منصة حصتي وسياسة الخصوصية والاستخدام المقبول"
           />
-          <span className="text-sm leading-6 text-slate-700">
-            أقر بأنني قرأت وفهمت <button type="button" onClick={() => onNavigate('/legal/terms')} className="text-blue-600 font-black">شروط الاستخدام</button> و<button type="button" onClick={() => onNavigate('/legal/privacy')} className="text-blue-600 font-black">سياسة الخصوصية</button> و<button type="button" onClick={() => onNavigate('/legal/acceptable')} className="text-blue-600 font-black">سياسة الاستخدام المقبول</button>، وأفهم متطلبات السن والموافقة المطبقة على الحساب.
-          </span>
-        </label>
+          <div className="text-sm leading-6 text-slate-700">
+            <span>أقر بأنني قرأت وفهمت </span>
+            <button type="button" onClick={() => onNavigate('/legal/terms')} className="text-blue-600 font-black hover:underline">شروط الاستخدام</button>
+            <span> و</span>
+            <button type="button" onClick={() => onNavigate('/legal/privacy')} className="text-blue-600 font-black hover:underline">سياسة الخصوصية</button>
+            <span> و</span>
+            <button type="button" onClick={() => onNavigate('/legal/acceptable')} className="text-blue-600 font-black hover:underline">سياسة الاستخدام المقبول</button>
+            <span>، وأفهم متطلبات السن والموافقة المطبقة على الحساب.</span>
+          </div>
+        </div>
 
         <div className="mt-6 p-4 rounded-2xl bg-blue-50 border border-blue-100 text-xs text-blue-900 leading-6 flex gap-2">
           <UserCheck className="w-4 h-4 shrink-0 mt-0.5" />
