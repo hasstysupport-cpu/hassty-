@@ -9,30 +9,33 @@ export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
 
-// Helper to check connection status
 export async function checkSupabaseConnection(): Promise<{ ok: boolean; message: string; missingTables?: boolean }> {
   if (!isSupabaseConfigured || !supabase) {
     return {
       ok: false,
-      message: 'لم يتم إضافة VITE_SUPABASE_URL أو VITE_SUPABASE_ANON_KEY في الإعدادات بعد.',
+      message: 'لم يتم إضافة VITE_SUPABASE_URL أو VITE_SUPABASE_ANON_KEY في إعدادات Vercel بعد.',
     };
   }
 
   try {
-    const { error } = await supabase.from('app_documents').select('count', { count: 'exact', head: true });
-    if (error) {
-      // Check if table missing (error code 42P01 in Postgres or PGRST204)
-      if (error.code === '42P01' || error.message?.includes('does not exist') || error.message?.includes('relation')) {
-        return {
-          ok: false,
-          missingTables: true,
-          message: 'تم الاتصال بخادم Supabase، ولكن جداول قاعدة البيانات لم يتم إنشاؤها بعد. يرجى نسخ كود SQL وتشغيله في SQL Editor.',
-        };
+    const checks = ['profiles', 'tutor_profiles', 'student_groups', 'attendance_records', 'booking_requests', 'safety_reports', 'teacher_verification_requests', 'commission_tracking'];
+    for (const table of checks) {
+      const { error } = await supabase.from(table).select('id', { count: 'exact', head: true });
+      if (error) {
+        if (error.code === '42P01' || error.message?.includes('does not exist') || error.message?.includes('relation')) {
+          return {
+            ok: false,
+            missingTables: true,
+            message: `الاتصال بـSupabase موجود، لكن جدول ${table} غير موجود أو لم يتم تطبيق الـschema بالكامل.`,
+          };
+        }
+        throw error;
       }
     }
+
     return {
       ok: true,
-      message: 'تم الاتصال بقاعدة بيانات Supabase بنجاح!',
+      message: 'تم الاتصال بقاعدة بيانات HASSTY في Supabase والجداول الأساسية تعمل.',
     };
   } catch (err: any) {
     return {
