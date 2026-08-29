@@ -7,12 +7,14 @@ import React, { useState, useEffect } from 'react';
 import { AccountRole } from './types';
 import { useAuth } from './lib/AuthContext';
 import { supabase } from './lib/supabase';
+import { recordRequiredSignupConsents } from './lib/legal';
 
 import { PublicNavbar } from './components/common/PublicNavbar';
 import { LoggedInNavbar } from './components/common/LoggedInNavbar';
 import { DashboardSidebar } from './components/common/DashboardSidebar';
 import { Footer } from './components/Footer';
 import { DevDisclaimerFloatingPill } from './components/common/DevDisclaimerFloatingPill';
+import { LegalConsentGate, hasRecentSignupConsent } from './components/common/LegalConsentGate';
 
 import { HomePage } from './pages/HomePage';
 import { SearchResultsPage } from './pages/SearchResultsPage';
@@ -27,6 +29,7 @@ import { ProfileSetupPage } from './pages/ProfileSetupPage';
 import { WhatsAppStudioPage } from './pages/admin/WhatsAppStudioPage';
 import { HasstyAdminApp } from './pages/admin/HasstyAdminApp';
 import { SECRET_ADMIN_ROUTE } from './lib/securityConfig';
+import { LegalPage, LegalSection } from './pages/LegalPage';
 
 import { StudentDashboardPage } from './pages/student/StudentDashboardPage';
 import { StudentQRCardPage } from './pages/student/StudentQRCardPage';
@@ -52,9 +55,7 @@ import { TeacherReviewsPage } from './pages/teacher/TeacherReviewsPage';
 export default function App() {
   const { user, logout } = useAuth();
   const [currentPath, setCurrentPath] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
-      return window.location.pathname || '/';
-    }
+    if (typeof window !== 'undefined') return window.location.pathname || '/';
     return '/';
   });
   const isLoggedIn = !!user;
@@ -65,6 +66,7 @@ export default function App() {
   const [searchCity, setSearchCity] = useState<string>('');
   const [needsProfileSetup, setNeedsProfileSetup] = useState(false);
   const [isCheckingProfile, setIsCheckingProfile] = useState(false);
+  const [signupLegalAccepted, setSignupLegalAccepted] = useState<boolean>(() => hasRecentSignupConsent());
 
   useEffect(() => {
     const handlePopState = () => setCurrentPath(window.location.pathname || '/');
@@ -113,19 +115,13 @@ export default function App() {
   const isAdminAppRoute = currentPath.startsWith(SECRET_ADMIN_ROUTE) || currentPath.startsWith('/admin') || (typeof window !== 'undefined' && window.location.hostname.startsWith('admin.'));
   const isUnverified = isLoggedIn && !user?.emailVerified && user?.role !== 'admin';
 
-  // First-login/profile completion gate. Google accounts are authenticated immediately,
-  // but they must provide the minimum role-specific profile data before entering dashboards.
   useEffect(() => {
     let cancelled = false;
     const check = async () => {
       if (!user?.uid || user.role === 'admin' || !supabase) {
-        if (!cancelled) {
-          setNeedsProfileSetup(false);
-          setIsCheckingProfile(false);
-        }
+        if (!cancelled) { setNeedsProfileSetup(false); setIsCheckingProfile(false); }
         return;
       }
-
       setIsCheckingProfile(true);
       try {
         const { data, error } = await supabase
@@ -134,7 +130,6 @@ export default function App() {
           .eq('id', user.uid)
           .maybeSingle();
         if (error) throw error;
-
         const metadata = (data?.metadata || {}) as Record<string, any>;
         const role = (data?.role || user.role) as AccountRole;
         const commonComplete = Boolean(data?.full_name?.trim() && data?.phone?.trim() && data?.governorate?.trim() && data?.city?.trim());
@@ -143,9 +138,7 @@ export default function App() {
           : role === 'student'
             ? Boolean((data?.grade || metadata.grade || user.profileData?.grade)?.toString().trim())
             : true;
-
-        const incomplete = !data || !commonComplete || !roleComplete;
-        if (!cancelled) setNeedsProfileSetup(incomplete);
+        if (!cancelled) setNeedsProfileSetup(!data || !commonComplete || !roleComplete);
       } catch (err) {
         console.warn('Profile completion check failed:', err);
         if (!cancelled) setNeedsProfileSetup(false);
@@ -158,15 +151,18 @@ export default function App() {
   }, [user]);
 
   useEffect(() => {
+    if (!user?.uid || !signupLegalAccepted || user.role === 'admin') return;
+    void recordRequiredSignupConsents(user.uid).catch((error) => console.warn('Legal consent audit warning:', error));
+  }, [user?.uid, signupLegalAccepted, user?.role]);
+
+  useEffect(() => {
     if (!needsProfileSetup || !isLoggedIn || isAdminAppRoute || isUnverified) return;
     if (currentPath !== '/setup-profile') setCurrentPath('/setup-profile');
   }, [needsProfileSetup, isLoggedIn, isAdminAppRoute, isUnverified, currentPath]);
 
   useEffect(() => {
     if (isLoggedIn && !isUnverified && !needsProfileSetup && !isCheckingProfile) {
-      if (currentPath === '/login' || currentPath === '/signup' || currentPath === '/setup-profile') {
-        handleLogin(currentRole);
-      }
+      if (currentPath === '/login' || currentPath === '/signup' || currentPath === '/setup-profile') handleLogin(currentRole);
     }
   }, [isLoggedIn, currentRole, currentPath, isUnverified, needsProfileSetup, isCheckingProfile]);
 
@@ -179,9 +175,7 @@ export default function App() {
     return null;
   });
 
-  if (isAdminAppRoute) {
-    return <HasstyAdminApp onSwitchToPublicApp={() => setCurrentPath('/')} initialToken={initialAdminToken} />;
-  }
+  if (isAdminAppRoute) return <HasstyAdminApp onSwitchToPublicApp={() => setCurrentPath('/')} initialToken={initialAdminToken} />;
 
   if (isLoggedIn && needsProfileSetup && !isUnverified && currentPath === '/setup-profile') {
     return (
@@ -192,29 +186,17 @@ export default function App() {
     );
   }
 
+  const legalMatch = currentPath.match(/^\/legal\/(terms|privacy|teacher|cookies|acceptable|refund|rights)$/);
+  if (legalMatch) {
+    return <LegalPage section={legalMatch[1] as LegalSection} onNavigate={handleNavigate} />;
+  }
+
   return (
     <div className="min-h-screen bg-[#F8FAFF] text-[#1F2937] font-['IBM_Plex_Sans_Arabic',sans-serif] selection:bg-[#EFF6FF] selection:text-[#2563EB] flex flex-col antialiased">
       {isLoggedIn && isDashboardRoute && !isUnverified && !needsProfileSetup ? (
-        <LoggedInNavbar
-          currentRole={currentRole}
-          currentPath={currentPath}
-          userName={user?.name}
-          userAvatar={user?.avatarUrl || user?.profileData?.avatarUrl}
-          onNavigate={handleNavigate}
-          onRoleChange={(newRole) => setCurrentPath(`/${newRole}/dashboard`)}
-          onLogout={handleLogout}
-        />
+        <LoggedInNavbar currentRole={currentRole} currentPath={currentPath} userName={user?.name} userAvatar={user?.avatarUrl || user?.profileData?.avatarUrl} onNavigate={handleNavigate} onRoleChange={(newRole) => setCurrentPath(`/${newRole}/dashboard`)} onLogout={handleLogout} />
       ) : (
-        <PublicNavbar
-          currentPath={currentPath}
-          isLoggedIn={isLoggedIn && !isUnverified && !needsProfileSetup}
-          user={user}
-          currentRole={currentRole}
-          onNavigate={handleNavigate}
-          onOpenLogin={() => handleNavigate('/login')}
-          onOpenSignup={() => handleNavigate('/signup')}
-          onLogout={handleLogout}
-        />
+        <PublicNavbar currentPath={currentPath} isLoggedIn={isLoggedIn && !isUnverified && !needsProfileSetup} user={user} currentRole={currentRole} onNavigate={handleNavigate} onOpenLogin={() => handleNavigate('/login')} onOpenSignup={() => handleNavigate('/signup')} onLogout={handleLogout} />
       )}
 
       {isDashboardRoute && isLoggedIn && !isUnverified && !needsProfileSetup ? (
@@ -227,12 +209,10 @@ export default function App() {
             {currentPath === '/student/tutors' && <StudentTutorsPage onNavigate={handleNavigate} onSelectTutor={handleSelectTutor} />}
             {currentPath === '/student/book' && <StudentBookPage />}
             {currentPath === '/student/payments' && <StudentPaymentsPage />}
-
             {currentPath === '/parent/dashboard' && <ParentDashboardPage onNavigate={handleNavigate} />}
             {currentPath === '/parent/attendance' && <ParentAttendancePage />}
             {currentPath === '/parent/payments' && <ParentPaymentsPage />}
             {currentPath === '/parent/settings' && <ParentSettingsPage />}
-
             {currentPath === '/teacher/dashboard' && <TeacherDashboardPage onNavigate={handleNavigate} />}
             {currentPath === '/teacher/students' && <TeacherStudentsPage onNavigate={handleNavigate} />}
             {currentPath === '/teacher/groups' && <TeacherGroupsPage />}
@@ -245,9 +225,7 @@ export default function App() {
         </div>
       ) : (
         <main className="flex-1 page-transition">
-          {isCheckingProfile && isLoggedIn && !isUnverified && currentPath !== '/setup-profile' && (
-            <div className="max-w-3xl mx-auto px-4 py-8 text-center text-xs text-slate-500">جاري تجهيز بيانات حسابك...</div>
-          )}
+          {isCheckingProfile && isLoggedIn && !isUnverified && currentPath !== '/setup-profile' && <div className="max-w-3xl mx-auto px-4 py-8 text-center text-xs text-slate-500">جاري تجهيز بيانات حسابك...</div>}
           {currentPath === '/' && <HomePage onNavigate={handleNavigate} onSelectTutor={handleSelectTutor} onSearchWithParams={handleSearchWithParams} />}
           {currentPath === '/search' && <SearchResultsPage onNavigate={handleNavigate} onSelectTutor={handleSelectTutor} initialSubject={searchSubject} initialGovernorate={searchGovernorate} initialCity={searchCity} />}
           {currentPath.startsWith('/tutor') && <TeacherProfilePage tutorId={selectedTutorId} onNavigate={handleNavigate} onSelectTutor={handleSelectTutor} />}
@@ -255,7 +233,8 @@ export default function App() {
           {currentPath === '/contact' && <ContactPage />}
           {currentPath === '/for-teachers' && <ForTeachersPage onNavigate={handleNavigate} />}
           {currentPath === '/login' && <LoginPage onNavigate={handleNavigate} onLoginSuccess={handleLogin} />}
-          {currentPath === '/signup' && <SignupPage onNavigate={handleNavigate} onSignupSuccess={handleLogin} />}
+          {currentPath === '/signup' && !signupLegalAccepted && <LegalConsentGate onAccept={() => setSignupLegalAccepted(true)} onNavigate={handleNavigate} />}
+          {currentPath === '/signup' && signupLegalAccepted && <SignupPage onNavigate={handleNavigate} onSignupSuccess={handleLogin} />}
           {(currentPath === '/verify-email' || isUnverified) && <VerifyEmailPage onNavigate={handleNavigate} onVerificationSuccess={handleLogin} />}
           {currentPath === '/whatsapp-studio' && <WhatsAppStudioPage />}
         </main>
