@@ -1,0 +1,127 @@
+name: One-time email signup profile flow
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch AuthContext
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/lib/AuthContext.tsx')
+          s = p.read_text(encoding='utf-8')
+
+          old = 'data: { full_name: cleanName, avatar_url: data.avatarUrl || null, role: data.role },'
+          new = '''data: {
+            full_name: cleanName,
+            avatar_url: data.avatarUrl || null,
+            role: data.role,
+            phone: cleanPhone,
+            governorate: data.governorate || '',
+            city: data.area || '',
+            grade: data.grade || '',
+            subject: data.subject || '',
+            experience: data.experience || '',
+            parentPhone: data.parentPhone || '',
+          },'''
+          if old in s:
+              s = s.replace(old, new, 1)
+
+          old = '''    const metadata: Record<string, any> = {
+      authProvider: 'email',''''
+          new = '''    const hasActiveSession = Boolean(authData.session);
+    const metadata: Record<string, any> = {
+      authProvider: 'email',''''
+          if old in s and 'const hasActiveSession = Boolean(authData.session);' not in s:
+              s = s.replace(old, new, 1)
+
+          old = '''    const profile = await upsertProfile(authData.user.id, {
+      email: cleanEmail,
+      full_name: cleanName,
+      phone: cleanPhone,
+      role: data.role,
+      avatar_url: data.avatarUrl || null,
+      governorate: data.governorate || null,
+      city: data.area || null,
+      grade: data.grade || null,
+      account_status: 'active',
+      metadata,
+    });'''
+          new = '''    let profile = await getProfile(authData.user.id);
+    if (!profile && hasActiveSession) {
+      profile = await upsertProfile(authData.user.id, {
+        email: cleanEmail,
+        full_name: cleanName,
+        phone: cleanPhone,
+        role: data.role,
+        avatar_url: data.avatarUrl || null,
+        governorate: data.governorate || null,
+        city: data.area || null,
+        grade: data.grade || null,
+        account_status: 'active',
+        metadata,
+      });
+    }
+
+    if (!profile) {
+      profile = {
+        id: authData.user.id,
+        email: cleanEmail,
+        full_name: cleanName,
+        phone: cleanPhone,
+        role: data.role,
+        avatar_url: data.avatarUrl || null,
+        governorate: data.governorate || null,
+        city: data.area || null,
+        grade: data.grade || null,
+        account_status: 'active',
+        badge: null,
+        qr_code: null,
+        metadata,
+      };
+    }'''
+          if old in s:
+              s = s.replace(old, new, 1)
+
+          old = '''    if (data.role === 'student') {
+      const qrCode = `HASSTY-${authData.user.id.replace(/-/g, '').slice(0, 10).toUpperCase()}`;
+      await upsertProfile(authData.user.id, { qr_code: qrCode, metadata: { ...metadata, qrCode } });
+    }
+
+    if (data.role === 'teacher') {'''
+          new = '''    if (data.role === 'student' && hasActiveSession) {
+      const qrCode = `HASSTY-${authData.user.id.replace(/-/g, '').slice(0, 10).toUpperCase()}`;
+      await upsertProfile(authData.user.id, { qr_code: qrCode, metadata: { ...metadata, qrCode } });
+      profile = { ...profile, qr_code: qrCode, metadata: { ...metadata, qrCode } };
+    }
+
+    if (data.role === 'teacher' && hasActiveSession) {'''
+          if old in s:
+              s = s.replace(old, new, 1)
+
+          p.write_text(s, encoding='utf-8')
+          print('patched:', 'hasActiveSession' in s)
+          PY
+
+      - name: Commit and remove workflow
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/lib/AuthContext.tsx
+          git commit -m 'fix: apply email signup profile RLS patch' || true
+          git rm .github/workflows/one-time-fix-email-signup.yml
+          git commit -m 'chore: remove one-time signup fix workflow'
+          git push origin HEAD:main
