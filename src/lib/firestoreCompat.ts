@@ -1,5 +1,6 @@
-export const db: any = {};
 import { supabase, isSupabaseConfigured } from './supabase';
+
+export const db: any = {};
 
 export type SupabaseDoc = { id: string; data: () => any; exists: () => boolean; ref?: any };
 export type SupabaseQuery = {
@@ -8,25 +9,6 @@ export type SupabaseQuery = {
   orderings: Array<{ field: string; direction: 'asc' | 'desc' }>;
   limitCount?: number;
 };
-
-const STORAGE_PREFIX = 'hassty_db_compat_';
-
-function getLocalCollection(collectionName: string): Record<string, any> {
-  try {
-    const raw = localStorage.getItem(`${STORAGE_PREFIX}${collectionName}`);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
-
-function saveLocalCollection(collectionName: string, data: Record<string, any>) {
-  try {
-    localStorage.setItem(`${STORAGE_PREFIX}${collectionName}`, JSON.stringify(data));
-  } catch (e) {
-    console.warn('LocalStorage save error:', e);
-  }
-}
 
 const emptyQuery = (collectionName: string): SupabaseQuery => ({ collectionName, filters: [], orderings: [] });
 
@@ -39,12 +21,15 @@ export const doc = (arg1: any, arg2?: string, arg3?: string) => {
 export const where = (field: string, op: string, value: any) => ({ field, op, value });
 export const orderBy = (field: string, direction: 'asc' | 'desc' = 'asc') => ({ field, direction });
 export const limit = (count: number) => ({ count });
-export const writeBatch = () => ({
-  set: (ref: any, data: any) => setDoc(ref, data),
-  update: (ref: any, data: any) => updateDoc(ref, data),
-  delete: (ref: any) => deleteDoc(ref),
-  commit: async () => {},
-});
+export const writeBatch = () => {
+  const operations: Array<() => Promise<void>> = [];
+  return {
+    set: (ref: any, data: any) => operations.push(() => setDoc(ref, data)),
+    update: (ref: any, data: any) => operations.push(() => updateDoc(ref, data)),
+    delete: (ref: any) => operations.push(() => deleteDoc(ref)),
+    commit: async () => { for (const operation of operations) await operation(); },
+  };
+};
 
 export const query = (ref: any, ...constraints: any[]): SupabaseQuery => {
   const q = emptyQuery(ref.collectionName || ref);
@@ -63,265 +48,369 @@ const makeDoc = (row: any): SupabaseDoc => ({
   exists: () => true,
 });
 
-const missingDoc = (id: string): SupabaseDoc => ({
-  id,
-  data: () => ({}),
-  exists: () => false,
-});
+const missingDoc = (id: string): SupabaseDoc => ({ id, data: () => ({}), exists: () => false });
+
+function requireSupabase() {
+  if (!isSupabaseConfigured || !supabase) throw new Error('Supabase is not configured');
+  return supabase;
+}
+
+function profileToData(profile: any) {
+  return {
+    id: profile.id,
+    uid: profile.id,
+    name: profile.full_name || 'مستخدم حِصّتي',
+    full_name: profile.full_name || '',
+    phone: profile.phone || '',
+    email: profile.email || '',
+    role: profile.role || 'student',
+    avatarUrl: profile.avatar_url || '',
+    qrCode: profile.qr_code || '',
+    governorate: profile.governorate || 'القاهرة',
+    area: profile.city || '',
+    grade: profile.grade || '',
+    accountStatus: profile.account_status || 'active',
+    status: profile.account_status || 'active',
+    badge: profile.badge || 'none',
+    isVerified: profile.badge === 'verified',
+    emailVerified: Boolean(profile.metadata?.emailVerified),
+    parentPhone: profile.metadata?.parentPhone || '',
+    nationalId: profile.metadata?.nationalId || '',
+    profileData: profile.metadata?.profileData || {},
+    ...((profile.metadata || {}) as Record<string, any>),
+    createdAt: profile.created_at,
+    updatedAt: profile.updated_at,
+  };
+}
+
+function tutorToData(tutor: any, profile?: any) {
+  return {
+    id: tutor.user_id,
+    uid: tutor.user_id,
+    name: profile?.full_name || tutor.title || 'مدرس حِصّتي',
+    title: tutor.title || '',
+    headline: tutor.headline || '',
+    subject: tutor.subjects?.[0] || '',
+    subjects: tutor.subjects || [],
+    levels: tutor.grades || [],
+    grades: tutor.grades || [],
+    governorate: tutor.governorate || profile?.governorate || 'القاهرة',
+    area: tutor.city || profile?.city || '',
+    rating: Number(tutor.rating || 0),
+    reviewsCount: Number(tutor.reviews_count || 0),
+    studentsCount: 0,
+    pricePerSession: Number(tutor.price_per_session || 0),
+    pricePerMonth: Number(tutor.price_per_month || 0),
+    monthlySubscriptionPrice: Number(tutor.price_per_month || 0),
+    isVerified: Boolean(tutor.is_verified),
+    verificationStatus: tutor.verification_status || 'pending',
+    experienceYears: tutor.experience_years_text || tutor.experience_years || '',
+    centers: tutor.center_names || [],
+    bio: tutor.bio || '',
+    phone: profile?.phone || '',
+    email: profile?.email || '',
+    avatarUrl: profile?.avatar_url || '',
+    ...((tutor.metadata || {}) as Record<string, any>),
+  };
+}
+
+async function getFromAppDocuments(collectionName: string, docId?: string) {
+  const client = requireSupabase();
+  let queryBuilder = client.from('app_documents').select('*').eq('collection_name', collectionName);
+  if (docId) queryBuilder = queryBuilder.eq('document_id', docId).maybeSingle();
+  return queryBuilder;
+}
 
 export async function getDoc(ref: any): Promise<SupabaseDoc> {
   const collName = ref.collectionName;
   const docId = ref.id;
+  const client = requireSupabase();
 
-  if (isSupabaseConfigured && supabase) {
-    try {
-      // 1. Try app_documents
-      const { data, error } = await supabase
-        .from('app_documents')
-        .select('*')
-        .eq('collection_name', collName)
-        .eq('document_id', docId)
-        .maybeSingle();
-
-      if (!error && data && data.data) {
-        const local = getLocalCollection(collName);
-        local[docId] = data.data;
-        saveLocalCollection(collName, local);
-        return makeDoc(data);
-      }
-
-      // 2. If 'users', try 'profiles' table directly
-      if (collName === 'users') {
-        const { data: prof, error: profErr } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', docId)
-          .maybeSingle();
-
-        if (!profErr && prof) {
-          const mappedUser = {
-            id: prof.id,
-            name: prof.full_name || prof.name || 'مستخدم حِصّتي',
-            phone: prof.phone || '',
-            email: prof.email || '',
-            role: prof.role || 'student',
-            governorate: prof.governorate || 'القاهرة',
-            area: prof.city || prof.area || '',
-            grade: prof.grade || '',
-            qrCode: prof.qr_code || '',
-            avatarUrl: prof.avatar_url || '',
-            createdAt: prof.created_at,
-          };
-          const local = getLocalCollection(collName);
-          local[docId] = mappedUser;
-          saveLocalCollection(collName, local);
-          return makeDoc({ document_id: prof.id, data: mappedUser });
-        }
-      }
-    } catch (e) {
-      console.warn('Supabase getDoc fallback to local cache:', e);
-    }
+  if (collName === 'users') {
+    const { data, error } = await client.from('profiles').select('*').eq('id', docId).maybeSingle();
+    if (error) throw error;
+    return data ? makeDoc({ document_id: data.id, data: profileToData(data) }) : missingDoc(docId);
   }
 
-  const local = getLocalCollection(collName);
-  if (local[docId]) {
-    return {
-      id: docId,
-      data: () => local[docId],
-      exists: () => true,
-    };
+  if (collName === 'tutors') {
+    const [{ data: tutor, error: tutorError }, { data: profile, error: profileError }] = await Promise.all([
+      client.from('tutor_profiles').select('*').eq('user_id', docId).maybeSingle(),
+      client.from('profiles').select('*').eq('id', docId).maybeSingle(),
+    ]);
+    if (tutorError) throw tutorError;
+    if (profileError) throw profileError;
+    return tutor ? makeDoc({ document_id: docId, data: tutorToData(tutor, profile) }) : missingDoc(docId);
   }
-  return missingDoc(docId);
+
+  const { data, error } = await getFromAppDocuments(collName, docId);
+  if (error) throw error;
+  return data ? makeDoc(data) : missingDoc(docId);
 }
 
-export async function getDocs(
-  q: any
-): Promise<{ docs: SupabaseDoc[]; empty: boolean; forEach: (fn: (d: SupabaseDoc) => void) => void }> {
-  const queryObj: SupabaseQuery = q.collectionName ? q : emptyQuery(q.collectionName || q.collection_name);
-  const collName = queryObj.collectionName;
-  let rowsMap = new Map<string, any>();
+async function fetchCollectionRows(collName: string) {
+  const client = requireSupabase();
 
-  if (isSupabaseConfigured && supabase) {
-    try {
-      // 1. Fetch from app_documents
-      const { data, error } = await supabase
-        .from('app_documents')
-        .select('*')
-        .eq('collection_name', collName);
-
-      if (!error && data && data.length > 0) {
-        for (const row of data) {
-          if (row.document_id) {
-            rowsMap.set(row.document_id, {
-              document_id: row.document_id,
-              collection_name: collName,
-              data: row.data || {},
-              created_at: row.created_at,
-            });
-          }
-        }
-      }
-
-      // 2. Fetch from native relational table if applicable
-      if (collName === 'users') {
-        const { data: profs, error: profErr } = await supabase
-          .from('profiles')
-          .select('*');
-
-        if (!profErr && profs && profs.length > 0) {
-          for (const p of profs) {
-            const existing = rowsMap.get(p.id);
-            const mapped = {
-              id: p.id,
-              name: p.full_name || p.name || existing?.data?.name || 'مستخدم',
-              phone: p.phone || existing?.data?.phone || '',
-              email: p.email || existing?.data?.email || '',
-              role: p.role || existing?.data?.role || 'student',
-              grade: p.grade || existing?.data?.grade || '',
-              governorate: p.governorate || existing?.data?.governorate || 'القاهرة',
-              area: p.city || p.area || existing?.data?.area || '',
-              qrCode: p.qr_code || existing?.data?.qrCode || '',
-              avatarUrl: p.avatar_url || existing?.data?.avatarUrl || '',
-              createdAt: p.created_at || existing?.data?.createdAt || new Date().toISOString(),
-              status: existing?.data?.status || 'active',
-              badge: existing?.data?.badge || 'none',
-              studentsCount: existing?.data?.studentsCount || 0,
-              totalRevenue: existing?.data?.totalRevenue || 0,
-              parentPhone: existing?.data?.parentPhone || '',
-            };
-            rowsMap.set(p.id, {
-              document_id: p.id,
-              collection_name: 'users',
-              data: mapped,
-              created_at: p.created_at,
-            });
-          }
-        }
-      }
-
-      // Sync local cache
-      const local: Record<string, any> = {};
-      rowsMap.forEach((v, k) => {
-        local[k] = v.data;
-      });
-      if (Object.keys(local).length > 0) {
-        saveLocalCollection(collName, local);
-      }
-    } catch (e) {
-      console.warn('Supabase getDocs exception, using local:', e);
-    }
+  if (collName === 'users') {
+    const { data, error } = await client.from('profiles').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data || []).map((row: any) => ({ document_id: row.id, data: profileToData(row), created_at: row.created_at }));
   }
 
-  // If no rows from Supabase, merge local cache
-  if (rowsMap.size === 0) {
-    const local = getLocalCollection(collName);
-    Object.entries(local).forEach(([id, val]) => {
-      rowsMap.set(id, {
-        document_id: id,
-        collection_name: collName,
-        data: val,
-      });
-    });
+  if (collName === 'tutors') {
+    const [{ data: tutors, error: tutorError }, { data: profiles, error: profileError }] = await Promise.all([
+      client.from('tutor_profiles').select('*').order('created_at', { ascending: false }),
+      client.from('profiles').select('id,full_name,phone,email,avatar_url,governorate,city'),
+    ]);
+    if (tutorError) throw tutorError;
+    if (profileError) throw profileError;
+    const profileById = new Map((profiles || []).map((p: any) => [p.id, p]));
+    return (tutors || []).map((row: any) => ({ document_id: row.user_id, data: tutorToData(row, profileById.get(row.user_id)), created_at: row.created_at }));
   }
 
-  let rows = Array.from(rowsMap.values());
+  const tableMap: Record<string, string> = {
+    groups: 'student_groups',
+    attendance: 'attendance_records',
+    booking_requests: 'booking_requests',
+    parent_children: 'parent_children',
+    makeup_requests: 'makeup_requests',
+    safety_reports: 'safety_reports',
+    attendance_disputes: 'attendance_disputes',
+    commissions: 'commission_tracking',
+  };
 
+  if (tableMap[collName]) {
+    const { data, error } = await client.from(tableMap[collName]).select('*');
+    if (error) throw error;
+    return (data || []).map((row: any) => ({ document_id: row.id, data: row, created_at: row.created_at }));
+  }
+
+  const { data, error } = await getFromAppDocuments(collName);
+  if (error) throw error;
+  return (data || []).map((row: any) => ({ document_id: row.document_id, data: row.data || {}, created_at: row.created_at }));
+}
+
+function applyQuery(rows: any[], queryObj: SupabaseQuery) {
+  let result = [...rows];
   for (const f of queryObj.filters) {
-    rows = rows.filter((r: any) => {
+    result = result.filter((r: any) => {
       const val = r.data?.[f.field];
-      return f.op === '==' ? val === f.value : f.op === '!=' ? val !== f.value : true;
+      if (f.op === '==') return val === f.value;
+      if (f.op === '!=') return val !== f.value;
+      return true;
     });
   }
-
   for (const o of [...queryObj.orderings].reverse()) {
-    rows.sort(
-      (a: any, b: any) =>
-        String(a.created_at || '').localeCompare(String(b.created_at || '')) *
-        (o.direction === 'asc' ? 1 : -1)
-    );
+    result.sort((a: any, b: any) => String(a.data?.[o.field] ?? a.created_at ?? '').localeCompare(String(b.data?.[o.field] ?? b.created_at ?? '')) * (o.direction === 'asc' ? 1 : -1));
   }
+  if (queryObj.limitCount) result = result.slice(0, queryObj.limitCount);
+  return result;
+}
 
-  if (queryObj.limitCount) rows = rows.slice(0, queryObj.limitCount);
+export async function getDocs(q: any): Promise<{ docs: SupabaseDoc[]; empty: boolean; forEach: (fn: (d: SupabaseDoc) => void) => void }> {
+  const queryObj: SupabaseQuery = q.collectionName ? q : emptyQuery(q.collectionName || q.collection_name);
+  const rows = applyQuery(await fetchCollectionRows(queryObj.collectionName), queryObj);
   const docs = rows.map(makeDoc);
   return { docs, empty: docs.length === 0, forEach: (fn) => docs.forEach(fn) };
+}
+
+async function upsertUser(docId: string, data: any) {
+  const client = requireSupabase();
+  const { data: existing, error: readError } = await client.from('profiles').select('metadata').eq('id', docId).maybeSingle();
+  if (readError) throw readError;
+  const metadata = { ...(existing?.metadata || {}), ...(data.profileData || {}), ...data };
+  const payload = {
+    id: docId,
+    full_name: data.name || data.full_name || 'مستخدم حِصّتي',
+    phone: data.phone || '00000000000',
+    email: data.email || null,
+    role: data.role || 'student',
+    avatar_url: data.avatarUrl || data.avatar_url || null,
+    qr_code: data.qrCode || data.qr_code || null,
+    governorate: data.governorate || null,
+    city: data.area || data.city || null,
+    grade: data.grade || null,
+    account_status: data.accountStatus || data.status || 'active',
+    badge: data.badge || (data.isVerified ? 'verified' : existing ? undefined : 'none'),
+    metadata,
+    updated_at: new Date().toISOString(),
+  };
+  const { error } = await client.from('profiles').upsert(payload, { onConflict: 'id' });
+  if (error) throw error;
+}
+
+async function upsertTutor(docId: string, data: any) {
+  const client = requireSupabase();
+  const { data: existing } = await client.from('tutor_profiles').select('*').eq('user_id', docId).maybeSingle();
+  const metadata = { ...(existing?.metadata || {}), ...data.metadata };
+  const payload: any = {
+    user_id: docId,
+    title: data.title || `معلم ${data.subject || 'المادة'}`,
+    headline: data.headline || null,
+    bio: data.bio || null,
+    subjects: data.subjects || (data.subject ? [data.subject] : []),
+    grades: data.grades || data.levels || [],
+    experience_years: Number.parseInt(String(data.experienceYears || '').replace(/[^0-9]/g, ''), 10) || 1,
+    experience_years_text: data.experienceYears ? String(data.experienceYears) : null,
+    rating: Number(data.rating || 5),
+    reviews_count: Number(data.reviewsCount || 0),
+    governorate: data.governorate || null,
+    city: data.area || data.city || null,
+    center_names: data.centers || data.center_names || [],
+    price_per_month: Number(data.pricePerMonth || data.monthlySubscriptionPrice || 0),
+    price_per_session: Number(data.pricePerSession || 0),
+    punctuality_rate: Number(data.punctualityRate || 100),
+    metadata: { ...metadata, joinCode: data.joinCode || metadata.joinCode },
+    // Client-created teachers are never auto-verified.
+    is_verified: Boolean(existing?.is_verified),
+    verification_status: existing?.verification_status || 'pending',
+    updated_at: new Date().toISOString(),
+  };
+  const { error } = await client.from('tutor_profiles').upsert(payload, { onConflict: 'user_id' });
+  if (error) throw error;
+}
+
+async function upsertRelationalCollection(collName: string, docId: string, data: any) {
+  const client = requireSupabase();
+  const map: Record<string, { table: string; payload: any }> = {
+    groups: {
+      table: 'student_groups',
+      payload: {
+        id: docId,
+        tutor_id: data.tutorId || data.teacherId,
+        name: data.name || 'مجموعة جديدة',
+        grade: data.grade || '',
+        schedule: data.schedule || data.timing || '',
+        location: data.location || '',
+        center_name: data.centerName || data.location || '',
+        max_students: Number(data.maxCapacity || data.maxStudents || 30),
+        current_count: Number(data.currentStudents || 0),
+        monthly_fee: Number(data.monthlyPrice || data.priceAmount || 0),
+        is_active: data.isPaused !== true,
+        updated_at: new Date().toISOString(),
+      },
+    },
+    booking_requests: {
+      table: 'booking_requests',
+      payload: {
+        id: docId,
+        tutor_id: data.tutorId,
+        student_id: data.studentId || null,
+        student_name: data.studentName || '',
+        student_phone: data.studentPhone || '',
+        parent_phone: data.parentPhone || null,
+        grade: data.studentGrade || data.grade || '',
+        group_id: data.groupId || null,
+        notes: data.notes || null,
+        status: data.status || 'pending',
+        updated_at: new Date().toISOString(),
+      },
+    },
+    attendance: {
+      table: 'attendance_records',
+      payload: {
+        id: docId,
+        group_id: data.groupId,
+        student_id: data.studentId || null,
+        student_name: data.studentName || '',
+        qr_code: data.qrCode || '',
+        date: data.date || new Date().toISOString().slice(0, 10),
+        time: data.time || new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+        status: data.status || 'present',
+        homework_status: data.homeworkStatus || 'pending',
+        notes: data.notes || null,
+        is_makeup: Boolean(data.isMakeup),
+        scanned_via_qr: data.scannedViaQr !== false,
+        updated_at: new Date().toISOString(),
+      },
+    },
+    safety_reports: {
+      table: 'safety_reports',
+      payload: {
+        id: docId,
+        ticket_number: data.ticketNumber || `HST-${Date.now()}`,
+        reporter_id: data.reporterId || null,
+        target_teacher_id: data.targetTeacherId || null,
+        report_type: data.reportType || data.category || 'other',
+        category: data.category || data.reportType || 'other',
+        details: data.details || data.description || '',
+        status: data.status === 'in_review' ? 'under_investigation' : data.status === 'resolved' ? 'resolved' : 'open',
+        updated_at: new Date().toISOString(),
+      },
+    },
+  };
+  const entry = map[collName];
+  if (!entry) return false;
+  const { error } = await client.from(entry.table).upsert(entry.payload, { onConflict: 'id' });
+  if (error) throw error;
+  return true;
 }
 
 export async function setDoc(ref: any, payload: any, options?: { merge?: boolean }) {
   const collName = ref.collectionName;
   const docId = ref.id;
+  const client = requireSupabase();
 
-  // 1. Update local cache immediately
-  const local = getLocalCollection(collName);
-  const existing = local[docId] || {};
-  const data = options?.merge ? { ...existing, ...payload } : payload;
-  local[docId] = data;
-  saveLocalCollection(collName, local);
-
-  // 2. Sync to Supabase if configured
-  if (isSupabaseConfigured && supabase) {
-    try {
-      // Upsert into app_documents
-      await supabase.from('app_documents').upsert(
-        {
-          collection_name: collName,
-          document_id: docId,
-          data,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'collection_name,document_id' }
-      );
-
-      // If 'users', also sync to 'profiles' table
-      if (collName === 'users') {
-        const phone = data.phone || `010${Math.floor(10000000 + Math.random() * 90000000)}`;
-        await supabase.from('profiles').upsert(
-          {
-            id: docId,
-            full_name: data.name || 'مستخدم',
-            phone,
-            email: data.email || null,
-            role: data.role || 'student',
-            governorate: data.governorate || 'القاهرة',
-            city: data.area || '',
-            grade: data.grade || null,
-            qr_code: data.qrCode || null,
-            avatar_url: data.avatarUrl || null,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'id' }
-        );
-      }
-    } catch (e) {
-      console.warn('Supabase setDoc sync error, local copy saved:', e);
+  if (collName === 'users') {
+    let data = payload;
+    if (options?.merge) {
+      const current = await getDoc(ref);
+      data = current.exists() ? { ...current.data(), ...payload } : payload;
     }
+    await upsertUser(docId, data);
+    return;
   }
+
+  if (collName === 'tutors') {
+    let data = payload;
+    if (options?.merge) {
+      const current = await getDoc(ref);
+      data = current.exists() ? { ...current.data(), ...payload } : payload;
+    }
+    await upsertTutor(docId, data);
+    return;
+  }
+
+  if (['groups', 'booking_requests', 'attendance', 'safety_reports'].includes(collName)) {
+    const handled = await upsertRelationalCollection(collName, docId, payload);
+    if (handled) return;
+  }
+
+  const current = options?.merge ? (await getDoc(ref)).data() : {};
+  const data = options?.merge ? { ...current, ...payload } : payload;
+  const { error } = await client.from('app_documents').upsert({
+    collection_name: collName,
+    document_id: docId,
+    data,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'collection_name,document_id' });
+  if (error) throw error;
 }
 
-export async function updateDoc(ref: any, patch: any) {
-  return setDoc(ref, patch, { merge: true });
-}
+export async function updateDoc(ref: any, patch: any) { return setDoc(ref, patch, { merge: true }); }
 
 export async function deleteDoc(ref: any) {
   const collName = ref.collectionName;
   const docId = ref.id;
-
-  // 1. Remove from local cache
-  const local = getLocalCollection(collName);
-  delete local[docId];
-  saveLocalCollection(collName, local);
-
-  // 2. Remove from Supabase
-  if (isSupabaseConfigured && supabase) {
-    try {
-      await supabase
-        .from('app_documents')
-        .delete()
-        .eq('collection_name', collName)
-        .eq('document_id', docId);
-    } catch (e) {
-      console.warn('Supabase deleteDoc error:', e);
-    }
+  const client = requireSupabase();
+  const tableMap: Record<string, string> = {
+    users: 'profiles',
+    groups: 'student_groups',
+    booking_requests: 'booking_requests',
+    attendance: 'attendance_records',
+    safety_reports: 'safety_reports',
+    parent_children: 'parent_children',
+    makeup_requests: 'makeup_requests',
+    attendance_disputes: 'attendance_disputes',
+    commissions: 'commission_tracking',
+  };
+  const table = tableMap[collName];
+  if (table) {
+    const { error } = await client.from(table).delete().eq('id', docId);
+    if (error) throw error;
+    return;
   }
+  const { error } = await client.from('app_documents').delete().eq('collection_name', collName).eq('document_id', docId);
+  if (error) throw error;
 }
 
 export async function addDoc(collectionRef: any, payload: any) {
@@ -330,67 +419,40 @@ export async function addDoc(collectionRef: any, payload: any) {
   return ref;
 }
 
-export function onSnapshot(
-  q: any,
-  callback: (snap: any) => void,
-  onError?: (e: any) => void
-) {
+export function onSnapshot(q: any, callback: (snap: any) => void, onError?: (e: any) => void) {
   let cancelled = false;
-
   const load = async () => {
     try {
       const snap = await getDocs(q);
       if (!cancelled) callback(snap);
     } catch (e) {
-      if (onError) onError(e);
+      if (!cancelled) onError?.(e);
     }
   };
+  void load();
 
-  load();
-
-  if (isSupabaseConfigured && supabase) {
-    const collName = q.collectionName || q;
-    try {
-      const channel = supabase
-        .channel(`compat:${collName}:${Date.now()}`)
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'app_documents' },
-          () => {
-            load();
-          }
-        )
-        .subscribe();
-
-      let profilesChannel: any = null;
-      if (collName === 'users') {
-        profilesChannel = supabase
-          .channel(`compat_profiles:${Date.now()}`)
-          .on(
-            'postgres_changes',
-            { event: '*', schema: 'public', table: 'profiles' },
-            () => {
-              load();
-            }
-          )
-          .subscribe();
-      }
-
-      return () => {
-        cancelled = true;
-        if (channel && supabase) supabase.removeChannel(channel);
-        if (profilesChannel && supabase) supabase.removeChannel(profilesChannel);
-      };
-    } catch (e) {
-      console.warn('Realtime channel creation warning:', e);
-    }
-  }
-
+  if (!isSupabaseConfigured || !supabase) return () => { cancelled = true; };
+  const collName = q.collectionName || q;
+  const tableMap: Record<string, string[]> = {
+    users: ['profiles'],
+    tutors: ['tutor_profiles', 'profiles'],
+    groups: ['student_groups'],
+    attendance: ['attendance_records'],
+    booking_requests: ['booking_requests'],
+    safety_reports: ['safety_reports'],
+    parent_children: ['parent_children'],
+    makeup_requests: ['makeup_requests'],
+    attendance_disputes: ['attendance_disputes'],
+    commissions: ['commission_tracking'],
+  };
+  const tables = tableMap[collName] || ['app_documents'];
+  const channel = supabase.channel(`compat:${collName}:${Date.now()}`);
+  tables.forEach((table) => channel.on('postgres_changes', { event: '*', schema: 'public', table }, () => void load()));
+  channel.subscribe();
   return () => {
     cancelled = true;
+    void supabase.removeChannel(channel);
   };
 }
 
-export const Timestamp = {
-  now: () => ({ toDate: () => new Date() }),
-};
+export const Timestamp = { now: () => ({ toDate: () => new Date() }) };
