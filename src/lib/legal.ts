@@ -18,6 +18,7 @@ const dbDocumentType = (documentType: LegalDocumentType) =>
         : documentType;
 
 export async function recordLegalConsent(userId: string, documentType: LegalDocumentType, source = 'web') {
+  if (!supabase) throw new Error('Supabase is not configured');
   const type = dbDocumentType(documentType);
   const version = LEGAL_VERSIONS[documentType];
   const { data: existing, error: lookupError } = await supabase
@@ -41,9 +42,19 @@ export async function recordLegalConsent(userId: string, documentType: LegalDocu
 }
 
 export async function recordRequiredSignupConsents(userId: string) {
-  await Promise.all([
+  if (!supabase) throw new Error('Supabase is not configured');
+  const { data: profile, error } = await supabase.from('profiles').select('role').eq('id', userId).maybeSingle();
+  if (error) throw error;
+
+  const required: Promise<void>[] = [
     recordLegalConsent(userId, 'terms'),
     recordLegalConsent(userId, 'privacy'),
     recordLegalConsent(userId, 'acceptableUse'),
-  ]);
+  ];
+
+  if (profile?.role === 'teacher') {
+    required.push(recordLegalConsent(userId, 'teacherVerification'));
+  }
+
+  await Promise.all(required);
 }
