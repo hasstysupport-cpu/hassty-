@@ -30,6 +30,7 @@ import { WhatsAppStudioPage } from './pages/admin/WhatsAppStudioPage';
 import { HasstyAdminApp } from './pages/admin/HasstyAdminApp';
 import { SECRET_ADMIN_ROUTE } from './lib/securityConfig';
 import { LegalPage, LegalSection } from './pages/LegalPage';
+import { NotificationsPage, CalendarPage, MessagesPage, AssignmentsPage, GradesPage, AttendanceOverviewPage } from './pages/PlatformFeaturesPages';
 
 import { StudentDashboardPage } from './pages/student/StudentDashboardPage';
 import { StudentQRCardPage } from './pages/student/StudentQRCardPage';
@@ -222,10 +223,20 @@ export default function App() {
             {currentPath === '/student/tutors' && <StudentTutorsPage onNavigate={handleNavigate} onSelectTutor={handleSelectTutor} />}
             {currentPath === '/student/book' && <StudentBookPage />}
             {currentPath === '/student/payments' && <StudentPaymentsPage />}
+            {currentPath === '/student/notifications' && <NotificationsPage onNavigate={handleNavigate} />}
+            {currentPath === '/student/calendar' && <CalendarPage />}
+            {currentPath === '/student/messages' && <MessagesPage />}
+            {currentPath === '/student/assignments' && <AssignmentsPage />}
+            {currentPath === '/student/grades' && <GradesPage />}
+            {currentPath === '/student/attendance' && <AttendanceOverviewPage />}
             {currentPath === '/parent/dashboard' && <ParentDashboardPage onNavigate={handleNavigate} />}
             {currentPath === '/parent/attendance' && <ParentAttendancePage />}
             {currentPath === '/parent/payments' && <ParentPaymentsPage />}
             {currentPath === '/parent/settings' && <ParentSettingsPage />}
+            {currentPath === '/parent/notifications' && <NotificationsPage onNavigate={handleNavigate} />}
+            {currentPath === '/parent/calendar' && <CalendarPage />}
+            {currentPath === '/parent/messages' && <MessagesPage />}
+            {currentPath === '/parent/grades' && <GradesPage />}
             {currentPath === '/teacher/dashboard' && <TeacherDashboardPage onNavigate={handleNavigate} />}
             {currentPath === '/teacher/students' && <TeacherStudentsPage onNavigate={handleNavigate} />}
             {currentPath === '/teacher/groups' && <TeacherGroupsPage />}
@@ -234,6 +245,10 @@ export default function App() {
             {currentPath === '/teacher/availability' && <TeacherAvailabilityPage />}
             {currentPath === '/teacher/profile' && <TeacherProfileEditPage />}
             {currentPath === '/teacher/reviews' && <TeacherReviewsPage />}
+            {currentPath === '/teacher/notifications' && <NotificationsPage onNavigate={handleNavigate} />}
+            {currentPath === '/teacher/calendar' && <CalendarPage />}
+            {currentPath === '/teacher/messages' && <MessagesPage />}
+            {currentPath === '/teacher/assignments' && <AssignmentsPage />}
           </main>
         </div>
       ) : (
