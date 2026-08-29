@@ -49,50 +49,17 @@ type TutorRow = {
   verification_status: 'pending' | 'approved' | 'rejected' | null;
 };
 
-type GroupRow = {
-  id: string;
-  tutor_id: string;
-  monthly_fee: number | null;
-  current_count: number | null;
-  max_students: number | null;
-  name: string;
-  grade: string;
-  schedule: string;
-  location: string;
-  center_name: string;
-  is_active: boolean | null;
-};
-
-type EnrollmentRow = {
-  group_id: string;
-  student_id: string | null;
-  status: 'active' | 'suspended' | 'left' | null;
-};
-
 function requireSupabase() {
   if (!supabase) throw new Error('Supabase is not configured');
   return supabase;
 }
 
-function isAdminEmail(email?: string | null) {
-  return !!email && ADMIN_EMAILS.has(email.toLowerCase().trim());
-}
-
-function mapStatus(status: string | null | undefined): AdminUserAccount['status'] {
-  return status === 'suspended' ? 'suspended' : 'active';
-}
-
-function mapBadge(badge: string | null | undefined): AccountBadgeType {
-  return badge === 'verified' || badge === 'suspicious' || badge === 'fraudulent' ? badge : 'none';
-}
-
 async function loadAccountRows(): Promise<AdminUserAccount[]> {
   const client = requireSupabase();
-
   const [{ data: profiles, error: profileError }, { data: tutors, error: tutorError }, { data: groups, error: groupsError }, { data: enrollments, error: enrollmentsError }] = await Promise.all([
     client.from('profiles').select('id,full_name,phone,email,role,avatar_url,qr_code,governorate,city,grade,account_status,badge,metadata,created_at,updated_at').order('created_at', { ascending: false }),
     client.from('tutor_profiles').select('id,user_id,title,bio,headline,subjects,grades,experience_years,experience_years_text,rating,reviews_count,governorate,city,center_names,price_per_month,price_per_session,punctuality_rate,is_verified,verification_status'),
-    client.from('student_groups').select('id,tutor_id,monthly_fee,current_count,max_students,name,grade,schedule,location,center_name,is_active'),
+    client.from('student_groups').select('id,tutor_id,monthly_fee,current_count,is_active'),
     client.from('group_enrollments').select('group_id,student_id,status').eq('status', 'active'),
   ]);
 
@@ -102,25 +69,20 @@ async function loadAccountRows(): Promise<AdminUserAccount[]> {
   if (enrollmentsError) throw enrollmentsError;
 
   const tutorByUser = new Map<string, TutorRow>((tutors || []).map((row: any) => [row.user_id, row as TutorRow]));
-  const groupById = new Map<string, GroupRow>((groups || []).map((row: any) => [row.id, row as GroupRow]));
+  const groupById = new Map<string, any>((groups || []).map((row: any) => [row.id, row]));
   const studentsByTutor = new Map<string, Set<string>>();
   const revenueByTutor = new Map<string, number>();
 
-  for (const enrollment of (enrollments || []) as EnrollmentRow[]) {
+  for (const enrollment of (enrollments || []) as any[]) {
     const group = groupById.get(enrollment.group_id);
-    if (!group || !group.tutor_id) continue;
-    const key = group.tutor_id;
-    if (!studentsByTutor.has(key)) studentsByTutor.set(key, new Set());
-    if (enrollment.student_id) studentsByTutor.get(key)!.add(enrollment.student_id);
-    const monthlyFee = Number(group.monthly_fee || 0);
-    revenueByTutor.set(key, (revenueByTutor.get(key) || 0) + monthlyFee);
+    if (!group || group.is_active === false || !group.tutor_id) continue;
+    if (!studentsByTutor.has(group.tutor_id)) studentsByTutor.set(group.tutor_id, new Set());
+    if (enrollment.student_id) studentsByTutor.get(group.tutor_id)!.add(enrollment.student_id);
+    revenueByTutor.set(group.tutor_id, (revenueByTutor.get(group.tutor_id) || 0) + Number(group.monthly_fee || 0));
   }
 
   return ((profiles || []) as ProfileRow[]).map((profile) => {
     const tutor = tutorByUser.get(profile.id);
-    const studentsCount = studentsByTutor.get(profile.id)?.size || 0;
-    const totalRevenue = tutor ? (revenueByTutor.get(profile.id) || 0) : 0;
-
     return {
       id: profile.id,
       name: profile.full_name || 'بدون اسم',
@@ -128,14 +90,14 @@ async function loadAccountRows(): Promise<AdminUserAccount[]> {
       email: profile.email || '',
       role: profile.role || 'student',
       createdAt: profile.created_at || '',
-      status: mapStatus(profile.account_status),
-      badge: tutor ? (tutor.is_verified ? 'verified' : mapBadge(profile.badge)) : mapBadge(profile.badge),
+      status: profile.account_status === 'suspended' ? 'suspended' : 'active',
+      badge: tutor ? (tutor.is_verified ? 'verified' : (profile.badge || 'none')) : (profile.badge || 'none'),
       grade: profile.grade || tutor?.grades?.[0],
       subject: tutor?.subjects?.[0],
       governorate: profile.governorate || tutor?.governorate || 'القاهرة',
       area: profile.city || tutor?.city || '',
-      studentsCount,
-      totalRevenue,
+      studentsCount: studentsByTutor.get(profile.id)?.size || 0,
+      totalRevenue: tutor ? (revenueByTutor.get(profile.id) || 0) : 0,
       qrCode: profile.qr_code || '',
       avatarUrl: profile.avatar_url || '',
       nationalId: String(profile.metadata?.nationalId || ''),
@@ -144,16 +106,9 @@ async function loadAccountRows(): Promise<AdminUserAccount[]> {
   });
 }
 
-function subscribeTables<T>(
-  channelName: string,
-  tables: string[],
-  loader: () => Promise<T>,
-  callback: (data: T) => void,
-  onError?: (error: any) => void,
-) {
+function subscribeTables<T>(channelName: string, tables: string[], loader: () => Promise<T>, callback: (data: T) => void, onError?: (error: any) => void) {
   const client = requireSupabase();
   let disposed = false;
-
   const load = async () => {
     try {
       const data = await loader();
@@ -162,18 +117,12 @@ function subscribeTables<T>(
       if (!disposed) onError?.(error);
     }
   };
-
   void load();
   const channel = client.channel(channelName);
-  for (const table of tables) {
-    channel.on('postgres_changes', { event: '*', schema: 'public', table }, () => void load());
-  }
+  tables.forEach((table) => channel.on('postgres_changes', { event: '*', schema: 'public', table }, () => void load()));
   channel.subscribe((status) => {
-    if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-      onError?.(new Error(`Realtime channel ${channelName}: ${status}`));
-    }
+    if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') onError?.(new Error(`Realtime channel ${channelName}: ${status}`));
   });
-
   return () => {
     disposed = true;
     void client.removeChannel(channel);
@@ -182,23 +131,12 @@ function subscribeTables<T>(
 
 export async function seedAdminDatabaseIfEmpty() {
   const client = requireSupabase();
-  const { data: teachers, error } = await client
-    .from('profiles')
-    .select('id,role,full_name,phone,email,governorate,city,grade,avatar_url,qr_code,metadata')
-    .eq('role', 'teacher');
+  const { data: teachers, error } = await client.from('profiles').select('id,role,full_name,phone,email,governorate,city,grade,metadata').eq('role', 'teacher');
   if (error) throw error;
-
   for (const teacher of teachers || []) {
-    const { data: existing, error: requestError } = await client
-      .from('teacher_verification_requests')
-      .select('id,status')
-      .eq('teacher_id', teacher.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const { data: existing, error: requestError } = await client.from('teacher_verification_requests').select('id').eq('teacher_id', teacher.id).limit(1).maybeSingle();
     if (requestError) throw requestError;
     if (existing) continue;
-
     await client.from('teacher_verification_requests').insert({
       teacher_id: teacher.id,
       teacher_name: teacher.full_name || 'مدرس حِصّتي',
@@ -221,13 +159,8 @@ export function subscribeToUsers(callback: (users: AdminUserAccount[]) => void, 
 }
 
 async function loadVerificationRows(): Promise<TeacherVerificationRequest[]> {
-  const client = requireSupabase();
-  const { data, error } = await client
-    .from('teacher_verification_requests')
-    .select('*')
-    .order('submitted_at', { ascending: false });
+  const { data, error } = await requireSupabase().from('teacher_verification_requests').select('*').order('submitted_at', { ascending: false });
   if (error) throw error;
-
   return ((data || []) as any[]).map((row) => ({
     id: row.id,
     teacherId: row.teacher_id,
@@ -253,13 +186,13 @@ export function subscribeToVerifications(callback: (requests: TeacherVerificatio
   return subscribeTables('admin:teacher-verification-requests', ['teacher_verification_requests'], loadVerificationRows, callback, onError);
 }
 
-function mapReportCategory(reportType: string | null, fallback: AdminSafetyReport['category'] = 'other'): AdminSafetyReport['category'] {
-  switch ((reportType || '').toLowerCase()) {
+function mapReportCategory(value?: string | null): AdminSafetyReport['category'] {
+  switch ((value || '').toLowerCase()) {
     case 'inappropriate_conduct': return 'inappropriate_conduct';
     case 'external_payment_demand': return 'external_payment_demand';
     case 'absence_no_notice': return 'absence_no_notice';
     case 'verbal_abuse': return 'verbal_abuse';
-    default: return fallback;
+    default: return 'other';
   }
 }
 
@@ -271,11 +204,10 @@ async function loadSafetyRows(): Promise<AdminSafetyReport[]> {
   ]);
   if (reportError) throw reportError;
   if (profileError) throw profileError;
-
-  const profilesById = new Map<string, any>((profiles || []).map((profile: any) => [profile.id, profile]));
+  const byId = new Map<string, any>((profiles || []).map((p: any) => [p.id, p]));
   return ((reports || []) as any[]).map((row) => {
-    const reporter = profilesById.get(row.reporter_id);
-    const target = profilesById.get(row.target_teacher_id);
+    const reporter = byId.get(row.reporter_id);
+    const target = byId.get(row.target_teacher_id);
     return {
       id: row.id,
       reporterName: reporter?.full_name || 'مستخدم',
@@ -283,7 +215,7 @@ async function loadSafetyRows(): Promise<AdminSafetyReport[]> {
       reporterPhone: reporter?.phone || '',
       targetTeacherId: row.target_teacher_id || '',
       targetTeacherName: target?.full_name || 'غير محدد',
-      category: mapReportCategory(row.report_type, row.category),
+      category: mapReportCategory(row.category || row.report_type),
       description: row.details || '',
       createdAt: row.created_at || '',
       status: row.status === 'under_investigation' ? 'in_review' : row.status === 'open' ? 'new' : 'resolved',
@@ -296,7 +228,7 @@ export function subscribeToReports(callback: (reports: AdminSafetyReport[]) => v
   return subscribeTables('admin:safety-reports', ['safety_reports', 'profiles'], loadSafetyRows, callback, onError);
 }
 
-function getBillingCycle(): string {
+function getBillingCycle() {
   const now = new Date();
   return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-01`;
 }
@@ -310,13 +242,15 @@ function getCommissionRate(students: number) {
 async function syncCurrentCommissionRows() {
   const client = requireSupabase();
   const billingCycle = getBillingCycle();
-  const [{ data: teachers, error: teacherError }, { data: groups, error: groupError }, { data: enrollments, error: enrollmentError }, { data: existing, error: existingError }] = await Promise.all([
+  const [{ data: teachers, error: teacherError }, { data: tutors, error: tutorError }, { data: groups, error: groupError }, { data: enrollments, error: enrollmentError }, { data: existing, error: existingError }] = await Promise.all([
     client.from('profiles').select('id,full_name,role').eq('role', 'teacher'),
+    client.from('tutor_profiles').select('user_id,subjects').in('user_id', (await client.from('profiles').select('id').eq('role', 'teacher')).data?.map((p: any) => p.id) || []),
     client.from('student_groups').select('id,tutor_id,monthly_fee,is_active'),
     client.from('group_enrollments').select('group_id,student_id,status').eq('status', 'active'),
     client.from('commission_tracking').select('id,teacher_id,billing_cycle,payment_status,last_payment_date').eq('billing_cycle', billingCycle),
   ]);
   if (teacherError) throw teacherError;
+  if (tutorError) throw tutorError;
   if (groupError) throw groupError;
   if (enrollmentError) throw enrollmentError;
   if (existingError) throw existingError;
@@ -331,16 +265,15 @@ async function syncCurrentCommissionRows() {
     if (enrollment.student_id) studentsByTeacher.get(group.tutor_id)!.add(enrollment.student_id);
     grossByTeacher.set(group.tutor_id, (grossByTeacher.get(group.tutor_id) || 0) + Number(group.monthly_fee || 0));
   }
-
+  const subjectByTeacher = new Map<string, string>((tutors || []).map((t: any) => [t.user_id, t.subjects?.[0] || '']));
   const existingByTeacher = new Map<string, any>((existing || []).map((r: any) => [r.teacher_id, r]));
   for (const teacher of teachers || []) {
     const count = studentsByTeacher.get(teacher.id)?.size || 0;
     const gross = grossByTeacher.get(teacher.id) || 0;
+    const old = existingByTeacher.get(teacher.id);
     const rate = getCommissionRate(count);
     const due = Number((gross * rate / 100).toFixed(2));
-    const old = existingByTeacher.get(teacher.id);
-
-    await client.from('commission_tracking').upsert({
+    const { error } = await client.from('commission_tracking').upsert({
       id: old?.id,
       teacher_id: teacher.id,
       billing_cycle: billingCycle,
@@ -352,23 +285,28 @@ async function syncCurrentCommissionRows() {
       last_payment_date: old?.last_payment_date || null,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'teacher_id,billing_cycle' });
+    if (error) throw error;
   }
 }
 
 async function loadCommissionRows(): Promise<TeacherCommissionTrackingItem[]> {
   const client = requireSupabase();
   await syncCurrentCommissionRows();
-  const { data, error } = await client
-    .from('commission_tracking')
-    .select('*')
-    .order('billing_cycle', { ascending: false })
-    .order('due_commission_egp', { ascending: false });
-  if (error) throw error;
-  return ((data || []) as any[]).map((row) => ({
+  const [{ data: rows, error: rowError }, { data: profiles, error: profileError }, { data: tutors, error: tutorError }] = await Promise.all([
+    client.from('commission_tracking').select('*').order('billing_cycle', { ascending: false }).order('due_commission_egp', { ascending: false }),
+    client.from('profiles').select('id,full_name'),
+    client.from('tutor_profiles').select('user_id,subjects'),
+  ]);
+  if (rowError) throw rowError;
+  if (profileError) throw profileError;
+  if (tutorError) throw tutorError;
+  const names = new Map<string, string>((profiles || []).map((p: any) => [p.id, p.full_name || 'مدرس']));
+  const subjects = new Map<string, string>((tutors || []).map((t: any) => [t.user_id, t.subjects?.[0] || '']));
+  return ((rows || []) as any[]).map((row) => ({
     id: row.id,
     teacherId: row.teacher_id,
-    teacherName: row.teacher_name || 'مدرس',
-    subject: row.subject || '',
+    teacherName: names.get(row.teacher_id) || 'مدرس',
+    subject: subjects.get(row.teacher_id) || '',
     activeStudentsCount: Number(row.active_students_count || 0),
     monthlyGrossEgp: Number(row.monthly_gross_egp || 0),
     tierRate: Number(row.tier_rate || 0),
@@ -380,7 +318,7 @@ async function loadCommissionRows(): Promise<TeacherCommissionTrackingItem[]> {
 }
 
 export function subscribeToCommissions(callback: (commissions: TeacherCommissionTrackingItem[]) => void, onError?: (error: any) => void) {
-  return subscribeTables('admin:commission-tracking', ['commission_tracking', 'student_groups', 'group_enrollments', 'profiles'], loadCommissionRows, callback, onError);
+  return subscribeTables('admin:commission-tracking', ['commission_tracking', 'student_groups', 'group_enrollments', 'profiles', 'tutor_profiles'], loadCommissionRows, callback, onError);
 }
 
 export async function createTeacherVerificationRequest(payload: Partial<TeacherVerificationRequest> & { teacherId: string; teacherName: string }) {
@@ -405,16 +343,11 @@ export async function createTeacherVerificationRequest(payload: Partial<TeacherV
 
 export async function dbUpdateAccountBadge(accountId: string, newBadge: AccountBadgeType) {
   const client = requireSupabase();
-  const { error } = await client.from('profiles').update({ badge: newBadge, updated_at: new Date().toISOString() }).eq('id', accountId);
+  const now = new Date().toISOString();
+  const { error } = await client.from('profiles').update({ badge: newBadge, updated_at: now }).eq('id', accountId);
   if (error) throw error;
-
-  if (newBadge === 'verified') {
-    const { error: tutorError } = await client.from('tutor_profiles').update({ is_verified: true, verification_status: 'approved', updated_at: new Date().toISOString() }).eq('user_id', accountId);
-    if (tutorError) throw tutorError;
-  } else if (newBadge !== 'verified') {
-    const { error: tutorError } = await client.from('tutor_profiles').update({ is_verified: false, verification_status: newBadge === 'fraudulent' ? 'rejected' : 'pending', updated_at: new Date().toISOString() }).eq('user_id', accountId);
-    if (tutorError) throw tutorError;
-  }
+  const { error: tutorError } = await client.from('tutor_profiles').update({ is_verified: newBadge === 'verified', verification_status: newBadge === 'verified' ? 'approved' : newBadge === 'fraudulent' ? 'rejected' : 'pending', updated_at: now }).eq('user_id', accountId);
+  if (tutorError) throw tutorError;
 }
 
 export async function dbUpdateAccountFullProfile(accountId: string, updates: Partial<AdminUserAccount>) {
@@ -424,8 +357,7 @@ export async function dbUpdateAccountFullProfile(accountId: string, updates: Par
   const metadata = { ...(current?.metadata || {}) };
   if (updates.nationalId !== undefined) metadata.nationalId = updates.nationalId;
   if (updates.parentPhone !== undefined) metadata.parentPhone = updates.parentPhone;
-
-  const profilePatch: Record<string, any> = { updated_at: new Date().toISOString(), metadata };
+  const profilePatch: Record<string, any> = { metadata, updated_at: new Date().toISOString() };
   if (updates.name !== undefined) profilePatch.full_name = updates.name;
   if (updates.phone !== undefined) profilePatch.phone = updates.phone;
   if (updates.email !== undefined) profilePatch.email = updates.email || null;
@@ -436,48 +368,46 @@ export async function dbUpdateAccountFullProfile(accountId: string, updates: Par
   if (updates.avatarUrl !== undefined) profilePatch.avatar_url = updates.avatarUrl || null;
   if (updates.status !== undefined) profilePatch.account_status = updates.status;
   if (updates.badge !== undefined) profilePatch.badge = updates.badge;
-
   const { error } = await client.from('profiles').update(profilePatch).eq('id', accountId);
   if (error) throw error;
 
-  const isTeacher = updates.role === 'teacher' || updates.subject !== undefined || updates.name !== undefined || updates.avatarUrl !== undefined || updates.governorate !== undefined || updates.area !== undefined;
+  const isTeacher = updates.role === 'teacher' || updates.subject !== undefined || updates.grade !== undefined || updates.governorate !== undefined || updates.area !== undefined || updates.name !== undefined || updates.avatarUrl !== undefined;
   if (isTeacher) {
-    const { data: existingTutor, error: tutorReadError } = await client.from('tutor_profiles').select('id,subjects,grades').eq('user_id', accountId).maybeSingle();
+    const { data: tutor, error: tutorReadError } = await client.from('tutor_profiles').select('id').eq('user_id', accountId).maybeSingle();
     if (tutorReadError) throw tutorReadError;
     const tutorPatch: Record<string, any> = { updated_at: new Date().toISOString() };
-    if (updates.name !== undefined) tutorPatch.title = `معلم ${updates.subject || 'المادة'}`;
     if (updates.subject !== undefined) tutorPatch.subjects = [updates.subject];
     if (updates.grade !== undefined) tutorPatch.grades = [updates.grade];
+    if (updates.name !== undefined) tutorPatch.title = `معلم ${updates.subject || 'المادة'}`;
     if (updates.governorate !== undefined) tutorPatch.governorate = updates.governorate;
     if (updates.area !== undefined) tutorPatch.city = updates.area;
-    if (existingTutor) {
-      const { error: tutorUpdateError } = await client.from('tutor_profiles').update(tutorPatch).eq('id', existingTutor.id);
-      if (tutorUpdateError) throw tutorUpdateError;
+    if (updates.avatarUrl !== undefined) tutorPatch.metadata = { avatarUrl: updates.avatarUrl };
+    if (tutor) {
+      const { error } = await client.from('tutor_profiles').update(tutorPatch).eq('id', tutor.id);
+      if (error) throw error;
     } else {
-      const { error: tutorInsertError } = await client.from('tutor_profiles').insert({ user_id: accountId, ...tutorPatch, is_verified: updates.badge === 'verified' });
-      if (tutorInsertError) throw tutorInsertError;
+      const { error } = await client.from('tutor_profiles').insert({ user_id: accountId, ...tutorPatch, is_verified: updates.badge === 'verified', verification_status: updates.badge === 'verified' ? 'approved' : 'pending' });
+      if (error) throw error;
     }
   }
 }
 
 export async function dbToggleAccountStatus(accountId: string, currentStatus: 'active' | 'suspended') {
-  const client = requireSupabase();
-  const { error } = await client.from('profiles').update({ account_status: currentStatus === 'active' ? 'suspended' : 'active', updated_at: new Date().toISOString() }).eq('id', accountId);
+  const { error } = await requireSupabase().from('profiles').update({ account_status: currentStatus === 'active' ? 'suspended' : 'active', updated_at: new Date().toISOString() }).eq('id', accountId);
   if (error) throw error;
 }
 
 export async function dbDeleteAccount(accountId: string) {
-  const client = requireSupabase();
-  const { error } = await client.from('profiles').delete().eq('id', accountId);
+  const { error } = await requireSupabase().from('profiles').delete().eq('id', accountId);
   if (error) throw error;
 }
 
 export async function dbApproveVerification(requestId: string, teacherId: string, adminEmail: string, teacherData?: Partial<AdminUserAccount>) {
   const client = requireSupabase();
   const now = new Date().toISOString();
+  if (!isAdminEmail(adminEmail)) throw new Error('Unauthorized admin');
   const { error: requestError } = await client.from('teacher_verification_requests').update({ status: 'approved', actioned_at: now, actioned_by: adminEmail, rejection_reason: null, updated_at: now }).eq('id', requestId);
   if (requestError) throw requestError;
-
   const profilePatch: Record<string, any> = { account_status: 'active', badge: 'verified', updated_at: now };
   if (teacherData?.name !== undefined) profilePatch.full_name = teacherData.name;
   if (teacherData?.phone !== undefined) profilePatch.phone = teacherData.phone;
@@ -486,16 +416,15 @@ export async function dbApproveVerification(requestId: string, teacherId: string
   if (teacherData?.grade !== undefined) profilePatch.grade = teacherData.grade;
   const { error: profileError } = await client.from('profiles').update(profilePatch).eq('id', teacherId);
   if (profileError) throw profileError;
-
-  const { data: existingTutor, error: tutorReadError } = await client.from('tutor_profiles').select('id').eq('user_id', teacherId).maybeSingle();
+  const { data: tutor, error: tutorReadError } = await client.from('tutor_profiles').select('id').eq('user_id', teacherId).maybeSingle();
   if (tutorReadError) throw tutorReadError;
   const tutorPatch: Record<string, any> = { is_verified: true, verification_status: 'approved', updated_at: now };
   if (teacherData?.subject !== undefined) tutorPatch.subjects = [teacherData.subject];
   if (teacherData?.grade !== undefined) tutorPatch.grades = [teacherData.grade];
   if (teacherData?.governorate !== undefined) tutorPatch.governorate = teacherData.governorate;
   if (teacherData?.area !== undefined) tutorPatch.city = teacherData.area;
-  if (existingTutor) {
-    const { error } = await client.from('tutor_profiles').update(tutorPatch).eq('id', existingTutor.id);
+  if (tutor) {
+    const { error } = await client.from('tutor_profiles').update(tutorPatch).eq('id', tutor.id);
     if (error) throw error;
   } else {
     const { error } = await client.from('tutor_profiles').insert({ user_id: teacherId, ...tutorPatch });
@@ -506,6 +435,7 @@ export async function dbApproveVerification(requestId: string, teacherId: string
 export async function dbRejectVerification(requestId: string, reason: string, adminEmail: string) {
   const client = requireSupabase();
   const now = new Date().toISOString();
+  if (!isAdminEmail(adminEmail)) throw new Error('Unauthorized admin');
   const { data: request, error: requestReadError } = await client.from('teacher_verification_requests').select('teacher_id').eq('id', requestId).maybeSingle();
   if (requestReadError) throw requestReadError;
   const { error } = await client.from('teacher_verification_requests').update({ status: 'rejected', rejection_reason: reason, actioned_at: now, actioned_by: adminEmail, updated_at: now }).eq('id', requestId);
