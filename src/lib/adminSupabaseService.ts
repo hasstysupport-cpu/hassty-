@@ -7,102 +7,172 @@ import {
   AccountBadgeType,
 } from '../types';
 
-type AppDocumentRow = {
-  collection_name: string;
-  document_id: string;
-  data: Record<string, any>;
-  created_at?: string;
+const ADMIN_EMAILS = new Set(['hasstysupport@gmail.com', 'admin@hassty.com']);
+
+type ProfileRow = {
+  id: string;
+  full_name: string;
+  phone: string;
+  email: string | null;
+  role: AdminUserAccount['role'];
+  avatar_url: string | null;
+  qr_code: string | null;
+  governorate: string | null;
+  city: string | null;
+  grade: string | null;
+  account_status: 'active' | 'suspended' | null;
+  badge: AccountBadgeType | null;
+  metadata: Record<string, any> | null;
+  created_at: string;
   updated_at?: string;
 };
 
-const COLLECTIONS = {
-  users: 'users',
-  verifications: 'verification_requests',
-  reports: 'safety_reports',
-  commissions: 'commissions',
-  tutors: 'tutors',
-} as const;
+type TutorRow = {
+  id: string;
+  user_id: string;
+  title: string | null;
+  bio: string | null;
+  headline: string | null;
+  subjects: string[] | null;
+  grades: string[] | null;
+  experience_years: number | null;
+  experience_years_text: string | null;
+  rating: number | null;
+  reviews_count: number | null;
+  governorate: string | null;
+  city: string | null;
+  center_names: string[] | null;
+  price_per_month: number | null;
+  price_per_session: number | null;
+  punctuality_rate: number | null;
+  is_verified: boolean | null;
+  verification_status: 'pending' | 'approved' | 'rejected' | null;
+};
+
+type GroupRow = {
+  id: string;
+  tutor_id: string;
+  monthly_fee: number | null;
+  current_count: number | null;
+  max_students: number | null;
+  name: string;
+  grade: string;
+  schedule: string;
+  location: string;
+  center_name: string;
+  is_active: boolean | null;
+};
+
+type EnrollmentRow = {
+  group_id: string;
+  student_id: string | null;
+  status: 'active' | 'suspended' | 'left' | null;
+};
 
 function requireSupabase() {
   if (!supabase) throw new Error('Supabase is not configured');
   return supabase;
 }
 
-function mapAccount(row: AppDocumentRow): AdminUserAccount {
-  const data = row.data || {};
-  return {
-    id: row.document_id,
-    name: data.name || data.full_name || 'بدون اسم',
-    phone: data.phone || '',
-    email: data.email || '',
-    role: data.role || 'student',
-    createdAt: data.createdAt || row.created_at || '',
-    status: data.status || data.accountStatus || 'active',
-    badge: data.badge || (data.isVerified ? 'verified' : 'none'),
-    subject: data.subject,
-    grade: data.grade,
-    governorate: data.governorate || 'القاهرة',
-    area: data.area || data.city || '',
-    studentsCount: Number(data.studentsCount) || 0,
-    totalRevenue: Number(data.totalRevenue) || 0,
-    avatarUrl: data.avatarUrl || data.avatar_url || data.photoUrl || '',
-    nationalId: data.nationalId || '',
-    qrCode: data.qrCode || data.qr_code || '',
-    parentPhone: data.parentPhone || '',
-  } as AdminUserAccount;
+function isAdminEmail(email?: string | null) {
+  return !!email && ADMIN_EMAILS.has(email.toLowerCase().trim());
 }
 
-async function readCollection(collectionName: string): Promise<AppDocumentRow[]> {
+function mapStatus(status: string | null | undefined): AdminUserAccount['status'] {
+  return status === 'suspended' ? 'suspended' : 'active';
+}
+
+function mapBadge(badge: string | null | undefined): AccountBadgeType {
+  return badge === 'verified' || badge === 'suspicious' || badge === 'fraudulent' ? badge : 'none';
+}
+
+async function loadAccountRows(): Promise<AdminUserAccount[]> {
   const client = requireSupabase();
-  const { data, error } = await client
-    .from('app_documents')
-    .select('collection_name,document_id,data,created_at,updated_at')
-    .eq('collection_name', collectionName)
-    .order('created_at', { ascending: false });
-  if (error) throw error;
-  return (data || []) as AppDocumentRow[];
+
+  const [{ data: profiles, error: profileError }, { data: tutors, error: tutorError }, { data: groups, error: groupsError }, { data: enrollments, error: enrollmentsError }] = await Promise.all([
+    client.from('profiles').select('id,full_name,phone,email,role,avatar_url,qr_code,governorate,city,grade,account_status,badge,metadata,created_at,updated_at').order('created_at', { ascending: false }),
+    client.from('tutor_profiles').select('id,user_id,title,bio,headline,subjects,grades,experience_years,experience_years_text,rating,reviews_count,governorate,city,center_names,price_per_month,price_per_session,punctuality_rate,is_verified,verification_status'),
+    client.from('student_groups').select('id,tutor_id,monthly_fee,current_count,max_students,name,grade,schedule,location,center_name,is_active'),
+    client.from('group_enrollments').select('group_id,student_id,status').eq('status', 'active'),
+  ]);
+
+  if (profileError) throw profileError;
+  if (tutorError) throw tutorError;
+  if (groupsError) throw groupsError;
+  if (enrollmentsError) throw enrollmentsError;
+
+  const tutorByUser = new Map<string, TutorRow>((tutors || []).map((row: any) => [row.user_id, row as TutorRow]));
+  const groupById = new Map<string, GroupRow>((groups || []).map((row: any) => [row.id, row as GroupRow]));
+  const studentsByTutor = new Map<string, Set<string>>();
+  const revenueByTutor = new Map<string, number>();
+
+  for (const enrollment of (enrollments || []) as EnrollmentRow[]) {
+    const group = groupById.get(enrollment.group_id);
+    if (!group || !group.tutor_id) continue;
+    const key = group.tutor_id;
+    if (!studentsByTutor.has(key)) studentsByTutor.set(key, new Set());
+    if (enrollment.student_id) studentsByTutor.get(key)!.add(enrollment.student_id);
+    const monthlyFee = Number(group.monthly_fee || 0);
+    revenueByTutor.set(key, (revenueByTutor.get(key) || 0) + monthlyFee);
+  }
+
+  return ((profiles || []) as ProfileRow[]).map((profile) => {
+    const tutor = tutorByUser.get(profile.id);
+    const studentsCount = studentsByTutor.get(profile.id)?.size || 0;
+    const totalRevenue = tutor ? (revenueByTutor.get(profile.id) || 0) : 0;
+
+    return {
+      id: profile.id,
+      name: profile.full_name || 'بدون اسم',
+      phone: profile.phone || '',
+      email: profile.email || '',
+      role: profile.role || 'student',
+      createdAt: profile.created_at || '',
+      status: mapStatus(profile.account_status),
+      badge: tutor ? (tutor.is_verified ? 'verified' : mapBadge(profile.badge)) : mapBadge(profile.badge),
+      grade: profile.grade || tutor?.grades?.[0],
+      subject: tutor?.subjects?.[0],
+      governorate: profile.governorate || tutor?.governorate || 'القاهرة',
+      area: profile.city || tutor?.city || '',
+      studentsCount,
+      totalRevenue,
+      qrCode: profile.qr_code || '',
+      avatarUrl: profile.avatar_url || '',
+      nationalId: String(profile.metadata?.nationalId || ''),
+      parentPhone: String(profile.metadata?.parentPhone || ''),
+    } as AdminUserAccount;
+  });
 }
 
-function subscribeCollection<T>(
-  collectionName: string,
-  mapper: (row: AppDocumentRow) => T,
-  callback: (items: T[]) => void,
-  onError?: (err: any) => void,
+function subscribeTables<T>(
+  channelName: string,
+  tables: string[],
+  loader: () => Promise<T>,
+  callback: (data: T) => void,
+  onError?: (error: any) => void,
 ) {
   const client = requireSupabase();
   let disposed = false;
 
   const load = async () => {
     try {
-      const rows = await readCollection(collectionName);
-      if (!disposed) callback(rows.map(mapper));
-    } catch (err) {
-      if (!disposed) {
-        onError?.(err);
-        callback([]);
-      }
+      const data = await loader();
+      if (!disposed) callback(data);
+    } catch (error) {
+      if (!disposed) onError?.(error);
     }
   };
 
   void load();
-
-  const channel = client
-    .channel(`admin:${collectionName}:${Date.now()}`)
-    .on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'app_documents',
-        filter: `collection_name=eq.${collectionName}`,
-      },
-      () => void load(),
-    )
-    .subscribe((status) => {
-      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-        onError?.(new Error(`Realtime channel ${collectionName}: ${status}`));
-      }
-    });
+  const channel = client.channel(channelName);
+  for (const table of tables) {
+    channel.on('postgres_changes', { event: '*', schema: 'public', table }, () => void load());
+  }
+  channel.subscribe((status) => {
+    if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+      onError?.(new Error(`Realtime channel ${channelName}: ${status}`));
+    }
+  });
 
   return () => {
     disposed = true;
@@ -111,208 +181,365 @@ function subscribeCollection<T>(
 }
 
 export async function seedAdminDatabaseIfEmpty() {
-  // Deliberately no mock/demo seeding in production.
-}
-
-export function subscribeToUsers(
-  callback: (users: AdminUserAccount[]) => void,
-  onError?: (err: any) => void,
-) {
-  return subscribeCollection(COLLECTIONS.users, mapAccount, callback, onError);
-}
-
-export function subscribeToVerifications(
-  callback: (reqs: TeacherVerificationRequest[]) => void,
-  onError?: (err: any) => void,
-) {
-  return subscribeCollection(
-    COLLECTIONS.verifications,
-    (row) => ({ id: row.document_id, ...(row.data || {}) }) as TeacherVerificationRequest,
-    callback,
-    onError,
-  );
-}
-
-export function subscribeToReports(
-  callback: (reps: AdminSafetyReport[]) => void,
-  onError?: (err: any) => void,
-) {
-  return subscribeCollection(
-    COLLECTIONS.reports,
-    (row) => ({ id: row.document_id, ...(row.data || {}) }) as AdminSafetyReport,
-    callback,
-    onError,
-  );
-}
-
-export function subscribeToCommissions(
-  callback: (comms: TeacherCommissionTrackingItem[]) => void,
-  onError?: (err: any) => void,
-) {
-  return subscribeCollection(
-    COLLECTIONS.commissions,
-    (row) => ({ id: row.document_id, ...(row.data || {}) }) as TeacherCommissionTrackingItem,
-    callback,
-    onError,
-  );
-}
-
-async function patchDocument(collectionName: string, documentId: string, patch: Record<string, any>) {
   const client = requireSupabase();
-  const { data: current, error: readError } = await client
-    .from('app_documents')
-    .select('data')
-    .eq('collection_name', collectionName)
-    .eq('document_id', documentId)
-    .maybeSingle();
-  if (readError) throw readError;
-
-  const merged = { ...(current?.data || {}), ...patch };
-  const { error } = await client
-    .from('app_documents')
-    .upsert(
-      {
-        collection_name: collectionName,
-        document_id: documentId,
-        data: merged,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'collection_name,document_id' },
-    );
+  const { data: teachers, error } = await client
+    .from('profiles')
+    .select('id,role,full_name,phone,email,governorate,city,grade,avatar_url,qr_code,metadata')
+    .eq('role', 'teacher');
   if (error) throw error;
-  return merged;
+
+  for (const teacher of teachers || []) {
+    const { data: existing, error: requestError } = await client
+      .from('teacher_verification_requests')
+      .select('id,status')
+      .eq('teacher_id', teacher.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (requestError) throw requestError;
+    if (existing) continue;
+
+    await client.from('teacher_verification_requests').insert({
+      teacher_id: teacher.id,
+      teacher_name: teacher.full_name || 'مدرس حِصّتي',
+      phone: teacher.phone || '',
+      stage: teacher.grade || '',
+      governorate: teacher.governorate || 'القاهرة',
+      area: teacher.city || '',
+      subject: '',
+      bio: '',
+      experience_years: '',
+      id_card_image_url: String((teacher.metadata as any)?.idCardImageUrl || ''),
+      certificate_image_url: String((teacher.metadata as any)?.certificateImageUrl || ''),
+      status: 'pending',
+    });
+  }
 }
 
-async function deleteDocument(collectionName: string, documentId: string) {
+export function subscribeToUsers(callback: (users: AdminUserAccount[]) => void, onError?: (error: any) => void) {
+  return subscribeTables('admin:users', ['profiles', 'tutor_profiles', 'student_groups', 'group_enrollments'], loadAccountRows, callback, onError);
+}
+
+async function loadVerificationRows(): Promise<TeacherVerificationRequest[]> {
   const client = requireSupabase();
-  const { error } = await client
-    .from('app_documents')
-    .delete()
-    .eq('collection_name', collectionName)
-    .eq('document_id', documentId);
+  const { data, error } = await client
+    .from('teacher_verification_requests')
+    .select('*')
+    .order('submitted_at', { ascending: false });
   if (error) throw error;
+
+  return ((data || []) as any[]).map((row) => ({
+    id: row.id,
+    teacherId: row.teacher_id,
+    teacherName: row.teacher_name || '',
+    phone: row.phone || '',
+    subject: row.subject || '',
+    stage: row.stage || '',
+    governorate: row.governorate || '',
+    area: row.area || '',
+    bio: row.bio || '',
+    experienceYears: row.experience_years || '',
+    idCardImageUrl: row.id_card_image_url || '',
+    certificateImageUrl: row.certificate_image_url || undefined,
+    submittedAt: row.submitted_at || row.created_at || '',
+    status: row.status,
+    rejectionReason: row.rejection_reason || undefined,
+    actionedAt: row.actioned_at || undefined,
+    actionedBy: row.actioned_by || undefined,
+  }));
+}
+
+export function subscribeToVerifications(callback: (requests: TeacherVerificationRequest[]) => void, onError?: (error: any) => void) {
+  return subscribeTables('admin:teacher-verification-requests', ['teacher_verification_requests'], loadVerificationRows, callback, onError);
+}
+
+function mapReportCategory(reportType: string | null, fallback: AdminSafetyReport['category'] = 'other'): AdminSafetyReport['category'] {
+  switch ((reportType || '').toLowerCase()) {
+    case 'inappropriate_conduct': return 'inappropriate_conduct';
+    case 'external_payment_demand': return 'external_payment_demand';
+    case 'absence_no_notice': return 'absence_no_notice';
+    case 'verbal_abuse': return 'verbal_abuse';
+    default: return fallback;
+  }
+}
+
+async function loadSafetyRows(): Promise<AdminSafetyReport[]> {
+  const client = requireSupabase();
+  const [{ data: reports, error: reportError }, { data: profiles, error: profileError }] = await Promise.all([
+    client.from('safety_reports').select('id,ticket_number,reporter_id,report_type,details,status,created_at,updated_at,target_teacher_id,category').order('created_at', { ascending: false }),
+    client.from('profiles').select('id,full_name,phone,role'),
+  ]);
+  if (reportError) throw reportError;
+  if (profileError) throw profileError;
+
+  const profilesById = new Map<string, any>((profiles || []).map((profile: any) => [profile.id, profile]));
+  return ((reports || []) as any[]).map((row) => {
+    const reporter = profilesById.get(row.reporter_id);
+    const target = profilesById.get(row.target_teacher_id);
+    return {
+      id: row.id,
+      reporterName: reporter?.full_name || 'مستخدم',
+      reporterRole: reporter?.role === 'parent' ? 'parent' : 'student',
+      reporterPhone: reporter?.phone || '',
+      targetTeacherId: row.target_teacher_id || '',
+      targetTeacherName: target?.full_name || 'غير محدد',
+      category: mapReportCategory(row.report_type, row.category),
+      description: row.details || '',
+      createdAt: row.created_at || '',
+      status: row.status === 'under_investigation' ? 'in_review' : row.status === 'open' ? 'new' : 'resolved',
+      teacherSuspended: false,
+    };
+  });
+}
+
+export function subscribeToReports(callback: (reports: AdminSafetyReport[]) => void, onError?: (error: any) => void) {
+  return subscribeTables('admin:safety-reports', ['safety_reports', 'profiles'], loadSafetyRows, callback, onError);
+}
+
+function getBillingCycle(): string {
+  const now = new Date();
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-01`;
+}
+
+function getCommissionRate(students: number) {
+  if (students >= 300) return 1.0;
+  if (students >= 150) return 1.5;
+  return 2.0;
+}
+
+async function syncCurrentCommissionRows() {
+  const client = requireSupabase();
+  const billingCycle = getBillingCycle();
+  const [{ data: teachers, error: teacherError }, { data: groups, error: groupError }, { data: enrollments, error: enrollmentError }, { data: existing, error: existingError }] = await Promise.all([
+    client.from('profiles').select('id,full_name,role').eq('role', 'teacher'),
+    client.from('student_groups').select('id,tutor_id,monthly_fee,is_active'),
+    client.from('group_enrollments').select('group_id,student_id,status').eq('status', 'active'),
+    client.from('commission_tracking').select('id,teacher_id,billing_cycle,payment_status,last_payment_date').eq('billing_cycle', billingCycle),
+  ]);
+  if (teacherError) throw teacherError;
+  if (groupError) throw groupError;
+  if (enrollmentError) throw enrollmentError;
+  if (existingError) throw existingError;
+
+  const groupById = new Map<string, any>((groups || []).map((g: any) => [g.id, g]));
+  const studentsByTeacher = new Map<string, Set<string>>();
+  const grossByTeacher = new Map<string, number>();
+  for (const enrollment of enrollments || []) {
+    const group = groupById.get(enrollment.group_id);
+    if (!group || group.is_active === false || !group.tutor_id) continue;
+    if (!studentsByTeacher.has(group.tutor_id)) studentsByTeacher.set(group.tutor_id, new Set());
+    if (enrollment.student_id) studentsByTeacher.get(group.tutor_id)!.add(enrollment.student_id);
+    grossByTeacher.set(group.tutor_id, (grossByTeacher.get(group.tutor_id) || 0) + Number(group.monthly_fee || 0));
+  }
+
+  const existingByTeacher = new Map<string, any>((existing || []).map((r: any) => [r.teacher_id, r]));
+  for (const teacher of teachers || []) {
+    const count = studentsByTeacher.get(teacher.id)?.size || 0;
+    const gross = grossByTeacher.get(teacher.id) || 0;
+    const rate = getCommissionRate(count);
+    const due = Number((gross * rate / 100).toFixed(2));
+    const old = existingByTeacher.get(teacher.id);
+
+    await client.from('commission_tracking').upsert({
+      id: old?.id,
+      teacher_id: teacher.id,
+      billing_cycle: billingCycle,
+      active_students_count: count,
+      monthly_gross_egp: gross,
+      tier_rate: rate,
+      due_commission_egp: due,
+      payment_status: old?.payment_status || 'pending',
+      last_payment_date: old?.last_payment_date || null,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'teacher_id,billing_cycle' });
+  }
+}
+
+async function loadCommissionRows(): Promise<TeacherCommissionTrackingItem[]> {
+  const client = requireSupabase();
+  await syncCurrentCommissionRows();
+  const { data, error } = await client
+    .from('commission_tracking')
+    .select('*')
+    .order('billing_cycle', { ascending: false })
+    .order('due_commission_egp', { ascending: false });
+  if (error) throw error;
+  return ((data || []) as any[]).map((row) => ({
+    id: row.id,
+    teacherId: row.teacher_id,
+    teacherName: row.teacher_name || 'مدرس',
+    subject: row.subject || '',
+    activeStudentsCount: Number(row.active_students_count || 0),
+    monthlyGrossEgp: Number(row.monthly_gross_egp || 0),
+    tierRate: Number(row.tier_rate || 0),
+    dueCommissionEgp: Number(row.due_commission_egp || 0),
+    paymentStatus: row.payment_status,
+    lastPaymentDate: row.last_payment_date || undefined,
+    billingCycle: row.billing_cycle,
+  }));
+}
+
+export function subscribeToCommissions(callback: (commissions: TeacherCommissionTrackingItem[]) => void, onError?: (error: any) => void) {
+  return subscribeTables('admin:commission-tracking', ['commission_tracking', 'student_groups', 'group_enrollments', 'profiles'], loadCommissionRows, callback, onError);
+}
+
+export async function createTeacherVerificationRequest(payload: Partial<TeacherVerificationRequest> & { teacherId: string; teacherName: string }) {
+  const client = requireSupabase();
+  const { data, error } = await client.from('teacher_verification_requests').insert({
+    teacher_id: payload.teacherId,
+    teacher_name: payload.teacherName,
+    phone: payload.phone || '',
+    subject: payload.subject || '',
+    stage: payload.stage || '',
+    governorate: payload.governorate || '',
+    area: payload.area || '',
+    bio: payload.bio || '',
+    experience_years: String(payload.experienceYears || ''),
+    id_card_image_url: payload.idCardImageUrl || '',
+    certificate_image_url: payload.certificateImageUrl || null,
+    status: 'pending',
+  }).select().single();
+  if (error) throw error;
+  return data;
 }
 
 export async function dbUpdateAccountBadge(accountId: string, newBadge: AccountBadgeType) {
   const client = requireSupabase();
-  await patchDocument(COLLECTIONS.users, accountId, {
-    badge: newBadge,
-    isVerified: newBadge === 'verified',
-  });
-  if (newBadge === 'verified' || newBadge === 'none') {
-    const { error } = await client
-      .from('profiles')
-      .update({ updated_at: new Date().toISOString() })
-      .eq('id', accountId);
-    if (error && error.code !== 'PGRST116') throw error;
+  const { error } = await client.from('profiles').update({ badge: newBadge, updated_at: new Date().toISOString() }).eq('id', accountId);
+  if (error) throw error;
+
+  if (newBadge === 'verified') {
+    const { error: tutorError } = await client.from('tutor_profiles').update({ is_verified: true, verification_status: 'approved', updated_at: new Date().toISOString() }).eq('user_id', accountId);
+    if (tutorError) throw tutorError;
+  } else if (newBadge !== 'verified') {
+    const { error: tutorError } = await client.from('tutor_profiles').update({ is_verified: false, verification_status: newBadge === 'fraudulent' ? 'rejected' : 'pending', updated_at: new Date().toISOString() }).eq('user_id', accountId);
+    if (tutorError) throw tutorError;
   }
 }
 
-export async function dbUpdateAccountFullProfile(
-  accountId: string,
-  updates: Partial<AdminUserAccount>,
-) {
-  const normalizedUpdates: Record<string, any> = { ...updates };
-  if (updates.badge !== undefined) {
-    normalizedUpdates.isVerified = updates.badge === 'verified';
-  }
+export async function dbUpdateAccountFullProfile(accountId: string, updates: Partial<AdminUserAccount>) {
+  const client = requireSupabase();
+  const { data: current, error: currentError } = await client.from('profiles').select('metadata').eq('id', accountId).maybeSingle();
+  if (currentError) throw currentError;
+  const metadata = { ...(current?.metadata || {}) };
+  if (updates.nationalId !== undefined) metadata.nationalId = updates.nationalId;
+  if (updates.parentPhone !== undefined) metadata.parentPhone = updates.parentPhone;
 
-  await patchDocument(COLLECTIONS.users, accountId, normalizedUpdates);
+  const profilePatch: Record<string, any> = { updated_at: new Date().toISOString(), metadata };
+  if (updates.name !== undefined) profilePatch.full_name = updates.name;
+  if (updates.phone !== undefined) profilePatch.phone = updates.phone;
+  if (updates.email !== undefined) profilePatch.email = updates.email || null;
+  if (updates.role !== undefined) profilePatch.role = updates.role;
+  if (updates.governorate !== undefined) profilePatch.governorate = updates.governorate;
+  if (updates.area !== undefined) profilePatch.city = updates.area;
+  if (updates.grade !== undefined) profilePatch.grade = updates.grade;
+  if (updates.avatarUrl !== undefined) profilePatch.avatar_url = updates.avatarUrl || null;
+  if (updates.status !== undefined) profilePatch.account_status = updates.status;
+  if (updates.badge !== undefined) profilePatch.badge = updates.badge;
 
-  const shouldSyncTutor =
-    updates.role === 'teacher' ||
-    updates.name !== undefined ||
-    updates.phone !== undefined ||
-    updates.subject !== undefined ||
-    updates.governorate !== undefined ||
-    updates.area !== undefined ||
-    updates.avatarUrl !== undefined ||
-    updates.badge !== undefined;
+  const { error } = await client.from('profiles').update(profilePatch).eq('id', accountId);
+  if (error) throw error;
 
-  if (shouldSyncTutor) {
-    const tutorUpdates: Record<string, any> = {};
-    if (updates.name !== undefined) tutorUpdates.name = updates.name;
-    if (updates.phone !== undefined) tutorUpdates.phone = updates.phone;
-    if (updates.subject !== undefined) tutorUpdates.subject = updates.subject;
-    if (updates.governorate !== undefined) tutorUpdates.governorate = updates.governorate;
-    if (updates.area !== undefined) tutorUpdates.area = updates.area;
-    if (updates.avatarUrl !== undefined) tutorUpdates.avatarUrl = updates.avatarUrl;
-    if (updates.badge !== undefined) tutorUpdates.isVerified = updates.badge === 'verified';
-    if (updates.grade !== undefined) tutorUpdates.grade = updates.grade;
-
-    if (Object.keys(tutorUpdates).length > 0) {
-      await patchDocument(COLLECTIONS.tutors, accountId, tutorUpdates);
+  const isTeacher = updates.role === 'teacher' || updates.subject !== undefined || updates.name !== undefined || updates.avatarUrl !== undefined || updates.governorate !== undefined || updates.area !== undefined;
+  if (isTeacher) {
+    const { data: existingTutor, error: tutorReadError } = await client.from('tutor_profiles').select('id,subjects,grades').eq('user_id', accountId).maybeSingle();
+    if (tutorReadError) throw tutorReadError;
+    const tutorPatch: Record<string, any> = { updated_at: new Date().toISOString() };
+    if (updates.name !== undefined) tutorPatch.title = `معلم ${updates.subject || 'المادة'}`;
+    if (updates.subject !== undefined) tutorPatch.subjects = [updates.subject];
+    if (updates.grade !== undefined) tutorPatch.grades = [updates.grade];
+    if (updates.governorate !== undefined) tutorPatch.governorate = updates.governorate;
+    if (updates.area !== undefined) tutorPatch.city = updates.area;
+    if (existingTutor) {
+      const { error: tutorUpdateError } = await client.from('tutor_profiles').update(tutorPatch).eq('id', existingTutor.id);
+      if (tutorUpdateError) throw tutorUpdateError;
+    } else {
+      const { error: tutorInsertError } = await client.from('tutor_profiles').insert({ user_id: accountId, ...tutorPatch, is_verified: updates.badge === 'verified' });
+      if (tutorInsertError) throw tutorInsertError;
     }
   }
 }
 
 export async function dbToggleAccountStatus(accountId: string, currentStatus: 'active' | 'suspended') {
-  await patchDocument(COLLECTIONS.users, accountId, {
-    status: currentStatus === 'active' ? 'suspended' : 'active',
-  });
+  const client = requireSupabase();
+  const { error } = await client.from('profiles').update({ account_status: currentStatus === 'active' ? 'suspended' : 'active', updated_at: new Date().toISOString() }).eq('id', accountId);
+  if (error) throw error;
 }
 
 export async function dbDeleteAccount(accountId: string) {
   const client = requireSupabase();
-  await deleteDocument(COLLECTIONS.users, accountId);
   const { error } = await client.from('profiles').delete().eq('id', accountId);
-  if (error && error.code !== 'PGRST116') throw error;
+  if (error) throw error;
 }
 
-export async function dbApproveVerification(
-  requestId: string,
-  teacherId: string,
-  adminEmail: string,
-  teacherData?: Partial<AdminUserAccount>,
-) {
-  await patchDocument(COLLECTIONS.verifications, requestId, {
-    status: 'approved',
-    actionedAt: new Date().toISOString(),
-    actionedBy: adminEmail,
-  });
-  if (teacherId) {
-    await patchDocument(COLLECTIONS.users, teacherId, {
-      status: 'active',
-      badge: 'verified',
-      isVerified: true,
-      ...(teacherData || {}),
-    });
+export async function dbApproveVerification(requestId: string, teacherId: string, adminEmail: string, teacherData?: Partial<AdminUserAccount>) {
+  const client = requireSupabase();
+  const now = new Date().toISOString();
+  const { error: requestError } = await client.from('teacher_verification_requests').update({ status: 'approved', actioned_at: now, actioned_by: adminEmail, rejection_reason: null, updated_at: now }).eq('id', requestId);
+  if (requestError) throw requestError;
+
+  const profilePatch: Record<string, any> = { account_status: 'active', badge: 'verified', updated_at: now };
+  if (teacherData?.name !== undefined) profilePatch.full_name = teacherData.name;
+  if (teacherData?.phone !== undefined) profilePatch.phone = teacherData.phone;
+  if (teacherData?.governorate !== undefined) profilePatch.governorate = teacherData.governorate;
+  if (teacherData?.area !== undefined) profilePatch.city = teacherData.area;
+  if (teacherData?.grade !== undefined) profilePatch.grade = teacherData.grade;
+  const { error: profileError } = await client.from('profiles').update(profilePatch).eq('id', teacherId);
+  if (profileError) throw profileError;
+
+  const { data: existingTutor, error: tutorReadError } = await client.from('tutor_profiles').select('id').eq('user_id', teacherId).maybeSingle();
+  if (tutorReadError) throw tutorReadError;
+  const tutorPatch: Record<string, any> = { is_verified: true, verification_status: 'approved', updated_at: now };
+  if (teacherData?.subject !== undefined) tutorPatch.subjects = [teacherData.subject];
+  if (teacherData?.grade !== undefined) tutorPatch.grades = [teacherData.grade];
+  if (teacherData?.governorate !== undefined) tutorPatch.governorate = teacherData.governorate;
+  if (teacherData?.area !== undefined) tutorPatch.city = teacherData.area;
+  if (existingTutor) {
+    const { error } = await client.from('tutor_profiles').update(tutorPatch).eq('id', existingTutor.id);
+    if (error) throw error;
+  } else {
+    const { error } = await client.from('tutor_profiles').insert({ user_id: teacherId, ...tutorPatch });
+    if (error) throw error;
   }
 }
 
 export async function dbRejectVerification(requestId: string, reason: string, adminEmail: string) {
-  await patchDocument(COLLECTIONS.verifications, requestId, {
-    status: 'rejected',
-    rejectionReason: reason,
-    actionedAt: new Date().toISOString(),
-    actionedBy: adminEmail,
-  });
-}
-
-export async function dbSuspendTeacherFromReport(teacherId: string, reportId: string) {
-  await patchDocument(COLLECTIONS.reports, reportId, {
-    teacherSuspended: true,
-    status: 'in_review',
-  });
-  if (teacherId) {
-    await patchDocument(COLLECTIONS.users, teacherId, {
-      status: 'suspended',
-      badge: 'fraudulent',
-    });
+  const client = requireSupabase();
+  const now = new Date().toISOString();
+  const { data: request, error: requestReadError } = await client.from('teacher_verification_requests').select('teacher_id').eq('id', requestId).maybeSingle();
+  if (requestReadError) throw requestReadError;
+  const { error } = await client.from('teacher_verification_requests').update({ status: 'rejected', rejection_reason: reason, actioned_at: now, actioned_by: adminEmail, updated_at: now }).eq('id', requestId);
+  if (error) throw error;
+  if (request?.teacher_id) {
+    const { error: tutorError } = await client.from('tutor_profiles').update({ is_verified: false, verification_status: 'rejected', updated_at: now }).eq('user_id', request.teacher_id);
+    if (tutorError) throw tutorError;
+    const { error: profileError } = await client.from('profiles').update({ badge: 'none', updated_at: now }).eq('id', request.teacher_id);
+    if (profileError) throw profileError;
   }
 }
 
+export async function dbSuspendTeacherFromReport(teacherId: string, reportId: string) {
+  const client = requireSupabase();
+  const now = new Date().toISOString();
+  const { error: reportError } = await client.from('safety_reports').update({ status: 'under_investigation', updated_at: now }).eq('id', reportId);
+  if (reportError) throw reportError;
+  const { error: profileError } = await client.from('profiles').update({ account_status: 'suspended', badge: 'fraudulent', updated_at: now }).eq('id', teacherId);
+  if (profileError) throw profileError;
+  const { error: tutorError } = await client.from('tutor_profiles').update({ is_verified: false, verification_status: 'rejected', updated_at: now }).eq('user_id', teacherId);
+  if (tutorError) throw tutorError;
+}
+
 export async function dbResolveReport(reportId: string) {
-  await patchDocument(COLLECTIONS.reports, reportId, { status: 'resolved' });
+  const { error } = await requireSupabase().from('safety_reports').update({ status: 'resolved', updated_at: new Date().toISOString() }).eq('id', reportId);
+  if (error) throw error;
 }
 
 export async function dbDismissReport(reportId: string) {
-  await deleteDocument(COLLECTIONS.reports, reportId);
+  const { error } = await requireSupabase().from('safety_reports').delete().eq('id', reportId);
+  if (error) throw error;
 }
 
 export async function dbMarkCommissionPaid(commissionId: string) {
-  await patchDocument(COLLECTIONS.commissions, commissionId, {
-    paymentStatus: 'paid',
-    lastPaymentDate: new Date().toISOString().split('T')[0],
-  });
+  const { error } = await requireSupabase().from('commission_tracking').update({ payment_status: 'paid', last_payment_date: new Date().toISOString().slice(0, 10), updated_at: new Date().toISOString() }).eq('id', commissionId);
+  if (error) throw error;
 }
