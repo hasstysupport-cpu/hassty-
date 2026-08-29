@@ -74,20 +74,8 @@ export const TeacherScanPage: React.FC = () => {
         if(existing){setMessage({kind:'info',title:'الطالب مسجل بالفعل',body:`${student.full_name||'الطالب'} موجود بالفعل في ${selectedGroup.name}.`});return;}
         if(!supabase)throw new Error('قاعدة البيانات غير متاحة.');
         const {error}=await supabase.from('group_enrollments').insert({
-          group_id:selectedGroup.id,
-          student_id:student.id,
-          student_name:student.full_name||'طالب',
-          student_phone:student.phone||'',
-          parent_phone:'',
-          qr_code:student.qr_code||qr,
-          avatar_url:student.avatar_url||'',
-          grade:student.grade||selectedGroup.grade||'',
-          status:'active',
-          enrolled_at:new Date().toISOString(),
-          attendance_rate:0,
-          total_sessions:0,
-          attended_sessions:0,
-          payment_status:'pending'
+          group_id:selectedGroup.id, student_id:student.id, student_name:student.full_name||'طالب', student_phone:student.phone||'', parent_phone:'', qr_code:student.qr_code||qr,
+          avatar_url:student.avatar_url||'', grade:student.grade||selectedGroup.grade||'', status:'active', enrolled_at:new Date().toISOString(), attendance_rate:0, total_sessions:0, attended_sessions:0, payment_status:'pending'
         });
         if(error)throw error;
         setMessage({kind:'success',title:'تم قيد الطالب',body:`${student.full_name||'الطالب'} تمت إضافته إلى ${selectedGroup.name}.`});
@@ -98,95 +86,52 @@ export const TeacherScanPage: React.FC = () => {
         setMessage({kind:'warning',title:'لا توجد حصة جارية',body:'يجب أن يكون المسح أثناء موعد حصة فعلية. لن يتم تسجيل غياب خارج وقت الحصة.'});
         return;
       }
-      if(timing.state==='not_started'){
-        setMessage({kind:'warning',title:'الحصة لم تبدأ بعد',body:'سيتم حساب الحالة تلقائيًا من وقت المسح الفعلي.'});
-        return;
-      }
-      if(timing.state==='ended'){
-        setMessage({kind:'warning',title:'الحصة انتهت',body:'لا يمكن تسجيل حضور بعد انتهاء الحصة.'});
-        return;
-      }
+      if(timing.state==='not_started'){setMessage({kind:'warning',title:'الحصة لم تبدأ بعد',body:'سيتم حساب الحالة تلقائيًا من وقت المسح الفعلي.'});return;}
+      if(timing.state==='ended'){setMessage({kind:'warning',title:'الحصة انتهت',body:'لا يمكن تسجيل حضور بعد انتهاء الحصة.'});return;}
 
       const enrollment=await getEnrolledStudent(selectedGroup.id,student.id);
       if(!enrollment){setMessage({kind:'error',title:'الطالب غير مقيد',body:'قيد الطالب في المجموعة أولًا باستخدام وضع «قيد طالب».'});return;}
 
       const status=timing.state==='on_time'?'present':timing.state==='late'?'late':'absent';
-      await recordQrAttendance({
+      let sessionId: string | undefined;
+      if (supabase) {
+        const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+        const { data: session } = await supabase.from('lesson_sessions')
+          .select('id').eq('tutor_id', teacherId).eq('group_id', selectedGroup.id).eq('session_date', today)
+          .eq('status','scheduled').order('starts_at',{ascending:true}).limit(1).maybeSingle();
+        sessionId = session?.id;
+      }
+
+      const attendance = await recordQrAttendance({
         groupId:selectedGroup.id,
         studentId:student.id,
         studentName:student.full_name||enrollment.student_name||'طالب',
         qrCode:student.qr_code||qr,
         status,
+        lateMinutes: timing.minutesLate,
+        sessionId,
         notes:`مسح QR حقيقي. بداية الحصة ${activeSlot.startTime}، نهاية ${activeSlot.endTime}، وقت المسح ${now.toLocaleTimeString('ar-EG')}`
       });
 
+      if(!attendance) throw new Error('تعذر حفظ سجل الحضور.');
       if(status==='present')setMessage({kind:'success',title:'حاضر في الموعد ✅',body:`تم تسجيل ${student.full_name||'الطالب'} حاضرًا خلال أول 15 دقيقة.`});
       else if(status==='late')setMessage({kind:'warning',title:'حاضر متأخر ⏰',body:`تم تسجيل ${student.full_name||'الطالب'} متأخرًا ${timing.minutesLate} دقيقة.`});
       else setMessage({kind:'error',title:'غياب ❌',body:'تم تسجيل الغياب تلقائيًا لأن وقت المسح تجاوز نصف مدة الحصة.'});
-    } catch(e:any){
-      setMessage({kind:'error',title:'فشل تنفيذ العملية',body:e?.message||'حدث خطأ غير متوقع.'});
-    } finally{setBusy(false);setManualCode('');}
-  },[activeSlot,busy,mode,now,selectedGroup,selectedIsActive,timing]);
+    } catch(e:any){setMessage({kind:'error',title:'فشل تنفيذ العملية',body:e?.message||'حدث خطأ غير متوقع.'});}
+    finally{setBusy(false);setManualCode('');}
+  },[activeSlot,busy,mode,now,selectedGroup,selectedIsActive,timing,teacherId]);
 
-  const banner = !selectedGroup
-    ? {label:'اختر المجموعة',icon:AlertCircle}
-    : !activeGroup
-      ? {label:'لا توجد حصة جارية الآن',icon:AlertCircle}
-      : activeGroup.id!==selectedGroup.id
-        ? {label:'المجموعة المختارة ليست الحصة الحالية',icon:AlertCircle}
-        : timing?.state==='on_time'
-          ? {label:'حضور في الموعد',icon:CheckCircle2}
-          : timing?.state==='late'
-            ? {label:`تأخير ${timing.minutesLate} دقيقة`,icon:Clock3}
-            : timing?.state==='absent'
-              ? {label:'بعد نصف الحصة = غياب',icon:XCircle}
-              : timing?.state==='ended'
-                ? {label:'الحصة انتهت',icon:XCircle}
-                : {label:'الحصة لم تبدأ بعد',icon:Clock3};
+  const banner = !selectedGroup ? {label:'اختر المجموعة',icon:AlertCircle} : !activeGroup ? {label:'لا توجد حصة جارية الآن',icon:AlertCircle} : activeGroup.id!==selectedGroup.id ? {label:'المجموعة المختارة ليست الحصة الحالية',icon:AlertCircle} : timing?.state==='on_time' ? {label:'حضور في الموعد',icon:CheckCircle2} : timing?.state==='late' ? {label:`تأخير ${timing.minutesLate} دقيقة`,icon:Clock3} : timing?.state==='absent' ? {label:'بعد نصف الحصة = غياب',icon:XCircle} : timing?.state==='ended' ? {label:'الحصة انتهت',icon:XCircle} : {label:'الحصة لم تبدأ بعد',icon:Clock3};
   const BannerIcon=banner.icon;
 
   return <div className="space-y-5 text-right max-w-5xl mx-auto">
     <section className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-7 shadow-sm">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
-          <div className="inline-flex items-center gap-2 text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-full"><QrCode className="w-4 h-4"/>مسح حضور QR حقيقي</div>
-          <h2 className="text-xl sm:text-2xl font-black text-slate-900 mt-2">تسجيل حضور الطلاب بالوقت الفعلي</h2>
-          <p className="text-xs text-slate-500 mt-1">الحالة تُحسب تلقائيًا من موعد المجموعة ووقت المسح — بدون Demo أو طالب وهمي.</p>
-        </div>
-        <div className="flex items-center gap-2 text-xs font-bold text-slate-600 bg-slate-50 px-3 py-2 rounded-2xl border border-slate-200"><Clock3 className="w-4 h-4 text-blue-600"/>{now.toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}</div>
-      </div>
-
-      <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-3">
-        <select value={selectedGroupId} onChange={e=>setSelectedGroupId(e.target.value)} className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold">
-          <option value="">اختر المجموعة</option>
-          {groups.map(g=><option key={g.id} value={g.id}>{g.name} — {g.schedule}</option>)}
-        </select>
-        <div className="flex gap-2">
-          <button type="button" onClick={()=>{setMode('attendance');setMessage(null)}} className={`flex-1 rounded-2xl border-2 px-3 py-3 text-sm font-black ${mode==='attendance'?'border-emerald-500 bg-emerald-50 text-emerald-800':'border-slate-200 bg-slate-50 text-slate-600'}`}><CheckCircle2 className="w-4 h-4 inline ml-1"/>حضور</button>
-          <button type="button" onClick={()=>{setMode('enroll');setMessage(null)}} className={`flex-1 rounded-2xl border-2 px-3 py-3 text-sm font-black ${mode==='enroll'?'border-blue-500 bg-blue-50 text-blue-800':'border-slate-200 bg-slate-50 text-slate-600'}`}><UserPlus className="w-4 h-4 inline ml-1"/>قيد طالب</button>
-        </div>
-      </div>
-
-      <div className={`mt-4 rounded-2xl border px-4 py-3 flex items-center gap-3 ${banner.label.includes('الموعد')?'bg-emerald-50 border-emerald-200 text-emerald-900':banner.label.includes('تأخير')?'bg-amber-50 border-amber-200 text-amber-900':banner.label.includes('غياب')||banner.label.includes('انتهت')?'bg-red-50 border-red-200 text-red-900':'bg-slate-50 border-slate-200 text-slate-700'}`}>
-        <BannerIcon className="w-5 h-5"/>
-        <div><div className="font-black text-sm">{banner.label}</div><div className="text-[11px] opacity-80">{activeSlot?`موعد المجموعة: ${activeSlot.dayArabic} ${activeSlot.startTime} → ${activeSlot.endTime}`:'الحالة تتحدث تلقائيًا كل 5 ثوانٍ'}</div></div>
-      </div>
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4"><div><div className="inline-flex items-center gap-2 text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-full"><QrCode className="w-4 h-4"/>مسح حضور QR حقيقي</div><h2 className="text-xl sm:text-2xl font-black text-slate-900 mt-2">تسجيل حضور الطلاب بالوقت الفعلي</h2><p className="text-xs text-slate-500 mt-1">الحالة تُحسب تلقائيًا من موعد المجموعة ووقت المسح — مع ربط السجل بالحصة الفعلية إن وُجدت.</p></div><div className="flex items-center gap-2 text-xs font-bold text-slate-600 bg-slate-50 px-3 py-2 rounded-2xl border border-slate-200"><Clock3 className="w-4 h-4 text-blue-600"/>{now.toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}</div></div>
+      <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-3"><select value={selectedGroupId} onChange={e=>setSelectedGroupId(e.target.value)} className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold"><option value="">اختر المجموعة</option>{groups.map(g=><option key={g.id} value={g.id}>{g.name} — {g.schedule}</option>)}</select><div className="flex gap-2"><button type="button" onClick={()=>{setMode('attendance');setMessage(null)}} className={`flex-1 rounded-2xl border-2 px-3 py-3 text-sm font-black ${mode==='attendance'?'border-emerald-500 bg-emerald-50 text-emerald-800':'border-slate-200 bg-slate-50 text-slate-600'}`}><CheckCircle2 className="w-4 h-4 inline ml-1"/>حضور</button><button type="button" onClick={()=>{setMode('enroll');setMessage(null)}} className={`flex-1 rounded-2xl border-2 px-3 py-3 text-sm font-black ${mode==='enroll'?'border-blue-500 bg-blue-50 text-blue-800':'border-slate-200 bg-slate-50 text-slate-600'}`}><UserPlus className="w-4 h-4 inline ml-1"/>قيد طالب</button></div></div>
+      <div className={`mt-4 rounded-2xl border px-4 py-3 flex items-center gap-3 ${banner.label.includes('الموعد')?'bg-emerald-50 border-emerald-200 text-emerald-900':banner.label.includes('تأخير')?'bg-amber-50 border-amber-200 text-amber-900':banner.label.includes('غياب')||banner.label.includes('انتهت')?'bg-red-50 border-red-200 text-red-900':'bg-slate-50 border-slate-200 text-slate-700'}`}><BannerIcon className="w-5 h-5"/><div><div className="font-black text-sm">{banner.label}</div><div className="text-[11px] opacity-80">{activeSlot?`موعد المجموعة: ${activeSlot.dayArabic} ${activeSlot.startTime} → ${activeSlot.endTime}`:'الحالة تتحدث تلقائيًا كل 5 ثوانٍ'}</div></div></div>
     </section>
-
-    <section className="bg-white border border-gray-200 rounded-3xl p-5 shadow-sm">
-      <RealQRCameraScanner isActive={scannerOpen} isPaused={busy} onScanSuccess={processCode}/>
-      <div className="max-w-md mx-auto mt-4 flex gap-2">
-        <input value={manualCode} onChange={e=>setManualCode(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')void processCode(manualCode)}} placeholder="أدخل كود QR يدويًا" className="flex-1 rounded-2xl border border-slate-300 px-4 py-3 text-sm font-mono text-left focus:outline-none focus:border-blue-500" dir="ltr"/>
-        <button type="button" disabled={busy} onClick={()=>void processCode(manualCode)} className="px-5 rounded-2xl bg-blue-600 text-white text-sm font-black disabled:opacity-50">{busy?'جاري...':'مسح'}</button>
-      </div>
-      <div className="mt-3 flex justify-center"><button type="button" onClick={()=>setScannerOpen(v=>!v)} className="text-xs font-bold text-slate-500 hover:text-blue-700">{scannerOpen?'إيقاف الكاميرا':'تشغيل الكاميرا'}</button></div>
-    </section>
-
-    {message&&<section className={`rounded-3xl border p-5 flex gap-3 ${message.kind==='success'?'bg-emerald-50 border-emerald-200 text-emerald-950':message.kind==='warning'?'bg-amber-50 border-amber-200 text-amber-950':message.kind==='error'?'bg-red-50 border-red-200 text-red-950':'bg-blue-50 border-blue-200 text-blue-950'}`}>
-      <div className="w-10 h-10 rounded-2xl bg-white border border-current/10 flex items-center justify-center shrink-0">{message.kind==='success'?<CheckCircle2 className="w-5 h-5"/>:message.kind==='error'?<XCircle className="w-5 h-5"/>:message.kind==='warning'?<AlertCircle className="w-5 h-5"/>:<ShieldCheck className="w-5 h-5"/>}</div>
-      <div><h3 className="font-black text-sm">{message.title}</h3><p className="text-xs mt-1 leading-6 opacity-80">{message.body}</p></div>
-    </section>}
-
+    <section className="bg-white border border-gray-200 rounded-3xl p-5 shadow-sm"><RealQRCameraScanner isActive={scannerOpen} isPaused={busy} onScanSuccess={processCode}/><div className="max-w-md mx-auto mt-4 flex gap-2"><input value={manualCode} onChange={e=>setManualCode(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')void processCode(manualCode)}} placeholder="أدخل كود QR يدويًا" className="flex-1 rounded-2xl border border-slate-300 px-4 py-3 text-sm font-mono text-left focus:outline-none focus:border-blue-500" dir="ltr"/><button type="button" disabled={busy} onClick={()=>void processCode(manualCode)} className="px-5 rounded-2xl bg-blue-600 text-white text-sm font-black disabled:opacity-50">{busy?'جاري...':'مسح'}</button></div><div className="mt-3 flex justify-center"><button type="button" onClick={()=>setScannerOpen(v=>!v)} className="text-xs font-bold text-slate-500 hover:text-blue-700">{scannerOpen?'إيقاف الكاميرا':'تشغيل الكاميرا'}</button></div></section>
+    {message&&<section className={`rounded-3xl border p-5 flex gap-3 ${message.kind==='success'?'bg-emerald-50 border-emerald-200 text-emerald-950':message.kind==='warning'?'bg-amber-50 border-amber-200 text-amber-950':message.kind==='error'?'bg-red-50 border-red-200 text-red-950':'bg-blue-50 border-blue-200 text-blue-950'}`}><div className="w-10 h-10 rounded-2xl bg-white border border-current/10 flex items-center justify-center shrink-0">{message.kind==='success'?<CheckCircle2 className="w-5 h-5"/>:message.kind==='error'?<XCircle className="w-5 h-5"/>:message.kind==='warning'?<AlertCircle className="w-5 h-5"/>:<ShieldCheck className="w-5 h-5"/>}</div><div><h3 className="font-black text-sm">{message.title}</h3><p className="text-xs mt-1 leading-6 opacity-80">{message.body}</p></div></section>}
     <button type="button" onClick={()=>void reloadGroups()} className="w-full py-3 rounded-2xl border border-slate-200 bg-white text-slate-700 font-black text-xs flex items-center justify-center gap-2"><RefreshCw className="w-4 h-4"/>تحديث المجموعات</button>
   </div>;
 };
