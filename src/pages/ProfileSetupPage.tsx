@@ -34,6 +34,8 @@ export const ProfileSetupPage: React.FC<ProfileSetupPageProps> = ({ onComplete, 
   const [parentPhone, setParentPhone] = useState(user?.profileData?.parentPhone || '');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
+  const [setupLegalAccepted, setSetupLegalAccepted] = useState(false);
+  const [setupLegalBlocked, setSetupLegalBlocked] = useState(false); // setup-legal-consent-v1
 
   const completion = useMemo(() => {
     const common = [name, phone, governorate, area].filter(Boolean).length;
@@ -44,6 +46,7 @@ export const ProfileSetupPage: React.FC<ProfileSetupPageProps> = ({ onComplete, 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!setupLegalAccepted) { setSetupLegalBlocked(true); return; }
     if (!user?.uid) {
       setError('تعذر تحديد حسابك الحالي. سجّل الدخول مرة أخرى.');
       return;
@@ -284,7 +287,15 @@ export const ProfileSetupPage: React.FC<ProfileSetupPageProps> = ({ onComplete, 
             <button disabled={isSaving} className="w-full py-3.5 rounded-2xl bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-60 text-white text-sm font-black transition-all shadow-lg shadow-blue-500/15 flex items-center justify-center gap-2">
               {isSaving ? <span>جاري حفظ بياناتك...</span> : <><Save className="w-4 h-4" /> حفظ وإنهاء إعداد الحساب <ArrowLeft className="w-4 h-4" /></>}
             </button>
-          </form>
+          
+          <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-4">
+            <label className="flex items-start gap-3 cursor-pointer" dir="rtl">
+              <input type="checkbox" checked={setupLegalAccepted} onChange={(e) => { setSetupLegalAccepted(e.target.checked); setSetupLegalBlocked(false); }} className="mt-1 w-5 h-5 accent-blue-600 shrink-0" />
+              <span className="text-xs sm:text-sm text-slate-700 leading-6">أوافق على <button type="button" onClick={() => window.open('/legal/terms','_blank','noopener,noreferrer')} className="font-black text-blue-700 underline">شروط الاستخدام</button> و<button type="button" onClick={() => window.open('/legal/privacy','_blank','noopener,noreferrer')} className="font-black text-blue-700 underline">سياسة الخصوصية</button>، وأؤكد أن البيانات التي قدمتها صحيحة.</span>
+            </label>
+            {setupLegalBlocked && <p className="mt-2 text-xs font-black text-red-600">لا يمكن إنهاء إعداد الحساب قبل الموافقة على الشروط والخصوصية.</p>}
+          </div>
+</form>
         </section>
       </div>
       <style>{`.input{width:100%;border:1px solid #e2e8f0;border-radius:16px;background:#f8fafc;padding:12px 14px;font-size:13px;font-weight:600;outline:none;transition:.2s}.input:focus{background:#fff;border-color:#2563eb;box-shadow:0 0 0 4px rgba(37,99,235,.08)}`}</style>
