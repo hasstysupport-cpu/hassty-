@@ -32,6 +32,7 @@ import { SECRET_ADMIN_ROUTE } from './lib/securityConfig';
 import { LegalPage, LegalSection } from './pages/LegalPage';
 import { NotificationsPage, CalendarPage, MessagesPage, AssignmentsPage, GradesPage, AttendanceOverviewPage } from './pages/PlatformFeaturesPages';
 import { TeacherAssignmentsPage } from './pages/teacher/TeacherAssignmentsPage';
+import { TeacherAttendancePage } from './pages/teacher/TeacherAttendancePage';
 import { ParentGradesPage } from './pages/parent/ParentGradesPage';
 
 import { StudentDashboardPage } from './pages/student/StudentDashboardPage';
@@ -224,6 +225,7 @@ export default function App() {
             {currentPath === '/teacher/students' && <TeacherStudentsPage onNavigate={handleNavigate} />}
             {currentPath === '/teacher/groups' && <TeacherGroupsPage />}
             {currentPath === '/teacher/scan' && <TeacherScanPage />}
+            {currentPath === '/teacher/attendance' && <TeacherAttendancePage />}
             {currentPath === '/teacher/payments' && <TeacherPaymentsPage onNavigate={handleNavigate} />}
             {currentPath === '/teacher/availability' && <TeacherAvailabilityPage />}
             {currentPath === '/teacher/profile' && <TeacherProfileEditPage />}
