@@ -3,7 +3,6 @@ import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import { AuthProvider } from './lib/AuthContext.tsx';
 import { ProfileCompletionGate } from './components/common/ProfileCompletionGate';
-import { LegalConsentGuard } from './components/common/LegalConsentGuard';
 import { LegalPage, type LegalSection } from './pages/LegalPage';
 import './index.css';
 
@@ -36,7 +35,6 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AuthProvider>
       <ProfileCompletionGate />
-      <LegalConsentGuard />
       <Root />
     </AuthProvider>
   </StrictMode>,
