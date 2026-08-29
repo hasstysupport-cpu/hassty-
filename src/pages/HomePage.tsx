@@ -7,10 +7,11 @@ import { FindTutorStepsSection } from '../components/FindTutorStepsSection';
 import { SubjectsSection } from '../components/SubjectsSection';
 import { AccountTypesSection } from '../components/AccountTypesSection';
 import { FeaturesSection } from '../components/FeaturesSection';
-import { StatsBand } from '../components/StatsBand';
-import { TestimonialsSection } from '../components/TestimonialsSection';
 import { TeacherCTASection } from '../components/TeacherCTASection';
+import { PlatformProofSection } from '../components/PlatformProofSection';
+import { ScrollReveal } from '../components/common/ScrollReveal';
 import { AccountRole } from '../types';
+import '../landing.css';
 
 interface HomePageProps {
   onNavigate: (path: string) => void;
@@ -27,81 +28,67 @@ export const HomePage: React.FC<HomePageProps> = ({
   onSearchWithParams,
 }) => {
   useSEO({
-    title: 'الرئيسية - احجز أفضل المدرسين الخصوصيين في مصر',
-    description: 'ابحث عن أفضل المدرسين الخصوصيين المعتمدين لمختلف المراحل الدراسية واللغات في مصر مع نظام الحضور الذكي بالـ QR كود وإشعارات فورية لأولياء الأمور.',
+    title: 'الرئيسية - حِصّتي | ابحث عن مدرسين موثقين',
+    description: 'منصة حِصّتي تساعد الطلاب وأولياء الأمور على الوصول إلى مدرسين موثقين، حجز الحصص، ومتابعة الحضور والبيانات التعليمية في مكان واحد.',
     canonicalPath: '/',
   });
 
   const handleSearch = (subject: string, governorate: string, city: string = '') => {
-    if (onSearchWithParams) {
-      onSearchWithParams(subject, governorate, city);
-    } else {
-      onNavigate('/search');
-    }
+    if (onSearchWithParams) onSearchWithParams(subject, governorate, city);
+    else onNavigate('/search');
   };
 
   const handleQRSimulator = () => {
-    if (onOpenQRSimulator) {
-      onOpenQRSimulator();
-    } else {
-      onNavigate('/student/qr-card');
-    }
+    if (onOpenQRSimulator) onOpenQRSimulator();
+    else onNavigate('/student/qr-card');
   };
 
   const handleAuth = (mode: 'login' | 'register', role?: AccountRole) => {
-    if (onOpenAuth) {
-      onOpenAuth(mode, role);
-    } else {
-      onNavigate(mode === 'login' ? '/login' : '/signup');
-    }
+    if (onOpenAuth) onOpenAuth(mode, role);
+    else onNavigate(mode === 'login' ? '/login' : '/signup');
   };
 
   return (
-    <div className="flex flex-col">
-      {/* 1. Hero */}
-      <HeroSection
-        onSearch={handleSearch}
-        onOpenQRSimulator={handleQRSimulator}
-      />
+    <div className="hs-home-shell flex flex-col bg-white overflow-hidden">
+      <ScrollReveal direction="up" delay={0} className="contents">
+        <HeroSection onSearch={handleSearch} onOpenQRSimulator={handleQRSimulator} />
+      </ScrollReveal>
 
-      {/* 2. Problem / Solution */}
-      <ProblemSolutionSection />
+      <ScrollReveal direction="up" delay={40}>
+        <ProblemSolutionSection />
+      </ScrollReveal>
 
-      {/* 3. How it Works */}
-      <HowItWorksSection
-        onOpenAuth={handleAuth}
-        onOpenTutorSearch={() => onNavigate('/search')}
-        onOpenQRSimulator={handleQRSimulator}
-      />
+      <ScrollReveal direction="up" delay={70}>
+        <HowItWorksSection
+          onOpenAuth={handleAuth}
+          onOpenTutorSearch={() => onNavigate('/search')}
+          onOpenQRSimulator={handleQRSimulator}
+        />
+      </ScrollReveal>
 
-      {/* 4. Find Tutor Steps */}
-      <FindTutorStepsSection
-        onOpenTutorSearch={() => onNavigate('/search')}
-      />
+      <ScrollReveal direction="up" delay={80}>
+        <FindTutorStepsSection onOpenTutorSearch={() => onNavigate('/search')} />
+      </ScrollReveal>
 
-      {/* 5. Subjects */}
-      <SubjectsSection
-        onSelectSubject={(subjectName) => handleSearch(subjectName, '')}
-      />
+      <ScrollReveal direction="up" delay={90}>
+        <SubjectsSection onSelectSubject={(subjectName) => handleSearch(subjectName, '')} />
+      </ScrollReveal>
 
-      {/* 6. Account Types */}
-      <AccountTypesSection
-        onSelectRole={(role) => handleAuth('register', role)}
-      />
+      <ScrollReveal direction="up" delay={90}>
+        <AccountTypesSection onSelectRole={(role) => handleAuth('register', role)} />
+      </ScrollReveal>
 
-      {/* 7. Features */}
-      <FeaturesSection />
+      <ScrollReveal direction="up" delay={90}>
+        <FeaturesSection />
+      </ScrollReveal>
 
-      {/* 8. Stats Band */}
-      <StatsBand />
+      <ScrollReveal direction="up" delay={90}>
+        <PlatformProofSection />
+      </ScrollReveal>
 
-      {/* 9. Testimonials */}
-      <TestimonialsSection />
-
-      {/* 10. Teacher CTA */}
-      <TeacherCTASection
-        onJoinAsTeacher={() => onNavigate('/for-teachers')}
-      />
+      <ScrollReveal direction="up" delay={100}>
+        <TeacherCTASection onJoinAsTeacher={() => onNavigate('/for-teachers')} />
+      </ScrollReveal>
     </div>
   );
 };
