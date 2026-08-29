@@ -114,6 +114,7 @@ export default function App() {
   const isDashboardRoute = currentPath.startsWith('/student') || currentPath.startsWith('/parent') || currentPath.startsWith('/teacher');
   const isAdminAppRoute = currentPath.startsWith(SECRET_ADMIN_ROUTE) || currentPath.startsWith('/admin') || (typeof window !== 'undefined' && window.location.hostname.startsWith('admin.'));
   const isUnverified = isLoggedIn && !user?.emailVerified && user?.role !== 'admin';
+  const isSignupRoute = currentPath === '/signup';
 
   useEffect(() => {
     let cancelled = false;
@@ -177,6 +178,18 @@ export default function App() {
 
   if (isAdminAppRoute) return <HasstyAdminApp onSwitchToPublicApp={() => setCurrentPath('/')} initialToken={initialAdminToken} />;
 
+  if (isSignupRoute && !isLoggedIn) {
+    return (
+      <div className="min-h-screen w-full bg-[#F8FAFF] text-[#1F2937] font-['IBM_Plex_Sans_Arabic',sans-serif] antialiased">
+        {!signupLegalAccepted ? (
+          <LegalConsentGate onAccept={() => setSignupLegalAccepted(true)} onNavigate={handleNavigate} />
+        ) : (
+          <SignupPage onNavigate={handleNavigate} onSignupSuccess={handleLogin} />
+        )}
+      </div>
+    );
+  }
+
   if (isLoggedIn && needsProfileSetup && !isUnverified && currentPath === '/setup-profile') {
     return (
       <div className="min-h-screen bg-[#F7FAFF] text-[#1F2937] font-['IBM_Plex_Sans_Arabic',sans-serif] antialiased">
@@ -233,8 +246,6 @@ export default function App() {
           {currentPath === '/contact' && <ContactPage />}
           {currentPath === '/for-teachers' && <ForTeachersPage onNavigate={handleNavigate} />}
           {currentPath === '/login' && <LoginPage onNavigate={handleNavigate} onLoginSuccess={handleLogin} />}
-          {currentPath === '/signup' && !signupLegalAccepted && <LegalConsentGate onAccept={() => setSignupLegalAccepted(true)} onNavigate={handleNavigate} />}
-          {currentPath === '/signup' && signupLegalAccepted && <SignupPage onNavigate={handleNavigate} onSignupSuccess={handleLogin} />}
           {(currentPath === '/verify-email' || isUnverified) && <VerifyEmailPage onNavigate={handleNavigate} onVerificationSuccess={handleLogin} />}
           {currentPath === '/whatsapp-studio' && <WhatsAppStudioPage />}
         </main>
