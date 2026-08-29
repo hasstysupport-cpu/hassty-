@@ -2,7 +2,6 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 import { AccountRole } from '../types';
 import { supabase } from './supabase';
 import { sendParentLinkRequest } from './parentStudentService';
-import { saveAdminSession } from './securityConfig';
 
 export interface UserSession {
   uid: string;
@@ -47,9 +46,9 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
 const PENDING_GOOGLE_ROLE_KEY = 'hassty_pending_role';
 const PENDING_GOOGLE_EXTRA_KEY = 'hassty_pending_extra';
+const GOOGLE_LOGIN_STARTED_KEY = 'hassty_google_login_started_at';
 
 const normalizeRole = (value: any): AccountRole | null => {
   return value === 'student' || value === 'parent' || value === 'teacher' || value === 'admin' ? value : null;
@@ -58,7 +57,6 @@ const normalizeRole = (value: any): AccountRole | null => {
 const mapProfileToSession = (authUser: any, profile: any, roleOverride?: AccountRole | null): UserSession => {
   const role = roleOverride ?? normalizeRole(profile?.role) ?? 'student';
   const metadata = (profile?.metadata || {}) as Record<string, any>;
-
   return {
     uid: authUser.id,
     email: authUser.email || profile?.email || '',
@@ -69,7 +67,7 @@ const mapProfileToSession = (authUser: any, profile: any, roleOverride?: Account
     governorate: profile?.governorate || '',
     area: profile?.city || '',
     profileData: {
-      ...(metadata || {}),
+      ...metadata,
       grade: profile?.grade || metadata.grade || '',
       role: profile?.role ?? null,
       isVerified: metadata.isVerified ?? false,
@@ -121,7 +119,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     let mounted = true;
-
     const hydrate = async () => {
       if (!supabase) {
         if (mounted) setLoading(false);
@@ -144,7 +141,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (mounted) setLoading(false);
       }
     };
-
     void hydrate();
 
     const { data: listener } = supabase?.auth.onAuthStateChange(async (_event, authSession) => {
@@ -174,13 +170,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { data, error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
     if (error) throw error;
     if (!data.user) throw new Error('تعذر تسجيل الدخول.');
-
     const profile = await getProfile(data.user.id);
     if (!profile) {
       await supabase.auth.signOut();
       throw new Error('الحساب موجود في المصادقة لكن ملف الحساب غير مكتمل. استخدم إنشاء حساب لإكماله.');
     }
-
     const session = mapProfileToSession(data.user, profile);
     persistSession(session);
     return session;
@@ -188,7 +182,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signupUser = async (data: SignupData): Promise<UserSession> => {
     if (!supabase) throw new Error('Supabase غير مُهيأ.');
-
     const cleanEmail = data.email.trim().toLowerCase();
     const cleanName = data.name.trim();
     const cleanPhone = data.phone.trim();
@@ -252,16 +245,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     if (data.role === 'parent' && data.studentJoinCode?.trim()) {
-      await sendParentLinkRequest(
-        {
-          uid: authData.user.id,
-          name: cleanName,
-          phone: cleanPhone,
-          email: cleanEmail,
-          avatarUrl: data.avatarUrl || '',
-        },
-        data.studentJoinCode.trim()
-      );
+      await sendParentLinkRequest({ uid: authData.user.id, name: cleanName, phone: cleanPhone, email: cleanEmail, avatarUrl: data.avatarUrl || '' }, data.studentJoinCode.trim());
     }
 
     const session = mapProfileToSession(authData.user, profile, data.role);
@@ -271,8 +255,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginWithGoogle = async (defaultRole?: AccountRole, extraData: any = {}): Promise<UserSession | null> => {
     if (!supabase) throw new Error('Supabase غير مُهيأ.');
-
     if (typeof window !== 'undefined') {
+      localStorage.setItem(GOOGLE_LOGIN_STARTED_KEY, String(Date.now()));
       localStorage.removeItem('hassty_google_auth_error');
       if (defaultRole) localStorage.setItem(PENDING_GOOGLE_ROLE_KEY, defaultRole);
       else localStorage.removeItem(PENDING_GOOGLE_ROLE_KEY);
@@ -283,33 +267,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const redirectTo = typeof window !== 'undefined' ? `${window.location.origin}/?googleLogin=1` : undefined;
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: {
-        redirectTo,
-        queryParams: { prompt: 'select_account' },
-      },
+      options: { redirectTo, queryParams: { prompt: 'select_account' } },
     });
     if (error) throw error;
     if (!data.url) throw new Error('تعذر فتح Google.');
-
-    // Supabase performs the browser redirect. Returning null keeps callers from routing prematurely.
     return null;
   };
 
   const sendPasswordReset = async (email: string): Promise<void> => {
     if (!supabase) throw new Error('Supabase غير مُهيأ.');
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), { redirectTo: `${window.location.origin}/reset-password` });
     if (error) throw error;
   };
 
   const sendEmailVerificationLink = async (email: string): Promise<void> => {
     if (!supabase) throw new Error('Supabase غير مُهيأ.');
-    const { error } = await supabase.auth.resend({
-      type: 'signup',
-      email: email.trim().toLowerCase(),
-      options: { emailRedirectTo: `${window.location.origin}/verify-email` },
-    });
+    const { error } = await supabase.auth.resend({ type: 'signup', email: email.trim().toLowerCase(), options: { emailRedirectTo: `${window.location.origin}/verify-email` } });
     if (error) throw error;
   };
 
@@ -324,11 +297,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateUserProfile = async (updates: Partial<any>) => {
     if (!supabase || !user?.uid) throw new Error('لا يوجد مستخدم مسجل.');
-
-    const metadataPatch = {
-      ...(user.profileData || {}),
-      ...(updates.profileData || {}),
-    };
+    const metadataPatch = { ...(user.profileData || {}), ...(updates.profileData || {}) };
     delete (metadataPatch as any).role;
 
     const profilePatch: Record<string, any> = {
@@ -344,31 +313,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const profile = await upsertProfile(user.uid, profilePatch);
 
     if (user.role === 'teacher') {
-      await supabase.from('tutor_profiles').upsert({
+      const tutorPatch: Record<string, any> = {
         user_id: user.uid,
-        title: updates.title,
-        headline: updates.headline,
-        bio: updates.bio,
-        subjects: updates.subject ? [updates.subject] : undefined,
-        grades: updates.grade ? [updates.grade] : undefined,
-        experience_years: updates.experienceYears !== undefined ? Number(updates.experienceYears) || 0 : undefined,
-        governorate: updates.governorate,
-        city: updates.area,
-      }, { onConflict: 'user_id' });
+        ...(updates.title !== undefined ? { title: updates.title } : {}),
+        ...(updates.headline !== undefined ? { headline: updates.headline } : {}),
+        ...(updates.bio !== undefined ? { bio: updates.bio } : {}),
+        ...(updates.subject !== undefined ? { subjects: [updates.subject] } : {}),
+        ...(updates.grade !== undefined ? { grades: [updates.grade] } : {}),
+        ...(updates.experienceYears !== undefined ? { experience_years: Number(updates.experienceYears) || 0 } : {}),
+        ...(updates.governorate !== undefined ? { governorate: updates.governorate } : {}),
+        ...(updates.area !== undefined ? { city: updates.area } : {}),
+      };
+      const { error } = await supabase.from('tutor_profiles').upsert(tutorPatch, { onConflict: 'user_id' });
+      if (error) throw error;
     }
 
     if (updates.name !== undefined || updates.avatarUrl !== undefined) {
-      const { error } = await supabase.auth.updateUser({
-        data: {
-          full_name: updates.name ?? user.name,
-          avatar_url: updates.avatarUrl ?? user.avatarUrl ?? null,
-        },
-      });
+      const { error } = await supabase.auth.updateUser({ data: { full_name: updates.name ?? user.name, avatar_url: updates.avatarUrl ?? user.avatarUrl ?? null } });
       if (error) throw error;
     }
 
     const { data: authData } = await supabase.auth.getUser();
-    if (authData.user) persistSession(mapProfileToSession(authData.user, profile));
+    if (authData.user) persistSession(mapProfileToSession(authData.user, profile, normalizeRole(profile.role)));
   };
 
   const logout = async () => {
@@ -379,23 +345,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (typeof window !== 'undefined') {
       localStorage.removeItem(PENDING_GOOGLE_ROLE_KEY);
       localStorage.removeItem(PENDING_GOOGLE_EXTRA_KEY);
+      localStorage.removeItem(GOOGLE_LOGIN_STARTED_KEY);
     }
     persistSession(null);
   };
 
-  const value = useMemo(() => ({
-    user,
-    loading,
-    loginUser,
-    loginWithGoogle,
-    signupUser,
-    sendPasswordReset,
-    sendEmailVerificationLink,
-    markEmailAsVerified,
-    updateUserProfile,
-    logout,
-  }), [user, loading]);
-
+  const value = useMemo(() => ({ user, loading, loginUser, loginWithGoogle, signupUser, sendPasswordReset, sendEmailVerificationLink, markEmailAsVerified, updateUserProfile, logout }), [user, loading]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
