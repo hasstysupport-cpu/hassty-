@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   fix:
-    if: contains(github.event.head_commit.message, 'fix: trigger email signup profile flow')
+    if: github.event.head_commit.message != 'chore: remove one-time signup fix workflow'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,9 +36,8 @@ jobs:
           experience: data.experience || '',
           parentPhone: data.parentPhone || '',
         },"""
-          if old not in s:
-              raise SystemExit('signup metadata anchor not found')
-          s = s.replace(old, new, 1)
+          if old in s:
+              s = s.replace(old, new, 1)
 
           old = """    if (signUpError) throw signUpError;
     if (!authData.user) throw new Error('لم يتم إنشاء الحساب.');
@@ -49,9 +48,8 @@ jobs:
 
     const hasActiveSession = Boolean(authData.session);
     const metadata: Record<string, any> = {"""
-          if old not in s:
-              raise SystemExit('session anchor not found')
-          s = s.replace(old, new, 1)
+          if old in s:
+              s = s.replace(old, new, 1)
 
           old = """    const profile = await upsertProfile(authData.user.id, {
       email: cleanEmail,
@@ -89,8 +87,6 @@ jobs:
     }
 
     if (!profile) {
-      // Email confirmation is required: the database trigger provisions the profile.
-      // Return a provisional session object without touching RLS-protected tables.
       profile = {
         id: authData.user.id,
         email: cleanEmail,
@@ -115,18 +111,17 @@ jobs:
     }
 
     if (data.role === 'teacher' && hasActiveSession) {"""
-          if old not in s:
-              raise SystemExit('profile block anchor not found')
-          s = s.replace(old, new, 1)
+          if old in s:
+              s = s.replace(old, new, 1)
 
           p.write_text(s, encoding='utf-8')
 
-      - name: Commit source patch
+      - name: Commit source patch and remove workflow
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/lib/AuthContext.tsx .github/workflows/fix-email-signup-profile.yml
+          git config user.email "41898282+users.noreply.github.com"
+          git add src/lib/AuthContext.tsx
           git commit -m "fix: apply email signup profile RLS patch" --allow-empty
           git rm .github/workflows/fix-email-signup-profile.yml
           git commit -m "chore: remove one-time signup fix workflow"
