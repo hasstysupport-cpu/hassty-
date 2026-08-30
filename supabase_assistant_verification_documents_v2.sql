@@ -39,10 +39,6 @@ create policy avd_assistant_insert on public.assistant_verification_documents
       where r.id = assistant_verification_documents.request_id and r.assistant_id = (select auth.uid())
     )
   );
-create policy avd_assistant_update on public.assistant_verification_documents
-  for update to authenticated
-  using (assistant_id = (select auth.uid()))
-  with check (assistant_id = (select auth.uid()));
 create policy avd_admin_select on public.assistant_verification_documents
   for select to authenticated using (private.is_admin_strict());
 create policy avd_admin_update on public.assistant_verification_documents
