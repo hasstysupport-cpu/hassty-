@@ -51,7 +51,7 @@ const PENDING_GOOGLE_EXTRA_KEY = 'hassty_pending_extra';
 const GOOGLE_LOGIN_STARTED_KEY = 'hassty_google_login_started_at';
 
 const normalizeRole = (value: any): AccountRole | null => {
-  return value === 'student' || value === 'parent' || value === 'teacher' || value === 'admin' ? value : null;
+  return value === 'student' || value === 'parent' || value === 'teacher' || value === 'assistant' || value === 'admin' ? value : null;
 };
 
 const mapProfileToSession = (authUser: any, profile: any, roleOverride?: AccountRole | null): UserSession => {
@@ -125,25 +125,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
       try {
-        const { data } = await supabase.auth.getUser();
+        const { data, error } = await supabase.auth.getSession();
         if (!mounted) return;
-        if (!data.user) {
+        if (error) throw error;
+        if (!data.session?.user) {
           persistSession(null);
-          setLoading(false);
           return;
         }
-        const session = await buildSession(data.user);
+        const session = await buildSession(data.session.user);
         if (mounted) persistSession(session);
       } catch (error) {
         console.warn('Auth hydration warning:', error);
-        if (mounted) persistSession(null);
+        try {
+          const stored = typeof window !== 'undefined' ? localStorage.getItem('hassty_user_session') : null;
+          const parsed = stored ? JSON.parse(stored) : null;
+          if (mounted && parsed?.uid) persistSession(parsed as UserSession);
+        } catch {}
       } finally {
         if (mounted) setLoading(false);
       }
     };
     void hydrate();
 
-    const { data: listener } = supabase?.auth.onAuthStateChange(async (_event, authSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, authSession) => {
       if (!mounted) return;
       if (!authSession?.user) {
         persistSession(null);
@@ -156,7 +160,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch (error) {
         console.warn('Auth profile sync warning:', error);
       }
-    }) || { subscription: { unsubscribe: () => {} } };
+    });
 
     return () => {
       mounted = false;
@@ -208,7 +212,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       verificationStatus: data.role === 'teacher' ? 'pending' : 'not_required',
     };
 
-    const profile = await upsertProfile(authData.user.id, {
+    const hasActiveSession = Boolean(authData.session);
+    let profile: any = {
+      id: authData.user.id,
       email: cleanEmail,
       full_name: cleanName,
       phone: cleanPhone,
@@ -218,15 +224,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       city: data.area || null,
       grade: data.grade || null,
       account_status: 'active',
+      badge: null,
+      qr_code: null,
       metadata,
-    });
+    };
 
-    if (data.role === 'student') {
-      const qrCode = `HASSTY-${authData.user.id.replace(/-/g, '').slice(0, 10).toUpperCase()}`;
-      await upsertProfile(authData.user.id, { qr_code: qrCode, metadata: { ...metadata, qrCode } });
+    if (hasActiveSession) {
+      profile = await upsertProfile(authData.user.id, profile);
+    } else {
+      try {
+        const provisioned = await getProfile(authData.user.id);
+        if (provisioned) profile = provisioned;
+      } catch {}
     }
 
-    if (data.role === 'teacher') {
+    if (data.role === 'student' && hasActiveSession) {
+      const qrCode = `HASSTY-${authData.user.id.replace(/-/g, '').slice(0, 10).toUpperCase()}`;
+      await upsertProfile(authData.user.id, { qr_code: qrCode, metadata: { ...metadata, qrCode } });
+      profile = { ...profile, qr_code: qrCode, metadata: { ...metadata, qrCode } };
+    }
+
+    if (data.role === 'teacher' && hasActiveSession) {
       const { error: tutorError } = await supabase.from('tutor_profiles').upsert({
         user_id: authData.user.id,
         title: `معلم ${data.subject || 'المادة'}`,
@@ -244,7 +262,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (tutorError) throw tutorError;
     }
 
-    if (data.role === 'parent' && data.studentJoinCode?.trim()) {
+    if (data.role === 'parent' && data.studentJoinCode?.trim() && hasActiveSession) {
       await sendParentLinkRequest({ uid: authData.user.id, name: cleanName, phone: cleanPhone, email: cleanEmail, avatarUrl: data.avatarUrl || '' }, data.studentJoinCode.trim());
     }
 
