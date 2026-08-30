@@ -105,6 +105,22 @@ async function buildSession(authUser: any): Promise<UserSession> {
   return mapProfileToSession(authUser, profile);
 }
 
+function cleanOAuthUrl() {
+  if (typeof window === 'undefined') return;
+  const url = new URL(window.location.href);
+  let changed = false;
+  if (url.searchParams.has('googleLogin')) {
+    url.searchParams.delete('googleLogin');
+    changed = true;
+  }
+  if (window.location.hash) {
+    // supabase-js consumes the OAuth fragment; remove any leftover fragment.
+    url.hash = '';
+    changed = true;
+  }
+  if (changed) window.history.replaceState({}, document.title, url.pathname + url.search);
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserSession | null>(null);
   const [loading, setLoading] = useState(true);
@@ -133,7 +149,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return;
         }
         const session = await buildSession(data.session.user);
-        if (mounted) persistSession(session);
+        if (mounted) {
+          persistSession(session);
+          cleanOAuthUrl();
+        }
       } catch (error) {
         console.warn('Auth hydration warning:', error);
         try {
@@ -156,7 +175,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const profile = await getProfile(authSession.user.id);
         const next = mapProfileToSession(authSession.user, profile);
-        if (mounted) persistSession(next);
+        if (mounted) {
+          persistSession(next);
+          cleanOAuthUrl();
+        }
       } catch (error) {
         console.warn('Auth profile sync warning:', error);
       }
@@ -282,7 +304,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       else localStorage.removeItem(PENDING_GOOGLE_EXTRA_KEY);
     }
 
-    const redirectTo = typeof window !== 'undefined' ? `${window.location.origin}/?googleLogin=1` : undefined;
+    // Return to the clean origin. supabase-js handles the OAuth callback/session
+    // in the browser, so no googleLogin query flag is needed.
+    const redirectTo = typeof window !== 'undefined' ? window.location.origin : undefined;
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo, queryParams: { prompt: 'select_account' } },
