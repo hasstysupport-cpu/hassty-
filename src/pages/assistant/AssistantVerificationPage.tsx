@@ -116,12 +116,6 @@ export const AssistantVerificationPage: React.FC<{ onNavigate?: (path: string) =
         throw docError;
       }
 
-      const patch = kind === 'id_card' ? { id_card_path: path, id_card_review_status: 'pending' } : { qualification_path: path, qualification_review_status: 'pending' };
-      const { error: reqError } = await supabase.from('assistant_verification_requests').update(patch).eq('id', request.id).eq('assistant_id', user.uid);
-      if (reqError) throw reqError;
-
-      const nextStatus = request.status === 'approved' ? 'under_review' : 'under_review';
-      await supabase.from('assistant_verification_requests').update({ status: nextStatus, documents_submitted_at: new Date().toISOString() }).eq('id', request.id).eq('assistant_id', user.uid);
       await supabase.from('notifications').insert({
         user_id: user.uid,
         title: kind === 'id_card' ? 'تم رفع بطاقة الهوية' : 'تم رفع المؤهل الدراسي',
