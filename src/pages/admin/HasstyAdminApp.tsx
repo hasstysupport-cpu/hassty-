@@ -9,7 +9,8 @@ import { SiteAnalyticsPage } from './SiteAnalyticsPage';
 import { CommissionTrackingPage } from './CommissionTrackingPage';
 import { AdminLoginPage } from './AdminLoginPage';
 import { AccountBadgeType, AdminUserAccount } from '../../types';
-import { subscribeToUsers, subscribeToVerifications, subscribeToReports, subscribeToCommissions, dbUpdateAccountBadge, dbToggleAccountStatus, dbDeleteAccount, dbApproveVerification, dbRejectVerification, dbSuspendTeacherFromReport, dbResolveReport, dbDismissReport, dbMarkCommissionPaid } from '../../lib/adminSupabaseService';
+import { subscribeToUsers, subscribeToVerifications, subscribeToReports, subscribeToCommissions, dbUpdateAccountBadge, dbToggleAccountStatus, dbDeleteAccount, dbRejectVerification, dbSuspendTeacherFromReport, dbResolveReport, dbDismissReport, dbMarkCommissionPaid } from '../../lib/adminSupabaseService';
+import { approveTeacherVerificationAtomic } from '../../lib/adminTeacherVerification';
 import { OFFICIAL_ADMIN_EMAIL, isCurrentAdminSessionValid, clearAdminSession } from '../../lib/securityConfig';
 import { supabase } from '../../lib/supabase';
 import { Loader2, AlertTriangle, RefreshCw, ShieldCheck } from 'lucide-react';
@@ -48,9 +49,8 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({ onSwitchToPublic
 
     const fail = (label: string, err: any) => {
       if (disposed) return;
-      const message = err?.message || String(err) || 'تعذر قراءة البيانات من Supabase.';
       setDbConnectionStatus('failed');
-      setDbErrorMessage(`${label}: ${message}`);
+      setDbErrorMessage(`${label}: ${err?.message || String(err) || 'تعذر قراءة البيانات من Supabase.'}`);
       setIsDbLoading(false);
     };
 
@@ -64,96 +64,49 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({ onSwitchToPublic
         if (sessionError) throw sessionError;
         if (!sessionData.session?.user) throw new Error('جلسة Supabase غير موجودة. أعد تسجيل الدخول.');
         const email = (sessionData.session.user.email || '').toLowerCase().trim();
-        if (email !== OFFICIAL_ADMIN_EMAIL.toLowerCase() && email !== 'admin@hassty.com') {
-          throw new Error('الحساب الحالي ليس حساب إدارة معتمدًا.');
-        }
-        if (!disposed) {
-          setAdminEmail(email);
-          setIsAuthenticated(true);
-        }
-
-        const markLoaded = () => {
-          if (disposed) return;
-          setDbConnectionStatus('connected');
-          setDbErrorMessage(null);
-          setIsDbLoading(false);
-        };
-
+        if (email !== OFFICIAL_ADMIN_EMAIL.toLowerCase() && email !== 'admin@hassty.com') throw new Error('الحساب الحالي ليس حساب إدارة معتمدًا.');
+        if (!disposed) { setAdminEmail(email); setIsAuthenticated(true); }
+        const markLoaded = () => { if (!disposed) { setDbConnectionStatus('connected'); setDbErrorMessage(null); setIsDbLoading(false); } };
         unsubUsers = subscribeToUsers(data => { if (!disposed) { setAccounts(data); markLoaded(); } }, err => fail('قراءة المستخدمين', err));
         unsubVerifs = subscribeToVerifications(data => { if (!disposed) setVerificationRequests(data); }, err => fail('قراءة طلبات التوثيق', err));
         unsubReports = subscribeToReports(data => { if (!disposed) setSafetyReports(data); }, err => fail('قراءة البلاغات', err));
         unsubComms = subscribeToCommissions(data => { if (!disposed) setCommissions(data); }, err => fail('قراءة العمولات', err));
-      } catch (err: any) {
-        fail('تهيئة لوحة الإدارة', err);
-      }
+      } catch (err: any) { fail('تهيئة لوحة الإدارة', err); }
     };
     void initRealtimeSync();
-    return () => {
-      disposed = true;
-      unsubUsers?.();
-      unsubVerifs?.();
-      unsubReports?.();
-      unsubComms?.();
-    };
+    return () => { disposed = true; unsubUsers?.(); unsubVerifs?.(); unsubReports?.(); unsubComms?.(); };
   }, [retryTrigger]);
 
   const handleRetryConnection = () => setRetryTrigger(v => v + 1);
-
   const handleGoogleAdminAuth = async () => {
     try {
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: 'select_account' });
-      const result = await signInWithPopup(auth, provider);
-      if (!result?.user) return;
+      const provider = new GoogleAuthProvider(); provider.setCustomParameters({ prompt: 'select_account' });
+      const result = await signInWithPopup(auth, provider); if (!result?.user) return;
       const email = (result.user.email || '').toLowerCase().trim();
-      if (email !== OFFICIAL_ADMIN_EMAIL.toLowerCase() && email !== 'admin@hassty.com') {
-        setDbConnectionStatus('failed');
-        setDbErrorMessage('هذا البريد ليس حساب الإدارة المعتمد.');
-        return;
-      }
-      setAdminEmail(email);
-      setIsAuthenticated(true);
-      setRetryTrigger(v => v + 1);
-    } catch (err: any) {
-      setDbConnectionStatus('failed');
-      setDbErrorMessage(err?.message || 'فشل تسجيل دخول Google للإدارة.');
-    }
+      if (email !== OFFICIAL_ADMIN_EMAIL.toLowerCase() && email !== 'admin@hassty.com') { setDbConnectionStatus('failed'); setDbErrorMessage('هذا البريد ليس حساب الإدارة المعتمد.'); return; }
+      setAdminEmail(email); setIsAuthenticated(true); handleRetryConnection();
+    } catch (err: any) { setDbConnectionStatus('failed'); setDbErrorMessage(err?.message || 'فشل تسجيل دخول Google للإدارة.'); }
   };
-
-  const handleLoginSuccess = (email:string) => { setIsAuthenticated(true); setAdminEmail(email); handleRetryConnection(); };
+  const handleLoginSuccess = (email: string) => { setIsAuthenticated(true); setAdminEmail(email); handleRetryConnection(); };
   const handleLogout = () => { setIsAuthenticated(false); clearAdminSession(); };
 
-  const handleUpdateAccountBadge = async (accountId:string,newBadge:AccountBadgeType) => {
-    try { await dbUpdateAccountBadge(accountId,newBadge); } catch(e){ console.error('Failed to update account badge in Supabase:',e); failSafely(e); }
-  };
-  const handleToggleAccountStatus = async (accountId:string) => {
-    const target=accounts.find(a=>a.id===accountId); if(!target)return;
-    try { await dbToggleAccountStatus(accountId,target.status); } catch(e){ console.error('Failed to toggle status in Supabase:',e); failSafely(e); }
-  };
-  const handleDeleteAccount = async (accountId:string) => {
-    try { await dbDeleteAccount(accountId); } catch(e){ console.error('Failed to delete account in Supabase:',e); failSafely(e); }
-  };
+  const failSafely = (err:any) => { setDbConnectionStatus('connected'); setDbErrorMessage(err?.message || 'فشلت العملية في Supabase.'); };
+  const handleUpdateAccountBadge = async (accountId:string,newBadge:AccountBadgeType) => { try { await dbUpdateAccountBadge(accountId,newBadge); handleRetryConnection(); } catch(e){ failSafely(e); } };
+  const handleToggleAccountStatus = async (accountId:string) => { const target=accounts.find(a=>a.id===accountId); if(!target)return; try { await dbToggleAccountStatus(accountId,target.status); handleRetryConnection(); } catch(e){ failSafely(e); } };
+  const handleDeleteAccount = async (accountId:string) => { try { await dbDeleteAccount(accountId); handleRetryConnection(); } catch(e){ failSafely(e); } };
   const handleApproveTeacherVerification = async (requestId:string) => {
     const targetReq=verificationRequests.find(r=>r.id===requestId); if(!targetReq)return;
-    const teacherData:Partial<AdminUserAccount>={name:targetReq.teacherName,phone:targetReq.phone,role:'teacher',status:'active',badge:'verified',subject:targetReq.subject,grade:targetReq.stage,governorate:targetReq.governorate,area:targetReq.area,nationalId:targetReq.nationalId};
-    try { await dbApproveVerification(requestId,targetReq.teacherId,adminEmail,teacherData); } catch(e){ console.error('Failed to approve teacher verification in Supabase:',e); failSafely(e); }
+    try {
+      await approveTeacherVerificationAtomic({ requestId, teacherId:targetReq.teacherId, adminEmail, name:targetReq.teacherName, phone:targetReq.phone, governorate:targetReq.governorate, city:targetReq.area, grade:targetReq.stage, subject:targetReq.subject });
+      setVerificationRequests(prev=>prev.map(r=>r.id===requestId?{...r,status:'approved'}:r));
+      handleRetryConnection();
+    } catch(e){ failSafely(e); }
   };
-  const handleRejectTeacherVerification = async (requestId:string,reason:string) => {
-    try { await dbRejectVerification(requestId,reason,adminEmail); } catch(e){ console.error('Failed to reject teacher verification in Supabase:',e); failSafely(e); }
-  };
-  const handleSuspendTeacherFromReport = async (teacherId:string,reportId:string) => {
-    try { await dbSuspendTeacherFromReport(teacherId,reportId); } catch(e){ console.error('Failed to suspend teacher from report in Supabase:',e); failSafely(e); }
-  };
-  const handleResolveSafetyReport = async (reportId:string) => {
-    try { await dbResolveReport(reportId); } catch(e){ console.error('Failed to resolve report:',e); failSafely(e); }
-  };
-  const handleDismissSafetyReport = async (reportId:string) => {
-    try { await dbDismissReport(reportId); } catch(e){ console.error('Failed to dismiss report:',e); failSafely(e); }
-  };
-  const handleMarkCommissionPaid = async (id:string) => {
-    try { await dbMarkCommissionPaid(id); } catch(e){ console.error('Failed to mark commission paid in Supabase:',e); failSafely(e); }
-  };
-  const failSafely = (err:any) => { setDbConnectionStatus('failed'); setDbErrorMessage(err?.message || 'فشلت العملية في Supabase. اضغط إعادة المحاولة.'); };
+  const handleRejectTeacherVerification = async (requestId:string,reason:string) => { try { await dbRejectVerification(requestId,reason,adminEmail); setVerificationRequests(prev=>prev.map(r=>r.id===requestId?{...r,status:'rejected',rejectionReason:reason}:r)); handleRetryConnection(); } catch(e){ failSafely(e); } };
+  const handleSuspendTeacherFromReport = async (teacherId:string,reportId:string) => { try { await dbSuspendTeacherFromReport(teacherId,reportId); handleRetryConnection(); } catch(e){ failSafely(e); } };
+  const handleResolveSafetyReport = async (reportId:string) => { try { await dbResolveReport(reportId); handleRetryConnection(); } catch(e){ failSafely(e); } };
+  const handleDismissSafetyReport = async (reportId:string) => { try { await dbDismissReport(reportId); handleRetryConnection(); } catch(e){ failSafely(e); } };
+  const handleMarkCommissionPaid = async (id:string) => { try { await dbMarkCommissionPaid(id); handleRetryConnection(); } catch(e){ failSafely(e); } };
 
   if(!isAuthenticated)return <AdminLoginPage onLoginSuccess={handleLoginSuccess} onBackToPublicSite={onSwitchToPublicApp} initialToken={initialToken}/>;
   const pendingVerificationsCount=verificationRequests.filter(v=>v.status==='pending').length;
