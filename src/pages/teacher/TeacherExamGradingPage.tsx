@@ -1,7 +1,8 @@
 import React,{useEffect,useState} from 'react';
 import {CheckCircle2,Loader2,Save,Send,Users} from 'lucide-react';
 import {supabase} from '../../lib/supabase';import {useAuth} from '../../lib/AuthContext';
-export const TeacherExamGradingPage:React.FC<{examId:string}>={({examId})=>{const{user}=useAuth();const[rows,setRows]=useState<any[]>([]);const[exam,setExam]=useState<any>(null);const[loading,setLoading]=useState(true);const[saving,setSaving]=useState<string|null>(null);const[notice,setNotice]=useState('');
+interface Props{examId:string}
+export const TeacherExamGradingPage:React.FC<Props>=({examId})=>{const{user}=useAuth();const[rows,setRows]=useState<any[]>([]);const[exam,setExam]=useState<any>(null);const[loading,setLoading]=useState(true);const[saving,setSaving]=useState<string|null>(null);const[notice,setNotice]=useState('');
 const load=async()=>{if(!supabase||!user?.uid||!examId)return;setLoading(true);try{const[{data:e,error:ee},{data:r,error:re}]=await Promise.all([supabase.from('exams').select('*').eq('id',examId).eq('teacher_id',user.uid).maybeSingle(),supabase.from('exam_results').select('id,student_id,score,max_score,percentage,feedback,attendance_status,graded_at,is_locked').eq('exam_id',examId).order('created_at')]);if(ee)throw ee;if(re)throw re;setExam(e);setRows(r||[]);}catch(x:any){setNotice(x?.message||'تعذر تحميل التصحيح.')}finally{setLoading(false);}};
 useEffect(()=>{void load();},[examId,user?.uid]);
 const ensure=async()=>{const{error}=await supabase!.rpc('ensure_exam_results',{p_exam_id:examId});if(error)throw error;await load();};
