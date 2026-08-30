@@ -6,7 +6,17 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
 export const supabase = isSupabaseConfigured
-  ? createClient(supabaseUrl, supabaseAnonKey)
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        // This is a client-only Vite SPA. Keep the browser session durable and
+        // let supabase-js consume OAuth tokens returned in the URL fragment.
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        flowType: 'implicit',
+        storageKey: 'hassty-supabase-auth',
+      },
+    })
   : null;
 
 export async function checkSupabaseConnection(): Promise<{ ok: boolean; message: string; missingTables?: boolean }> {
