@@ -21,74 +21,28 @@ interface HomePageProps {
   onSelectTutor?: (tutorId: string) => void;
 }
 
-export const HomePage: React.FC<HomePageProps> = ({
-  onNavigate,
-  onOpenQRSimulator,
-  onOpenAuth,
-  onSearchWithParams,
-}) => {
-  useSEO({
-    title: 'الرئيسية - حِصّتي | ابحث عن مدرسين موثقين',
-    description: 'منصة حِصّتي تساعد الطلاب وأولياء الأمور على الوصول إلى مدرسين موثقين، حجز الحصص، ومتابعة الحضور والبيانات التعليمية في مكان واحد.',
-    canonicalPath: '/',
-  });
+export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onOpenQRSimulator, onOpenAuth, onSearchWithParams }) => {
+  useSEO({ title: 'الرئيسية - حِصّتي | ابحث عن مدرسين موثقين', description: 'منصة حِصّتي تساعد الطلاب وأولياء الأمور على الوصول إلى مدرسين موثقين، حجز الحصص، ومتابعة الحضور والبيانات التعليمية في مكان واحد.', canonicalPath: '/' });
 
-  const handleSearch = (subject: string, governorate: string, city: string = '') => {
-    if (onSearchWithParams) onSearchWithParams(subject, governorate, city);
-    else onNavigate('/search');
-  };
-
-  const handleQRSimulator = () => {
-    if (onOpenQRSimulator) onOpenQRSimulator();
-    else onNavigate('/student/qr-card');
-  };
-
+  const handleSearch = (subject: string, governorate: string, city: string = '') => onSearchWithParams ? onSearchWithParams(subject, governorate, city) : onNavigate('/search');
+  const handleQRSimulator = () => onOpenQRSimulator ? onOpenQRSimulator() : onNavigate('/student/qr-card');
   const handleAuth = (mode: 'login' | 'register', role?: AccountRole) => {
+    if (role === 'assistant' && mode === 'register') { onNavigate('/assistant/signup'); return; }
     if (onOpenAuth) onOpenAuth(mode, role);
     else onNavigate(mode === 'login' ? '/login' : '/signup');
   };
 
   return (
     <div className="hs-home-shell flex flex-col bg-white overflow-hidden">
-      <ScrollReveal direction="up" delay={0} className="contents">
-        <HeroSection onSearch={handleSearch} onOpenQRSimulator={handleQRSimulator} />
-      </ScrollReveal>
-
-      <ScrollReveal direction="up" delay={40}>
-        <ProblemSolutionSection />
-      </ScrollReveal>
-
-      <ScrollReveal direction="up" delay={70}>
-        <HowItWorksSection
-          onOpenAuth={handleAuth}
-          onOpenTutorSearch={() => onNavigate('/search')}
-          onOpenQRSimulator={handleQRSimulator}
-        />
-      </ScrollReveal>
-
-      <ScrollReveal direction="up" delay={80}>
-        <FindTutorStepsSection onOpenTutorSearch={() => onNavigate('/search')} />
-      </ScrollReveal>
-
-      <ScrollReveal direction="up" delay={90}>
-        <SubjectsSection onSelectSubject={(subjectName) => handleSearch(subjectName, '')} />
-      </ScrollReveal>
-
-      <ScrollReveal direction="up" delay={90}>
-        <AccountTypesSection onSelectRole={(role) => handleAuth('register', role)} />
-      </ScrollReveal>
-
-      <ScrollReveal direction="up" delay={90}>
-        <FeaturesSection />
-      </ScrollReveal>
-
-      <ScrollReveal direction="up" delay={90}>
-        <PlatformProofSection />
-      </ScrollReveal>
-
-      <ScrollReveal direction="up" delay={100}>
-        <TeacherCTASection onJoinAsTeacher={() => onNavigate('/for-teachers')} />
-      </ScrollReveal>
+      <ScrollReveal direction="up" delay={0} className="contents"><HeroSection onSearch={handleSearch} onOpenQRSimulator={handleQRSimulator} /></ScrollReveal>
+      <ScrollReveal direction="up" delay={40}><ProblemSolutionSection /></ScrollReveal>
+      <ScrollReveal direction="up" delay={70}><HowItWorksSection onOpenAuth={handleAuth} onOpenTutorSearch={() => onNavigate('/search')} onOpenQRSimulator={handleQRSimulator} /></ScrollReveal>
+      <ScrollReveal direction="up" delay={80}><FindTutorStepsSection onOpenTutorSearch={() => onNavigate('/search')} /></ScrollReveal>
+      <ScrollReveal direction="up" delay={90}><SubjectsSection onSelectSubject={(subjectName) => handleSearch(subjectName, '')} /></ScrollReveal>
+      <ScrollReveal direction="up" delay={90}><AccountTypesSection onSelectRole={(role) => handleAuth('register', role)} /></ScrollReveal>
+      <ScrollReveal direction="up" delay={90}><FeaturesSection /></ScrollReveal>
+      <ScrollReveal direction="up" delay={90}><PlatformProofSection /></ScrollReveal>
+      <ScrollReveal direction="up" delay={100}><TeacherCTASection onJoinAsTeacher={() => onNavigate('/for-teachers')} /></ScrollReveal>
     </div>
   );
 };
