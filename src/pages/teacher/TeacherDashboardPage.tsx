@@ -1,1 +1,1 @@
-export { TeacherDashboardPageV2 as TeacherDashboardPage } from './TeacherDashboardPageV2';
+export { TeacherWorkspacePage as TeacherDashboardPage } from './TeacherWorkspacePage';
