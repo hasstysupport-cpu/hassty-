@@ -18,6 +18,7 @@ const roleLabels: Record<AccountRole,{title:string;badge:string;path:string;fall
   student:{title:'حساب طالب',badge:'bg-blue-50 text-blue-700 border-blue-200',path:'/student/profile',fallback:'طالب حِصّتي'},
   parent:{title:'حساب ولي أمر',badge:'bg-amber-50 text-amber-800 border-amber-200',path:'/parent/settings',fallback:'ولي أمر حِصّتي'},
   teacher:{title:'حساب مدرس',badge:'bg-emerald-50 text-emerald-800 border-emerald-200',path:'/teacher/profile',fallback:'معلم حِصّتي'},
+  assistant:{title:'حساب مساعد',badge:'bg-teal-50 text-teal-800 border-teal-200',path:'/teacher/dashboard',fallback:'مساعد حِصّتي'},
   admin:{title:'حساب إدارة',badge:'bg-purple-50 text-purple-800 border-purple-200',path:'/admin',fallback:'مدير حِصّتي'},
 };
 

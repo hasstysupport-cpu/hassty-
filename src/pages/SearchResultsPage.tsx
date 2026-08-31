@@ -69,20 +69,67 @@ export const SearchResultsPage: React.FC<SearchResultsPageProps> = ({
         setLoading(false);
         return;
       }
-      const { data, error: queryError } = await supabase
-        .from('public_verified_teachers')
-        .select('*')
-        .order('rating', { ascending: false })
-        .order('reviews_count', { ascending: false });
-      if (!active) return;
-      if (queryError) {
-        console.error('Verified teacher directory error:', queryError);
-        setTeachers([]);
-        setError('تعذر تحميل المدرسين المعتمدين حاليًا.');
-      } else {
-        setTeachers((data || []) as PublicTeacherRow[]);
+      try {
+        const { data, error: queryError } = await supabase
+          .from('public_verified_teachers')
+          .select('*')
+          .order('rating', { ascending: false })
+          .order('reviews_count', { ascending: false });
+        if (!active) return;
+        if (!queryError && data) {
+          setTeachers(data as PublicTeacherRow[]);
+          setLoading(false);
+          return;
+        }
+
+        // Fallback: Query tutor_profiles & profiles directly
+        const { data: tpList, error: tpError } = await supabase
+          .from('tutor_profiles')
+          .select('*')
+          .order('rating', { ascending: false });
+        if (tpError) throw tpError;
+        
+        const userIds = (tpList || []).map((t: any) => t.user_id).filter(Boolean);
+        let profileMap = new Map<string, any>();
+        if (userIds.length > 0) {
+          const { data: profs } = await supabase.from('profiles').select('*').in('id', userIds);
+          profileMap = new Map((profs || []).map((p: any) => [p.id, p]));
+        }
+
+        const combined: PublicTeacherRow[] = (tpList || []).map((t: any) => {
+          const p = profileMap.get(t.user_id) || {};
+          return {
+            id: t.user_id,
+            name: p.full_name || 'مدرس معتمد',
+            title: t.title || 'معلم متخصص',
+            headline: t.headline || '',
+            subjects: Array.isArray(t.subjects) ? t.subjects : [],
+            grades: Array.isArray(t.grades) ? t.grades : [],
+            governorate: p.governorate || t.governorate || '',
+            city: p.city || t.city || '',
+            rating: Number(t.rating || 5.0),
+            reviews_count: Number(t.reviews_count || 0),
+            price_per_session: Number(t.price_per_session || 0),
+            price_per_month: Number(t.price_per_month || 0),
+            experience_years: Number(t.experience_years || 1),
+            center_names: Array.isArray(t.center_names) ? t.center_names : [],
+            avatar_url: p.avatar_url || '',
+            is_verified: t.is_verified === true || t.verification_status === 'approved',
+          };
+        });
+
+        if (active) {
+          setTeachers(combined);
+        }
+      } catch (err: any) {
+        console.error('Verified teacher directory error:', err);
+        if (active) {
+          setTeachers([]);
+          setError('تعذر تحميل المدرسين المعتمدين حاليًا.');
+        }
+      } finally {
+        if (active) setLoading(false);
       }
-      setLoading(false);
     };
     void load();
     return () => { active = false; };

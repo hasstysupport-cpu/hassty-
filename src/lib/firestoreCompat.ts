@@ -114,11 +114,12 @@ function tutorToData(tutor: any, profile?: any) {
   };
 }
 
-async function getFromAppDocuments(collectionName: string, docId?: string) {
+async function getFromAppDocuments(collectionName: string, docId?: string): Promise<any> {
   const client = requireSupabase();
-  let queryBuilder = client.from('app_documents').select('*').eq('collection_name', collectionName);
-  if (docId) queryBuilder = queryBuilder.eq('document_id', docId).maybeSingle();
-  return queryBuilder;
+  if (docId) {
+    return client.from('app_documents').select('*').eq('collection_name', collectionName).eq('document_id', docId).maybeSingle();
+  }
+  return client.from('app_documents').select('*').eq('collection_name', collectionName);
 }
 
 export async function getDoc(ref: any): Promise<SupabaseDoc> {

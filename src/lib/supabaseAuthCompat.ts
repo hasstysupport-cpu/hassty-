@@ -76,7 +76,7 @@ export async function signOut(_auth: any) {
   auth.currentUser = null;
 }
 
-export async function sendEmailVerification(user: User) {
+export async function sendEmailVerification(user: { email?: string | null } | User) {
   if (!supabase || !user.email) throw new Error('لا يوجد بريد إلكتروني للحساب');
   const { error } = await supabase.auth.resend({
     type: 'signup',
@@ -86,7 +86,7 @@ export async function sendEmailVerification(user: User) {
   if (error) throw error;
 }
 
-export async function reload(_user: User) {
+export async function reload(_user?: any) {
   if (!supabase) return null;
   const { data, error } = await supabase.auth.getUser();
   if (error) throw error;

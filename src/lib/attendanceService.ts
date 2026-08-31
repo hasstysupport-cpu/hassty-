@@ -59,9 +59,20 @@ export async function recordQrAttendance(input: {
   scannedAt?: Date;
   sessionId?: string;
   lateMinutes?: number;
+  tutorId?: string;
 }) {
   if (!supabase) throw new Error('قاعدة البيانات غير متاحة.');
   if (!input.groupId || !input.studentId) throw new Error('بيانات الطالب أو المجموعة غير صالحة.');
+  
+  // Find tutor_id from student_groups if not provided
+  let tutorId = input.tutorId || '';
+  if (!tutorId) {
+    const { data: grp } = await supabase.from('student_groups').select('tutor_id').eq('id', input.groupId).limit(1);
+    if (grp?.[0]?.tutor_id) {
+      tutorId = grp[0].tutor_id;
+    }
+  }
+
   const now = input.scannedAt || new Date();
   const parts = toDateParts(now);
   let query = supabase.from('attendance_records').select('id').eq('group_id', input.groupId).eq('student_id', input.studentId).eq('date', parts.date).order('created_at', { ascending: false }).limit(1);
@@ -69,8 +80,9 @@ export async function recordQrAttendance(input: {
   const { data: existing, error: existingError } = await query;
   if (existingError) throw existingError;
 
-  const payload = {
+  const payload: any = {
     group_id: input.groupId,
+    tutor_id: tutorId || null,
     student_id: input.studentId,
     student_name: input.studentName,
     qr_code: input.qrCode,
@@ -103,7 +115,12 @@ export async function checkoutAttendance(attendanceId: string, studentId: string
   const now = new Date().toISOString();
   const { data, error } = await supabase.from('attendance_records').update({ checked_out_at: now, updated_at: now }).eq('id', attendanceId).eq('student_id', studentId).is('checked_out_at', null).select('*').single();
   if (error) throw error;
-  const event = await supabase.from('attendance_events').insert({ attendance_id: attendanceId, student_id: studentId, group_id: data.group_id, event_type: 'check_out', actor_id: actorId, occurred_at: now, notes });
-  if (event.error) throw event.error;
+  if (data?.group_id) {
+    try {
+      await supabase.from('attendance_events').insert({ attendance_id: attendanceId, student_id: studentId, group_id: data.group_id, event_type: 'check_out', actor_id: actorId, occurred_at: now, notes });
+    } catch {
+      // ignore event logging failure if table is not used
+    }
+  }
   return data;
 }

@@ -15,6 +15,7 @@ const roleCopy: Record<SetupRole, { title: string; subtitle: string; icon: React
   student: { title: 'كمّل بياناتك كطالب', subtitle: 'خطوة واحدة ونجهز حسابك لاكتشاف المدرسين والحصص.', icon: GraduationCap },
   parent: { title: 'كمّل بيانات ولي الأمر', subtitle: 'أضف بياناتك حتى تتابع أبناءك وحضورهم ومدفوعاتهم.', icon: Users },
   teacher: { title: 'جهّز ملفك كمدرس', subtitle: 'بياناتك الأساسية هتظهر في ملفك بعد إكمال التسجيل، ثم يبدأ التحقق.', icon: Briefcase },
+  assistant: { title: 'بيانات المساعد', subtitle: 'أدخل بياناتك لربط حسابك بالمدرس وإدارة المجموعات والحضور.', icon: UserRound },
 };
 
 export const ProfileSetupPage: React.FC<ProfileSetupPageProps> = ({ onComplete, onLogout }) => {

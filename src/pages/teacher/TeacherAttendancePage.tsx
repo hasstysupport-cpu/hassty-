@@ -1,101 +1,101 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { CalendarClock, CheckCircle2, Clock3, LogIn, LogOut, RefreshCw, Users, XCircle } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { CalendarClock, CheckCircle2, Clock3, LogOut, RefreshCw, Users, XCircle, Layers } from 'lucide-react';
 import { useAuth } from '../../lib/AuthContext';
 import { supabase } from '../../lib/supabase';
-
-interface LessonSession {
-  id: string;
-  title: string;
-  subject?: string | null;
-  session_date: string;
-  starts_at: string;
-  ends_at: string;
-  location?: string | null;
-  status: 'scheduled' | 'completed' | 'cancelled';
-  group_id?: string | null;
-}
-
-interface AttendanceRow {
-  id: string;
-  student_id: string;
-  student_name: string;
-  status: 'present' | 'late' | 'absent';
-  checked_in_at?: string | null;
-  checked_out_at?: string | null;
-  late_minutes?: number;
-  attendance_method?: string;
-}
-
-const fmt = (value?: string | null) => value ? new Date(value).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+import { loadTeacherGroups } from '../../lib/teacherStore';
+import { StudentGroup } from '../../types';
 
 export const TeacherAttendancePage: React.FC = () => {
   const { user } = useAuth();
-  const [sessions, setSessions] = useState<LessonSession[]>([]);
-  const [selectedSession, setSelectedSession] = useState<string>('');
-  const [rows, setRows] = useState<AttendanceRow[]>([]);
+  const teacherId = user?.uid || '';
+  const [groups, setGroups] = useState<StudentGroup[]>([]);
+  const [selectedGroupId, setSelectedGroupId] = useState<string>('all');
+  const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [lastAction, setLastAction] = useState('');
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  const load = async () => {
-    if (!supabase || !user?.uid) return;
+  const fmt = (v?: string | null) => {
+    if (!v) return '-';
+    try {
+      const d = new Date(v);
+      if (isNaN(d.getTime())) return v;
+      return d.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return v;
+    }
+  };
+
+  const load = useCallback(async () => {
+    if (!supabase || !teacherId) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError('');
     try {
-      const { data: sessionData, error: sessionError } = await supabase
-        .from('lesson_sessions')
-        .select('id,title,subject,session_date,starts_at,ends_at,location,status,group_id')
-        .eq('tutor_id', user.uid)
-        .order('starts_at', { ascending: false })
-        .limit(40);
-      if (sessionError) throw sessionError;
-      const nextSessions = (sessionData || []) as LessonSession[];
-      setSessions(nextSessions);
-      const nextId = selectedSession && nextSessions.some((s) => s.id === selectedSession)
-        ? selectedSession
-        : nextSessions.find((s) => s.status === 'scheduled')?.id || nextSessions[0]?.id || '';
-      setSelectedSession(nextId);
+      const liveGroups = await loadTeacherGroups(teacherId);
+      setGroups(liveGroups);
 
-      if (nextId) {
-        const { data: attendanceData, error: attendanceError } = await supabase
-          .from('attendance_records')
-          .select('id,student_id,student_name,status,checked_in_at,checked_out_at,late_minutes,attendance_method')
-          .eq('session_id', nextId)
-          .order('checked_in_at', { ascending: true });
-        if (attendanceError) throw attendanceError;
-        setRows((attendanceData || []) as AttendanceRow[]);
-      } else {
+      const groupIds = liveGroups.map(g => g.id);
+      if (groupIds.length === 0) {
         setRows([]);
+        setLoading(false);
+        return;
       }
+
+      let query = supabase.from('attendance_records').select('*');
+
+      if (selectedGroupId && selectedGroupId !== 'all') {
+        query = query.eq('group_id', selectedGroupId);
+      } else {
+        query = query.in('group_id', groupIds);
+      }
+
+      const { data, error: queryError } = await query
+        .order('date', { ascending: false })
+        .order('time', { ascending: false })
+        .limit(100);
+
+      if (queryError) throw queryError;
+      setRows(data || []);
     } catch (e: any) {
       setError(e?.message || 'تعذر تحميل سجل الحضور.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [teacherId, selectedGroupId]);
 
-  useEffect(() => { void load(); }, [user?.uid]);
   useEffect(() => {
-    if (!selectedSession || !supabase) return;
-    const channel = supabase
-      .channel(`teacher-attendance:${selectedSession}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance_records', filter: `session_id=eq.${selectedSession}` }, () => void load())
-      .subscribe();
-    return () => { void supabase.removeChannel(channel); };
-  }, [selectedSession]);
+    void load();
+  }, [load]);
 
-  const selected = useMemo(() => sessions.find((s) => s.id === selectedSession) || null, [sessions, selectedSession]);
-  const stats = useMemo(() => ({
+  // Realtime subscription for attendance records
+  useEffect(() => {
+    if (!supabase || !teacherId) return;
+    const channel = supabase
+      .channel(`attendance-teacher-${teacherId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance_records' }, () => {
+        void load();
+      })
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [teacherId, load]);
+
+  const stats = {
     total: rows.length,
     present: rows.filter((r) => r.status === 'present').length,
     late: rows.filter((r) => r.status === 'late').length,
     absent: rows.filter((r) => r.status === 'absent').length,
-    open: rows.filter((r) => !r.checked_out_at && r.checked_in_at).length,
-  }), [rows]);
+    open: rows.filter((r) => r.checked_in_at && !r.checked_out_at).length,
+  };
 
-  const checkout = async (row: AttendanceRow) => {
-    if (!supabase || !user?.uid || !row.id || row.checked_out_at) return;
+  const checkout = async (row: any) => {
+    if (!supabase || !user) return;
     setBusyId(row.id);
     setError('');
     try {
@@ -103,19 +103,23 @@ export const TeacherAttendancePage: React.FC = () => {
       const { error: updateError } = await supabase
         .from('attendance_records')
         .update({ checked_out_at: now, updated_at: now })
-        .eq('id', row.id)
-        .eq('student_id', row.student_id);
+        .eq('id', row.id);
       if (updateError) throw updateError;
-      const { error: eventError } = await supabase.from('attendance_events').insert({
-        attendance_id: row.id,
-        student_id: row.student_id,
-        group_id: selected?.group_id || null,
-        event_type: 'check_out',
-        actor_id: user.uid,
-        occurred_at: now,
-        notes: 'تسجيل خروج من لوحة المعلم',
-      });
-      if (eventError) throw eventError;
+
+      try {
+        await supabase.from('attendance_events').insert({
+          attendance_id: row.id,
+          student_id: row.student_id,
+          group_id: row.group_id || null,
+          event_type: 'check_out',
+          actor_id: user.uid,
+          occurred_at: now,
+          notes: 'تسجيل خروج من لوحة المعلم',
+        });
+      } catch {
+        // ignore if optional table
+      }
+
       setLastAction(`تم تسجيل خروج ${row.student_name} الساعة ${new Date(now).toLocaleTimeString('ar-EG')}`);
       await load();
     } catch (e: any) {
@@ -133,25 +137,33 @@ export const TeacherAttendancePage: React.FC = () => {
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-black">
               <CalendarClock className="w-4 h-4" /> حضور وانصراف لحظي
             </div>
-            <h1 className="text-2xl font-black text-[#1E3A8A] mt-2">إدارة الحضور المتطور</h1>
-            <p className="text-sm text-gray-500 mt-1">مراجعة الدخول والخروج، التأخير، والحالات المسجلة لكل حصة.</p>
+            <h1 className="text-2xl font-black text-[#1E3A8A] mt-2">إدارة الحضور والغياب</h1>
+            <p className="text-sm text-gray-500 mt-1">مراجعة الحضور المباشر عبر رمز QR، أوقات الدخول والخروج، ونسب الالتزام لكل مجموعة.</p>
           </div>
-          <button onClick={() => void load()} className="px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-xs font-black text-gray-700 flex items-center justify-center gap-2">
+          <button
+            onClick={() => void load()}
+            className="px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-xs font-black text-gray-700 flex items-center justify-center gap-2 hover:bg-gray-100 transition"
+          >
             <RefreshCw className="w-4 h-4" /> تحديث الآن
           </button>
         </div>
 
         <div className="mt-5 grid sm:grid-cols-2 gap-3">
-          <select value={selectedSession} onChange={(e) => setSelectedSession(e.target.value)} className="rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm font-bold">
-            <option value="">اختر الحصة</option>
-            {sessions.map((s) => <option key={s.id} value={s.id}>{s.title} — {fmt(s.starts_at)}</option>)}
-          </select>
-          {selected && (
-            <div className="rounded-2xl border border-blue-100 bg-blue-50/60 px-4 py-3 text-sm">
-              <div className="font-black text-[#1E3A8A]">{selected.title}</div>
-              <div className="text-xs text-gray-600 mt-1">{selected.subject || 'بدون مادة'} · {selected.location || 'بدون مكان'}</div>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            <Layers className="w-5 h-5 text-blue-600 shrink-0" />
+            <select
+              value={selectedGroupId}
+              onChange={(e) => setSelectedGroupId(e.target.value)}
+              className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">جميع المجموعات ({groups.length})</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name} {g.subject ? `(${g.subject})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div className="mt-5 grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -179,17 +191,56 @@ export const TeacherAttendancePage: React.FC = () => {
           <h2 className="font-black text-gray-900">سجل الطلاب</h2>
           <span className="text-xs text-gray-500">آخر مزامنة: {new Date().toLocaleTimeString('ar-EG')}</span>
         </div>
-        {loading ? <div className="py-16 text-center text-sm text-gray-400">جاري تحميل سجل الحضور...</div> : rows.length === 0 ? <div className="py-16 text-center text-sm text-gray-400">لا توجد سجلات حضور لهذه الحصة حتى الآن.</div> : <div className="divide-y divide-gray-100">{rows.map((row) => (
-          <div key={row.id} className="p-4 flex flex-col md:flex-row md:items-center gap-4">
-            <div className="w-11 h-11 rounded-2xl bg-blue-50 text-blue-700 flex items-center justify-center font-black shrink-0">{row.student_name?.slice(0, 1) || 'ط'}</div>
-            <div className="flex-1 min-w-0"><div className="font-black text-sm text-gray-900">{row.student_name}</div><div className="text-xs text-gray-500 mt-1">دخول: {fmt(row.checked_in_at)} · خروج: {fmt(row.checked_out_at)}</div></div>
-            <div className="flex items-center gap-2">
-              <span className={`px-3 py-1.5 rounded-xl text-[11px] font-black border ${row.status === 'present' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : row.status === 'late' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-red-50 text-red-700 border-red-200'}`}>{row.status === 'present' ? 'حاضر' : row.status === 'late' ? `متأخر ${row.late_minutes || 0}د` : 'غائب'}</span>
-              {row.checked_in_at && !row.checked_out_at && <button disabled={busyId === row.id} onClick={() => void checkout(row)} className="px-4 py-2 rounded-xl bg-[#1E3A8A] text-white text-xs font-black flex items-center gap-1.5 disabled:opacity-50"><LogOut className="w-4 h-4" />{busyId === row.id ? 'جاري...' : 'تسجيل خروج'}</button>}
-              {row.checked_out_at && <span className="px-3 py-2 rounded-xl bg-gray-100 text-gray-600 text-xs font-black flex items-center gap-1.5"><LogOut className="w-4 h-4" />تم الخروج</span>}
-            </div>
+        {loading ? (
+          <div className="py-16 text-center text-sm text-gray-400">جاري تحميل سجل الحضور من قاعدة البيانات...</div>
+        ) : rows.length === 0 ? (
+          <div className="py-16 text-center text-sm text-gray-400">لا توجد سجلات حضور مسجلة حتى الآن.</div>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {rows.map((row) => (
+              <div key={row.id} className="p-4 flex flex-col md:flex-row md:items-center gap-4">
+                <div className="w-11 h-11 rounded-2xl bg-blue-50 text-blue-700 flex items-center justify-center font-black shrink-0">
+                  {row.student_name?.slice(0, 1) || 'ط'}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-black text-sm text-gray-900">{row.student_name}</div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    التاريخ: {row.date} {row.time ? `الساعة ${row.time}` : ''} · دخول: {fmt(row.checked_in_at)} · خروج: {fmt(row.checked_out_at)}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`px-3 py-1.5 rounded-xl text-[11px] font-black border ${
+                      row.status === 'present'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : row.status === 'late'
+                        ? 'bg-amber-50 text-amber-700 border-amber-200'
+                        : 'bg-red-50 text-red-700 border-red-200'
+                    }`}
+                  >
+                    {row.status === 'present' ? 'حاضر' : row.status === 'late' ? `متأخر ${row.late_minutes || 0}د` : 'غائب'}
+                  </span>
+                  {row.checked_in_at && !row.checked_out_at && (
+                    <button
+                      disabled={busyId === row.id}
+                      onClick={() => void checkout(row)}
+                      className="px-4 py-2 rounded-xl bg-[#1E3A8A] text-white text-xs font-black flex items-center gap-1.5 disabled:opacity-50 hover:bg-blue-900"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      {busyId === row.id ? 'جاري...' : 'تسجيل خروج'}
+                    </button>
+                  )}
+                  {row.checked_out_at && (
+                    <span className="px-3 py-2 rounded-xl bg-gray-100 text-gray-600 text-xs font-black flex items-center gap-1.5">
+                      <LogOut className="w-4 h-4" />
+                      تم الخروج
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
-        ))}</div>}
+        )}
       </section>
     </div>
   );

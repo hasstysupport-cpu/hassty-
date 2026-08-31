@@ -79,7 +79,7 @@ function legalDocument(kind: LegalKind) {
     ],
   };
 
-  const generic: Record<LegalKind, { title: string; icon: React.ReactNode; intro: string; sections: string[][] }> = {
+  const generic: Record<string, { title: string; icon: React.ReactNode; intro: string; sections: string[][] }> = {
     acceptable: { title: 'سياسة الاستخدام المقبول', icon: <ShieldCheck className="w-7 h-7" />, intro: 'استخدم حِصّتي للتعليم والخدمات المرتبطة به بصورة مشروعة وآمنة.', sections: [
       ['مسموح', 'التعلم، الحجز، إدارة المجموعات، متابعة الحضور، التواصل المحترم، ورفع المحتوى الذي يملك المستخدم حق استخدامه.'],
       ['ممنوع', 'الاحتيال، الحسابات الوهمية، سرقة الحسابات، spam، جمع بيانات الآخرين دون إذن، تغيير أو تزوير الحضور، مشاركة مستندات الآخرين، ومحاولات تجاوز أنظمة الأمان.'],
@@ -103,7 +103,7 @@ function legalDocument(kind: LegalKind) {
       ['كيف تقدم الطلب؟', 'أرسل طلبك إلى hasstysupport@gmail.com مع وصف الطلب وبيانات الحساب. قد نطلب تحققًا مناسبًا من الهوية قبل الإفصاح أو التعديل أو الحذف.'],
     ] },
   };
-  return generic[kind];
+  return generic[kind] || generic.acceptable;
 }
 
 export const LegalComplianceLayer: React.FC = () => {
@@ -176,28 +176,28 @@ export const LegalComplianceLayer: React.FC = () => {
     }
   };
 
-  const document = kind ? legalDocument(kind) : null;
+  const legalDoc = kind ? legalDocument(kind) : null;
 
   return (
     <>
-      {document && (
+      {legalDoc && (
         <div className="fixed inset-0 z-[120] overflow-y-auto bg-slate-950/35 backdrop-blur-sm p-3 sm:p-6" dir="rtl">
           <div className="min-h-full flex items-start justify-center py-4 sm:py-8">
             <div className="w-full max-w-5xl rounded-[2rem] bg-white shadow-2xl border border-slate-200 overflow-hidden">
               <div className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-slate-200 px-5 sm:px-8 py-5 flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-2xl bg-blue-50 text-blue-700 flex items-center justify-center">{document.icon}</div>
+                  <div className="w-11 h-11 rounded-2xl bg-blue-50 text-blue-700 flex items-center justify-center">{legalDoc.icon}</div>
                   <div>
-                    <h1 className="text-xl sm:text-2xl font-black text-slate-900">{document.title}</h1>
+                    <h1 className="text-xl sm:text-2xl font-black text-slate-900">{legalDoc.title}</h1>
                     <p className="text-[11px] text-slate-500 mt-0.5">آخر تحديث: 29 أغسطس 2026</p>
                   </div>
                 </div>
                 <button onClick={() => window.history.back()} className="p-2.5 rounded-xl hover:bg-slate-100 text-slate-500" aria-label="إغلاق"><X className="w-5 h-5" /></button>
               </div>
               <div className="p-5 sm:p-8">
-                <div className="rounded-2xl bg-blue-50 border border-blue-100 p-4 text-sm leading-7 text-slate-700">{document.intro}</div>
+                <div className="rounded-2xl bg-blue-50 border border-blue-100 p-4 text-sm leading-7 text-slate-700">{legalDoc.intro}</div>
                 <div className="mt-6 space-y-5">
-                  {document.sections.map(([heading, body]) => (
+                  {legalDoc.sections.map(([heading, body]) => (
                     <section key={heading} className="rounded-2xl border border-slate-200 p-4 sm:p-5">
                       <h2 className="font-black text-slate-900 mb-2">{heading}</h2>
                       <p className="text-sm text-slate-600 leading-8">{body}</p>

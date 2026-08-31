@@ -9,6 +9,8 @@ import {
 
 const ADMIN_EMAILS = new Set(['hasstysupport@gmail.com', 'admin@hassty.com']);
 
+const isAdminEmail = (email?: string | null) => Boolean(email && ADMIN_EMAILS.has(email.toLowerCase().trim()));
+
 type ProfileRow = {
   id: string;
   full_name: string;

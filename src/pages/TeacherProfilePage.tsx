@@ -54,12 +54,45 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({ tutorId,
     setLoading(true);
     setLoadError('');
     try {
-      const [{ data: row, error: tutorError }, { data: reviewRows, error: reviewsError }] = await Promise.all([
-        supabase.from('public_verified_teachers').select('*').eq('id', tutorId).maybeSingle(),
-        supabase.from('tutor_reviews').select('id,rating,comment,created_at,teaching_quality,punctuality,behavior,value_for_money,verified_session').eq('tutor_id', tutorId).order('created_at', { ascending: false }),
-      ]);
-      if (tutorError) throw tutorError;
-      if (reviewsError) throw reviewsError;
+      let row: any = null;
+      const { data: viewRow, error: tutorError } = await supabase.from('public_verified_teachers').select('*').eq('id', tutorId).maybeSingle();
+      if (!tutorError && viewRow) {
+        row = viewRow;
+      } else {
+        const [{ data: pData }, { data: tpData }] = await Promise.all([
+          supabase.from('profiles').select('*').eq('id', tutorId).maybeSingle(),
+          supabase.from('tutor_profiles').select('*').eq('user_id', tutorId).maybeSingle(),
+        ]);
+        if (pData || tpData) {
+          row = {
+            id: tutorId,
+            name: pData?.full_name || 'مدرس معتمد',
+            title: tpData?.title || 'معلم متخصص',
+            headline: tpData?.headline || '',
+            bio: tpData?.bio || '',
+            subjects: tpData?.subjects || [],
+            grades: tpData?.grades || [],
+            governorate: pData?.governorate || tpData?.governorate || '',
+            city: pData?.city || tpData?.city || '',
+            rating: tpData?.rating || 5.0,
+            reviews_count: tpData?.reviews_count || 0,
+            price_per_session: tpData?.price_per_session || 0,
+            price_per_month: tpData?.price_per_month || 0,
+            experience_years: tpData?.experience_years || 1,
+            center_names: tpData?.center_names || [],
+            avatar_url: pData?.avatar_url || '',
+            metadata: { ...(pData?.metadata || {}), ...(tpData?.metadata || {}) },
+          };
+        }
+      }
+
+      let reviewRows: any[] = [];
+      try {
+        const { data: revs } = await supabase.from('tutor_reviews').select('id,rating,comment,created_at,teaching_quality,punctuality,behavior,value_for_money,verified_session').eq('tutor_id', tutorId).order('created_at', { ascending: false });
+        reviewRows = revs || [];
+      } catch {
+        // reviews optional
+      }
       if (!row) {
         setTutor(null);
         setLoadError('هذا المدرس غير موجود أو غير موثق حاليًا.');
