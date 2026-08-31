@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Activity, BarChart3, BellRing, BookOpen, Calendar, ClipboardCheck, ClipboardList, FileCheck2, Home, Layers, LogOut, MessageCircle, QrCode, Receipt, ScanLine, Settings2, ShieldCheck, Star, UserCheck, UserCog, UserPlus, Users, WalletCards } from 'lucide-react';
+import { Activity, BarChart3, BellRing, BookOpen, Calendar, ClipboardCheck, ClipboardList, FileCheck2, Home, Layers, LogOut, MessageCircle, QrCode, Receipt, ScanLine, Settings2, ShieldCheck, Star, UserCheck, UserCog, UserPlus, Users, WalletCards, UserPlus2, Shuffle, BookMarked, StickyNote } from 'lucide-react';
 import { AccountRole } from '../../types';
 import { useAuth } from '../../lib/AuthContext';
 import { getCleanAvatarUrl } from '../../lib/avatarHelper';
@@ -11,9 +11,9 @@ interface Props{currentRole:AccountRole;currentPath:string;onNavigate:(path:stri
 const sections=(role:AccountRole):Section[]=>{
  if(role==='teacher') return [
   {title:'الرئيسية',items:[{name:'لوحة التحكم',path:'/teacher/dashboard',icon:Activity},{name:'الإشعارات',path:'/teacher/notifications',icon:BellRing},{name:'الرسائل',path:'/teacher/messages',icon:MessageCircle},{name:'التقويم',path:'/teacher/calendar',icon:Calendar}]},
-  {title:'إدارة الطلاب',items:[{name:'الطلاب',path:'/teacher/students',icon:Users},{name:'المجموعات',path:'/teacher/groups',icon:Layers},{name:'الحضور',path:'/teacher/attendance',icon:UserCheck},{name:'مسح الحضور QR',path:'/teacher/scan',icon:ScanLine,highlight:true},{name:'الواجبات',path:'/teacher/assignments',icon:BookOpen}]},
+  {title:'إدارة الطلاب',items:[{name:'الطلاب',path:'/teacher/students',icon:Users},{name:'المجموعات',path:'/teacher/groups',icon:Layers},{name:'الجلسات والحصص',path:'/teacher/sessions',icon:Calendar},{name:'طلبات التسجيل',path:'/teacher/enrollment-requests',icon:UserPlus2,highlight:true},{name:'النقل والتعويض',path:'/teacher/transfers',icon:Shuffle},{name:'الحضور',path:'/teacher/attendance',icon:UserCheck},{name:'مسح الحضور QR',path:'/teacher/scan',icon:ScanLine,highlight:true},{name:'الواجبات',path:'/teacher/assignments',icon:BookOpen},{name:'ملاحظات الطلاب',path:'/teacher/student-notes',icon:StickyNote}]},
   {title:'فريق العمل',items:[{name:'المساعدون',path:'/teacher/assistants',icon:UserPlus,highlight:true}]},
-  {title:'الامتحانات والتقييم',items:[{name:'الامتحانات والتوزيع',path:'/teacher/exams',icon:FileCheck2,highlight:true},{name:'التقييمات',path:'/teacher/reviews',icon:Star}]},
+  {title:'الامتحانات والتقييم',items:[{name:'الامتحانات والتوزيع',path:'/teacher/exams',icon:FileCheck2,highlight:true},{name:'دفتر الدرجات',path:'/teacher/gradebook',icon:BookMarked},{name:'التقييمات',path:'/teacher/reviews',icon:Star}]},
   {title:'المال والملف',items:[{name:'المدفوعات والعمولة',path:'/teacher/payments',icon:WalletCards},{name:'المواعيد المتاحة',path:'/teacher/availability',icon:Calendar},{name:'الملف العام',path:'/teacher/profile',icon:UserCog}]},
  ];
  if(role==='assistant') return [{title:'المساعد',items:[{name:'الرئيسية',path:'/assistant/dashboard',icon:Activity},{name:'التوثيق',path:'/assistant/verification',icon:ShieldCheck,highlight:true},{name:'المجموعات',path:'/assistant/groups',icon:Layers},{name:'الطلاب',path:'/assistant/students',icon:Users},{name:'الحضور والانصراف',path:'/assistant/attendance',icon:UserCheck},{name:'المصروفات',path:'/assistant/payments',icon:Receipt},{name:'الدعوات',path:'/assistant/invitations',icon:UserPlus},{name:'الرسائل',path:'/assistant/messages',icon:MessageCircle},{name:'الإشعارات',path:'/assistant/notifications',icon:BellRing},{name:'التقويم',path:'/assistant/calendar',icon:Calendar},{name:'الملف الشخصي',path:'/assistant/profile',icon:UserCog}]}];
