@@ -107,10 +107,10 @@ export const StudentTutorsPage: React.FC<StudentTutorsPageProps> = ({
   };
 
   return (
-    <div className="space-y-8 text-right">
+    <div className="space-y-4 text-right">
       
       {/* Header */}
-      <div className="bg-white border border-[#E5E7EB] rounded-3xl p-6 sm:p-8 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-white border border-[#E5E7EB] rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#2563EB] bg-[#EFF6FF] px-3 py-1 rounded-full border border-blue-200 mb-2">
             <Users className="w-3.5 h-3.5" />
@@ -143,11 +143,11 @@ export const StudentTutorsPage: React.FC<StudentTutorsPageProps> = ({
 
       {/* Tutors Grid */}
       {tutorsList.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {tutorsList.map((tutor) => (
             <div
               key={tutor.id}
-              className="bg-white border border-[#E5E7EB] rounded-3xl p-6 hover:border-blue-300 transition-all flex flex-col justify-between shadow-xs"
+              className="bg-white border border-[#E5E7EB] rounded-2xl p-4 hover:border-blue-300 flex flex-col justify-between shadow-xs"
             >
               <div>
                 <div className="flex items-start gap-4 mb-4">
@@ -174,7 +174,7 @@ export const StudentTutorsPage: React.FC<StudentTutorsPageProps> = ({
                 </div>
 
                 {/* Tutor Info */}
-                <div className="space-y-2.5 p-3.5 bg-gray-50 rounded-2xl border border-gray-100 text-xs">
+                <div className="space-y-2 p-3 bg-gray-50 rounded-xl border border-gray-100 text-xs">
                   <div className="flex items-center justify-between">
                     <span className="text-[#6B7280]">كود المعلم:</span>
                     <strong className="text-[#2563EB] font-mono font-bold">{tutor.joinCode}</strong>
@@ -199,8 +199,8 @@ export const StudentTutorsPage: React.FC<StudentTutorsPageProps> = ({
           ))}
         </div>
       ) : (
-        <div className="bg-white border border-gray-200 rounded-3xl p-12 text-center space-y-4 shadow-xs">
-          <div className="w-16 h-16 rounded-3xl bg-blue-50 text-[#2563EB] mx-auto flex items-center justify-center">
+        <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center space-y-3">
+          <div className="w-14 h-14 rounded-2xl bg-blue-50 text-[#2563EB] mx-auto flex items-center justify-center">
             <GraduationCap className="w-8 h-8" />
           </div>
           <div className="space-y-1">
@@ -229,7 +229,7 @@ export const StudentTutorsPage: React.FC<StudentTutorsPageProps> = ({
       {/* MODAL: Join by code / scan */}
       {isJoinModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 space-y-5 text-right relative animate-scaleUp">
+          <div className="bg-white rounded-2xl max-w-md w-full p-4 sm:p-5 space-y-4 text-right relative animate-scaleUp">
             
             <button
               onClick={() => {

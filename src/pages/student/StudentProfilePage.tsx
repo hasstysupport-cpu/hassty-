@@ -121,7 +121,7 @@ export const StudentProfilePage: React.FC = () => {
     <div className="space-y-6 text-right font-['IBM_Plex_Sans_Arabic',sans-serif]">
       
       {/* 1. Header with Live Photo & QR Badge */}
-      <div className="bg-white border border-[#E5E7EB] rounded-3xl p-6 sm:p-8 shadow-xs flex flex-col md:flex-row items-center justify-between gap-6">
+      <div className="bg-white border border-[#E5E7EB] rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-5 sm:gap-6">
           
           {/* Avatar with Quick Upload Trigger */}
@@ -129,7 +129,7 @@ export const StudentProfilePage: React.FC = () => {
             <img
               src={getCleanAvatarUrl(avatarUrl, 'student', name)}
               alt={name || 'صورة الطالب'}
-              className="w-20 h-20 sm:w-24 sm:h-24 rounded-3xl object-cover border-2 border-white ring-4 ring-blue-50 shadow-sm bg-gray-50"
+              className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-white ring-4 ring-blue-50 shadow-sm bg-gray-50"
               referrerPolicy="no-referrer"
             />
             <label
@@ -150,7 +150,7 @@ export const StudentProfilePage: React.FC = () => {
 
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <h2 className="text-xl sm:text-2xl font-black text-[#1E3A8A]">
+              <h2 className="text-lg sm:text-xl font-black text-[#1E3A8A]">
                 {name || 'طالب منصة حِصّتي'}
               </h2>
               <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-[#2563EB] border border-blue-200">
@@ -205,7 +205,7 @@ export const StudentProfilePage: React.FC = () => {
       <form onSubmit={handleSaveProfile} className="space-y-6">
         
         {/* Section A: Photo Management Card */}
-        <div className="bg-white border border-[#E5E7EB] rounded-3xl p-6 sm:p-7 shadow-xs space-y-4">
+        <div className="bg-white border border-[#E5E7EB] rounded-2xl p-4 sm:p-5 space-y-4">
           <div>
             <h3 className="text-base font-black text-[#1E3A8A] flex items-center gap-2">
               <Camera className="w-5 h-5 text-[#2563EB]" />
@@ -220,7 +220,7 @@ export const StudentProfilePage: React.FC = () => {
             <img
               src={getCleanAvatarUrl(avatarUrl, 'student', name)}
               alt="معاينة الصورة"
-              className="w-24 h-24 rounded-3xl object-cover border-2 border-gray-200 shadow-xs bg-gray-50 shrink-0"
+              className="w-20 h-20 rounded-2xl object-cover border-2 border-gray-200 shadow-xs bg-gray-50 shrink-0"
               referrerPolicy="no-referrer"
             />
 
@@ -258,7 +258,7 @@ export const StudentProfilePage: React.FC = () => {
         </div>
 
         {/* Section B: Personal Information */}
-        <div className="bg-white border border-[#E5E7EB] rounded-3xl p-6 sm:p-7 shadow-xs space-y-5">
+        <div className="bg-white border border-[#E5E7EB] rounded-2xl p-4 sm:p-5 space-y-4">
           <div>
             <h3 className="text-base font-black text-[#1E3A8A] flex items-center gap-2">
               <User className="w-5 h-5 text-[#2563EB]" />
@@ -377,7 +377,7 @@ export const StudentProfilePage: React.FC = () => {
         </div>
 
         {/* Section C: Parent Info & Safety Notifications */}
-        <div className="bg-white border border-[#E5E7EB] rounded-3xl p-6 sm:p-7 shadow-xs space-y-5">
+        <div className="bg-white border border-[#E5E7EB] rounded-2xl p-4 sm:p-5 space-y-4">
           <div>
             <h3 className="text-base font-black text-[#1E3A8A] flex items-center gap-2">
               <ShieldCheck className="w-5 h-5 text-emerald-600" />

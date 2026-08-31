@@ -133,22 +133,25 @@ export const TeacherDashboardPageV2: React.FC<Props> = ({ onNavigate }) => {
         </div>
       )}
 
-      <section className="rounded-3xl bg-gradient-to-br from-[#0F2F6B] to-[#1E3A8A] text-white p-6 sm:p-8 shadow-lg">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+      <section className="anim-up hero-lux rounded-2xl p-5 sm:p-6 text-white shadow-xl">
+        <div className="hero-dots" aria-hidden="true" />
+        <div className="hero-blob w-44 h-44 -top-20 -right-16 animate-float-slow" aria-hidden="true" />
+        <div className="hero-blob w-28 h-28 -bottom-14 -left-10 animate-float-reverse" aria-hidden="true" />
+        <div className="relative flex flex-col lg:flex-row lg:items-center justify-between gap-5">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold">
-              <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+            <div className="inline-flex items-center gap-2 rounded-full bg-white/15 border border-white/30 backdrop-blur-sm px-3 py-1.5 text-xs font-bold">
+              <CheckCircle2 className="w-4 h-4 text-emerald-200" />
               لوحة المدرس
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black mt-3">أهلاً يا أستاذ {user?.name || 'المعلم'} 👋</h1>
-            <p className="text-blue-100 text-sm mt-2">{user?.profileData?.subject ? `مادة ${user.profileData.subject}` : 'إدارة حصصك وطلابك ومواعيدك من مكان واحد.'}</p>
+            <h1 className="text-2xl sm:text-3xl font-black mt-3 drop-shadow-sm">أهلاً يا أستاذ {user?.name || 'المعلم'} 👋</h1>
+            <p className="text-white/85 text-sm mt-2">{user?.profileData?.subject ? `مادة ${user.profileData.subject}` : 'إدارة حصصك وطلابك ومواعيدك من مكان واحد.'}</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button onClick={() => onNavigate('/teacher/scan')} className="rounded-2xl bg-emerald-500 hover:bg-emerald-600 px-5 py-3 text-sm font-black flex items-center gap-2">
+            <button onClick={() => onNavigate('/teacher/scan')} className="btn-primary-shine rounded-2xl bg-white text-[color:var(--role-color)] px-5 py-3 text-sm font-black flex items-center gap-2 cursor-pointer shadow-lg hover:-translate-y-0.5">
               <ScanLine className="w-5 h-5" />
               مسح حضور QR
             </button>
-            <button onClick={() => onNavigate('/teacher/groups')} className="rounded-2xl bg-white/10 border border-white/15 px-5 py-3 text-sm font-bold flex items-center gap-2">
+            <button onClick={() => onNavigate('/teacher/groups')} className="rounded-2xl bg-white/15 border border-white/30 backdrop-blur-sm px-5 py-3 text-sm font-bold flex items-center gap-2 cursor-pointer hover:bg-white/30">
               <Layers className="w-5 h-5" />
               المجموعات
             </button>
@@ -157,14 +160,14 @@ export const TeacherDashboardPageV2: React.FC<Props> = ({ onNavigate }) => {
       </section>
 
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Stat icon={<Users />} label="الطلاب" value={uniqueStudentIds} />
-        <Stat icon={<Layers />} label="المجموعات" value={groups.length} />
-        <Stat icon={<Clock3 />} label="طلبات معلقة" value={bookings.length} />
-        <Stat icon={<Award />} label="الحضور" value={`${attendanceRate}%`} />
+        <Stat delay={60} icon={<Users />} label="الطلاب" value={uniqueStudentIds} />
+        <Stat delay={130} icon={<Layers />} label="المجموعات" value={groups.length} />
+        <Stat delay={200} icon={<Clock3 />} label="طلبات معلقة" value={bookings.length} />
+        <Stat delay={270} icon={<Award />} label="الحضور" value={`${attendanceRate}%`} />
       </section>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-        <section className="xl:col-span-2 rounded-3xl bg-white border border-slate-200 p-5">
+        <section className="anim-up card-lux xl:col-span-2 rounded-2xl bg-white border border-slate-200 p-5" style={{animationDelay:'340ms'}}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-black text-slate-900 flex items-center gap-2">
               <Calendar className="w-5 h-5 text-blue-600" />
@@ -181,8 +184,8 @@ export const TeacherDashboardPageV2: React.FC<Props> = ({ onNavigate }) => {
             <Box text="لا توجد طلبات حجز معلقة حاليًا." />
           ) : (
             <div className="space-y-3">
-              {bookings.map(b => (
-                <div key={b.id} className="rounded-2xl border border-slate-200 p-4">
+              {bookings.map((b, i) => (
+                <div key={b.id} className="row-in rounded-2xl border border-slate-200 p-4 hover:shadow-lg hover:shadow-slate-200/70 hover:border-[color:var(--role-soft-border)] hover:-translate-y-0.5" style={{animationDelay:`${Math.min(i*50,350)}ms`}}>
                   <div className="flex flex-col md:flex-row gap-3 justify-between">
                     <div>
                       <div className="font-black text-slate-900">{b.studentName}</div>
@@ -206,9 +209,9 @@ export const TeacherDashboardPageV2: React.FC<Props> = ({ onNavigate }) => {
           )}
         </section>
 
-        <section className="rounded-3xl bg-white border border-slate-200 p-5">
+        <section className="anim-up card-lux rounded-2xl bg-white border border-slate-200 p-5" style={{animationDelay:'420ms'}}>
           <h2 className="font-black text-slate-900 flex items-center gap-2 mb-4">
-            <Users className="w-5 h-5 text-blue-600" />
+            <Users className="w-5 h-5 text-[color:var(--role-color)]" />
             حالة الطلاب
           </h2>
           <div className="space-y-3">
@@ -217,23 +220,23 @@ export const TeacherDashboardPageV2: React.FC<Props> = ({ onNavigate }) => {
             <Mini label="سجلات حضور" value={attendance.length} />
             <Mini label="آخر تحديث" value={new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })} />
           </div>
-          <button onClick={() => onNavigate('/teacher/students')} className="w-full mt-5 rounded-2xl bg-slate-900 text-white py-3 text-xs font-black">
+          <button onClick={() => onNavigate('/teacher/students')} className="chip-grad btn-primary-shine w-full mt-5 rounded-2xl py-3 text-xs font-black cursor-pointer hover:-translate-y-0.5">
             عرض كشف الطلاب
           </button>
         </section>
       </div>
 
-      <section className="rounded-3xl bg-white border border-slate-200 p-5">
+      <section className="anim-up card-lux rounded-2xl bg-white border border-slate-200 p-5" style={{animationDelay:'500ms'}}>
         <h2 className="font-black text-slate-900 mb-4 flex items-center gap-2">
-          <Clock3 className="w-5 h-5 text-blue-600" />
+          <Clock3 className="w-5 h-5 text-[color:var(--role-color)]" />
           آخر عمليات الحضور
         </h2>
         {attendance.length === 0 ? (
           <Box text="لا توجد سجلات حضور حتى الآن." />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-            {attendance.slice(0, 8).map(r => (
-              <div key={r.id} className="rounded-2xl bg-slate-50 border border-slate-100 p-3 flex items-center justify-between">
+            {attendance.slice(0, 8).map((r, i) => (
+              <div key={r.id} className="row-in rounded-2xl bg-slate-50 border border-slate-100 p-3 flex items-center justify-between hover:border-[color:var(--role-soft-border)]" style={{animationDelay:`${Math.min(i*45,350)}ms`}}>
                 <div>
                   <div className="font-black text-xs text-slate-800">{r.student_name || 'طالب'}</div>
                   <div className="text-[11px] text-slate-500 mt-1">{r.date} • {r.time || ''}</div>
@@ -250,14 +253,14 @@ export const TeacherDashboardPageV2: React.FC<Props> = ({ onNavigate }) => {
   );
 };
 
-function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
+function Stat({ icon, label, value, delay }: { icon: React.ReactNode; label: string; value: React.ReactNode; delay?: number }) {
   return (
-    <div className="rounded-2xl bg-white border border-slate-200 p-4">
+    <div className="card-lux anim-up rounded-2xl bg-white border border-slate-200 p-4" style={delay ? { animationDelay: `${delay}ms` } : undefined}>
       <div className="flex items-center justify-between text-slate-500">
         <span className="text-xs font-bold">{label}</span>
-        <span className="text-blue-600">{React.cloneElement(icon as React.ReactElement, { className: 'w-4 h-4' })}</span>
+        <span className="chip-grad w-7 h-7 rounded-lg flex items-center justify-center text-white shadow-md shrink-0">{React.cloneElement(icon as React.ReactElement, { className: 'w-3.5 h-3.5' })}</span>
       </div>
-      <div className="text-2xl font-black text-slate-900 mt-2">{value}</div>
+      <div className="text-2xl font-black mt-2 bg-gradient-to-br from-slate-900 to-slate-600 bg-clip-text text-transparent tabular-nums">{value}</div>
     </div>
   );
 }

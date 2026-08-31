@@ -175,15 +175,15 @@ export const ParentAttendancePage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 text-right" dir="rtl">
+    <div className="space-y-4 text-right" dir="rtl">
       {/* Header */}
-      <div className="bg-white border border-gray-200 rounded-3xl p-6 sm:p-8 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#2563EB] bg-[#EFF6FF] px-3 py-1 rounded-full border border-blue-200 mb-2">
             <ClipboardCheck className="w-3.5 h-3.5" />
             <span>سجل الحضور والغياب الموثق</span>
           </div>
-          <h2 className="text-xl sm:text-2xl font-black text-[#1E3A8A]">
+          <h2 className="text-xl sm:text-xl font-black text-[#1E3A8A]">
             سجل حضور وغياب الطالب ({currentChild.name})
           </h2>
           <p className="text-xs text-[#6B7280] mt-1">
@@ -219,35 +219,35 @@ export const ParentAttendancePage: React.FC = () => {
 
       {/* Attendance Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div className="bg-white border border-gray-200 rounded-3xl p-5 space-y-1">
+        <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-1">
           <span className="text-xs font-bold text-[#6B7280]">نسبة الالتزام الكلية</span>
-          <p className="text-2xl font-black text-[#10B981]">{stats.attendanceRate}%</p>
+          <p className="text-xl font-black text-[#10B981]">{stats.attendanceRate}%</p>
           <div className="w-full bg-gray-100 h-2 rounded-full mt-2 overflow-hidden">
             <div className="bg-[#10B981] h-full rounded-full" style={{ width: `${stats.attendanceRate}%` }} />
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-3xl p-5 space-y-1">
+        <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-1">
           <span className="text-xs font-bold text-[#6B7280]">حاضر بالموعد</span>
-          <p className="text-2xl font-black text-[#10B981]">{stats.presentOnTime} حصة</p>
+          <p className="text-xl font-black text-[#10B981]">{stats.presentOnTime} حصة</p>
           <span className="text-[11px] text-emerald-700 font-bold">أخضر ✅</span>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-3xl p-5 space-y-1">
+        <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-1">
           <span className="text-xs font-bold text-[#6B7280]">حاضر متأخر</span>
-          <p className="text-2xl font-black text-amber-600">{stats.presentLate} حصص</p>
+          <p className="text-xl font-black text-amber-600">{stats.presentLate} حصص</p>
           <span className="text-[11px] text-amber-700 font-bold">برتقالي ⏰</span>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-3xl p-5 space-y-1">
+        <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-1">
           <span className="text-xs font-bold text-[#6B7280]">مرات الغياب المسجلة</span>
-          <p className="text-2xl font-black text-[#EF4444]">{stats.absentCount} حصة</p>
+          <p className="text-xl font-black text-[#EF4444]">{stats.absentCount} حصة</p>
           <span className="text-[11px] text-red-600 font-bold">متاح طلب تعويض</span>
         </div>
       </div>
 
       {/* Filterable Table */}
-      <div className="bg-white border border-gray-200 rounded-3xl p-6 sm:p-8 space-y-5 shadow-xs">
+      <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 space-y-4 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <h3 className="text-base font-bold text-[#1E3A8A]">سجل الحصص التفصيلي</h3>
           <div className="flex items-center gap-2">
