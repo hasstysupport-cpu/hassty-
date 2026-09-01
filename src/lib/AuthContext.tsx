@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { AccountRole } from '../types';
 import { supabase } from './supabase';
-import { sendParentLinkRequest } from './parentStudentService';
+import { authApi, getDeviceId, setStoredToken } from './authApi';
+import type { RegisterPayload } from './authApi';
 
 export interface UserSession {
   uid: string;
@@ -16,31 +17,23 @@ export interface UserSession {
   emailVerified?: boolean;
 }
 
-interface SignupData {
-  email: string;
-  password: string;
-  role: AccountRole;
-  name: string;
-  phone: string;
-  avatarUrl?: string;
-  governorate?: string;
-  area?: string;
-  grade?: string;
-  subject?: string;
-  experience?: string;
-  parentPhone?: string;
-  studentJoinCode?: string;
-}
+export type LoginFlowResult =
+  | { status: 'complete'; session: UserSession }
+  | { status: 'otp_required'; email: string; name: string }
+  | { status: 'unconfirmed'; email: string; name: string };
+
+interface SignupData extends Omit<RegisterPayload, 'consent'> {}
 
 interface AuthContextType {
   user: UserSession | null;
   loading: boolean;
-  loginUser: (email: string, password: string) => Promise<UserSession>;
+  /** Password login → returns next step (direct / OTP / activation) */
+  beginPasswordLogin: (email: string, password: string) => Promise<LoginFlowResult>;
+  /** Re-login after a successful OTP/activation step (password kept in caller memory) */
+  finishPasswordLogin: (email: string, password: string) => Promise<UserSession>;
   loginWithGoogle: (defaultRole?: AccountRole, extraData?: any) => Promise<UserSession | null>;
-  signupUser: (data: SignupData) => Promise<UserSession>;
-  sendPasswordReset: (email: string) => Promise<void>;
-  sendEmailVerificationLink: (email: string) => Promise<void>;
-  markEmailAsVerified: (uid: string) => Promise<void>;
+  /** Server-side registration → pending account + emailed code */
+  signupUser: (data: SignupData) => Promise<{ ok: boolean; userId?: string; maskedEmail?: string; expiresIn?: number; error?: string; code?: string }>;
   updateUserProfile: (data: Partial<any>) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -100,11 +93,6 @@ async function upsertProfile(uid: string, values: Record<string, any>) {
   return data;
 }
 
-async function buildSession(authUser: any): Promise<UserSession> {
-  const profile = await getProfile(authUser.id);
-  return mapProfileToSession(authUser, profile);
-}
-
 function cleanOAuthUrl() {
   if (typeof window === 'undefined') return;
   const url = new URL(window.location.href);
@@ -114,7 +102,6 @@ function cleanOAuthUrl() {
     changed = true;
   }
   if (window.location.hash) {
-    // supabase-js consumes the OAuth fragment; remove any leftover fragment.
     url.hash = '';
     changed = true;
   }
@@ -148,11 +135,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           persistSession(null);
           return;
         }
-        const session = await buildSession(data.session.user);
-        if (mounted) {
-          persistSession(session);
-          cleanOAuthUrl();
-        }
+        const profile = await getProfile(data.session.user.id);
+        persistSession(mapProfileToSession(data.session.user, profile));
+        cleanOAuthUrl();
       } catch (error) {
         console.warn('Auth hydration warning:', error);
         try {
@@ -174,11 +159,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       try {
         const profile = await getProfile(authSession.user.id);
-        const next = mapProfileToSession(authSession.user, profile);
-        if (mounted) {
-          persistSession(next);
-          cleanOAuthUrl();
-        }
+        persistSession(mapProfileToSession(authSession.user, profile));
+        cleanOAuthUrl();
       } catch (error) {
         console.warn('Auth profile sync warning:', error);
       }
@@ -190,109 +172,75 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const loginUser = async (email: string, password: string): Promise<UserSession> => {
+  /* ================= PASSWORD LOGIN (2-step) ================= */
+  const beginPasswordLogin = async (email: string, password: string): Promise<LoginFlowResult> => {
     if (!supabase) throw new Error('Supabase غير مُهيأ.');
     const cleanEmail = email.trim().toLowerCase();
+
     const { data, error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
+    if (error) {
+      const msg = String(error.message || '');
+      if (msg.includes('Email not confirmed')) {
+        // pending activation → caller switches to the activation panel
+        return { status: 'unconfirmed', email: cleanEmail, name: '' };
+      }
+      throw error;
+    }
+    const user = data.user;
+    if (!user) throw new Error('تعذر تسجيل الدخول.');
+
+    const profile = await getProfile(user.id);
+
+    /* confirmed user without a profile (legacy / google) → let the app route
+       them to profile setup instead of hard-failing */
+    if (!profile) {
+      if (!user.email_confirmed_at) {
+        await supabase.auth.signOut();
+        return { status: 'unconfirmed', email: cleanEmail, name: user.user_metadata?.full_name || '' };
+      }
+      const session = mapProfileToSession(user, null);
+      persistSession(session);
+      return { status: 'complete', session };
+    }
+
+    /* new-device check → OTP (session revoked until the code is confirmed) */
+    if (user.email_confirmed_at) {
+      try {
+        const check = await authApi.loginCheck(getDeviceId());
+        if (check.ok && check.otpRequired) {
+          await supabase.auth.signOut();
+          return { status: 'otp_required', email: cleanEmail, name: profile.full_name || '' };
+        }
+      } catch (e: any) {
+        // network hiccup — Supabase already verified the password; proceed safely
+        console.warn('login-check warning:', e?.message || e);
+      }
+    }
+
+    const session = mapProfileToSession(user, profile);
+    persistSession(session);
+    return { status: 'complete', session };
+  };
+
+  /* Re-login after OTP / activation success (password stays in the caller's memory) */
+  const finishPasswordLogin = async (email: string, password: string): Promise<UserSession> => {
+    if (!supabase) throw new Error('Supabase غير مُهيأ.');
+    const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
     if (error) throw error;
-    if (!data.user) throw new Error('تعذر تسجيل الدخول.');
+    if (!data.user) throw new Error('تعذر إكمال تسجيل الدخول.');
+    const { data: authUser } = await supabase.auth.getUser();
     const profile = await getProfile(data.user.id);
     if (!profile) {
-      await supabase.auth.signOut();
-      throw new Error('الحساب موجود في المصادقة لكن ملف الحساب غير مكتمل. استخدم إنشاء حساب لإكماله.');
+      const session = mapProfileToSession(authUser?.user || data.user, null);
+      persistSession(session);
+      return session;
     }
     const session = mapProfileToSession(data.user, profile);
     persistSession(session);
     return session;
   };
 
-  const signupUser = async (data: SignupData): Promise<UserSession> => {
-    if (!supabase) throw new Error('Supabase غير مُهيأ.');
-    const cleanEmail = data.email.trim().toLowerCase();
-    const cleanName = data.name.trim();
-    const cleanPhone = data.phone.trim();
-    if (!cleanEmail || !cleanName || !cleanPhone) throw new Error('من فضلك أكمل البيانات الأساسية.');
-
-    const { data: authData, error: signUpError } = await supabase.auth.signUp({
-      email: cleanEmail,
-      password: data.password,
-      options: {
-        data: { full_name: cleanName, avatar_url: data.avatarUrl || null, role: data.role },
-        emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/verify-email` : undefined,
-      },
-    });
-    if (signUpError) throw signUpError;
-    if (!authData.user) throw new Error('لم يتم إنشاء الحساب.');
-
-    const metadata: Record<string, any> = {
-      authProvider: 'email',
-      subject: data.subject || '',
-      experienceYears: data.experience || '',
-      parentPhone: data.parentPhone || '',
-      onboardingComplete: true,
-      isVerified: false,
-      verificationStatus: data.role === 'teacher' ? 'pending' : 'not_required',
-    };
-
-    const hasActiveSession = Boolean(authData.session);
-    let profile: any = {
-      id: authData.user.id,
-      email: cleanEmail,
-      full_name: cleanName,
-      phone: cleanPhone,
-      role: data.role,
-      avatar_url: data.avatarUrl || null,
-      governorate: data.governorate || null,
-      city: data.area || null,
-      grade: data.grade || null,
-      account_status: 'active',
-      badge: null,
-      qr_code: null,
-      metadata,
-    };
-
-    if (hasActiveSession) {
-      profile = await upsertProfile(authData.user.id, profile);
-    } else {
-      try {
-        const provisioned = await getProfile(authData.user.id);
-        if (provisioned) profile = provisioned;
-      } catch {}
-    }
-
-    if (data.role === 'student' && hasActiveSession) {
-      const qrCode = `HASSTY-${authData.user.id.replace(/-/g, '').slice(0, 10).toUpperCase()}`;
-      await upsertProfile(authData.user.id, { qr_code: qrCode, metadata: { ...metadata, qrCode } });
-      profile = { ...profile, qr_code: qrCode, metadata: { ...metadata, qrCode } };
-    }
-
-    if (data.role === 'teacher' && hasActiveSession) {
-      const { error: tutorError } = await supabase.from('tutor_profiles').upsert({
-        user_id: authData.user.id,
-        title: `معلم ${data.subject || 'المادة'}`,
-        headline: `معلم ${data.subject || 'المادة'}`,
-        bio: '',
-        subjects: data.subject ? [data.subject] : [],
-        grades: data.grade ? [data.grade] : [],
-        experience_years: Number(data.experience || 0) || 0,
-        governorate: data.governorate || null,
-        city: data.area || null,
-        price_per_session: 0,
-        is_verified: false,
-        verification_status: 'pending',
-      }, { onConflict: 'user_id' });
-      if (tutorError) throw tutorError;
-    }
-
-    if (data.role === 'parent' && data.studentJoinCode?.trim() && hasActiveSession) {
-      await sendParentLinkRequest({ uid: authData.user.id, name: cleanName, phone: cleanPhone, email: cleanEmail, avatarUrl: data.avatarUrl || '' }, data.studentJoinCode.trim());
-    }
-
-    const session = mapProfileToSession(authData.user, profile, data.role);
-    persistSession(session);
-    return session;
-  };
-
+  /* ================= GOOGLE ================= */
   const loginWithGoogle = async (defaultRole?: AccountRole, extraData: any = {}): Promise<UserSession | null> => {
     if (!supabase) throw new Error('Supabase غير مُهيأ.');
     if (typeof window !== 'undefined') {
@@ -304,8 +252,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       else localStorage.removeItem(PENDING_GOOGLE_EXTRA_KEY);
     }
 
-    // Return to the clean origin. supabase-js handles the OAuth callback/session
-    // in the browser, so no googleLogin query flag is needed.
     const redirectTo = typeof window !== 'undefined' ? window.location.origin : undefined;
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -316,39 +262,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return null;
   };
 
-  const sendPasswordReset = async (email: string): Promise<void> => {
-    if (!supabase) throw new Error('Supabase غير مُهيأ.');
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), { redirectTo: `${window.location.origin}/reset-password` });
-    if (error) throw error;
-  };
-
-  const sendEmailVerificationLink = async (email: string): Promise<void> => {
-    if (!supabase) throw new Error('Supabase غير مُهيأ.');
-    const { error } = await supabase.auth.resend({ type: 'signup', email: email.trim().toLowerCase(), options: { emailRedirectTo: `${window.location.origin}/verify-email` } });
-    if (error) throw error;
-  };
-
-  const markEmailAsVerified = async (uid: string): Promise<void> => {
-    if (!supabase || !uid) return;
-    const { data, error } = await supabase.auth.getUser();
-    if (error) throw error;
-    if (!data.user || data.user.id !== uid) return;
-    const session = await buildSession(data.user);
-    persistSession({ ...session, emailVerified: true });
+  /* ================= SIGNUP (server-side) ================= */
+  const signupUser = async (data: SignupData) => {
+    const res = await authApi.register({ ...data, consent: true });
+    return res;
   };
 
   const updateUserProfile = async (updates: Partial<any>) => {
     if (!supabase || !user?.uid) throw new Error('لا يوجد مستخدم مسجل.');
     const metadataPatch = { ...(user.profileData || {}), ...(updates.profileData || {}) };
     delete (metadataPatch as any).role;
-    // Teachers complete their profile through ProfileSetupPage, which sends
-    // subject/experienceYears/bio as top-level updates. Persist them into
-    // profiles.metadata as well, otherwise App's profile-completion check
-    // (metadata.subject) never passes and email teachers stay stuck on
-    // /setup-profile forever. The Google first-login path already writes them.
-    if (updates.subject !== undefined) metadataPatch.subject = updates.subject;
-    if (updates.experienceYears !== undefined) metadataPatch.experienceYears = String(updates.experienceYears ?? '');
-    if (updates.bio !== undefined) metadataPatch.bio = updates.bio;
 
     const profilePatch: Record<string, any> = {
       ...(updates.name !== undefined ? { full_name: updates.name } : {}),
@@ -400,7 +323,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     persistSession(null);
   };
 
-  const value = useMemo(() => ({ user, loading, loginUser, loginWithGoogle, signupUser, sendPasswordReset, sendEmailVerificationLink, markEmailAsVerified, updateUserProfile, logout }), [user, loading]);
+  const value = useMemo(
+    () => ({ user, loading, beginPasswordLogin, finishPasswordLogin, loginWithGoogle, signupUser, updateUserProfile, logout }),
+    [user, loading],
+  );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
@@ -409,3 +335,5 @@ export const useAuth = () => {
   if (!context) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 };
+
+export { setStoredToken };

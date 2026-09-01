@@ -1,1063 +1,530 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
-  QrCode,
-  Users,
-  ShieldCheck,
-  BookOpen,
-  ArrowLeft,
-  CheckCircle2,
-  MapPin,
-  Sparkles,
-  Phone,
-  User,
-  GraduationCap,
-  Mail,
-  Lock,
-  Eye,
-  EyeOff,
-  AlertCircle,
-  Send,
-  ExternalLink,
-  Camera,
-  UploadCloud,
-  X as CloseIcon,
-  Trash2,
-  RefreshCw
+  GraduationCap, Users, Briefcase, CheckCircle2, AlertCircle, Loader2, Mail, Lock, Eye, EyeOff,
+  RefreshCw, ArrowRight, Phone, MapPin, BookOpen, Sparkles, ShieldCheck, UserCheck, Award, KeyRound, Heart,
 } from 'lucide-react';
 import { AccountRole } from '../types';
-import { SUBJECTS_DATA } from '../data/mockData';
-import { LocationSelector } from '../components/common/LocationSelector';
 import { useAuth } from '../lib/AuthContext';
-import { getCleanAvatarUrl, optimizeProfileImage } from '../lib/avatarHelper';
-import { findStudentByCodeOrPhone } from '../lib/parentStudentService';
+import { authApi, passwordStrength } from '../lib/authApi';
 import { AuthShell } from '../components/common/AuthShell';
+import { OtpCodeInput } from '../components/common/OtpCodeInput';
+import { LocationSelector } from '../components/common/LocationSelector';
+import { SUBJECTS_DATA } from '../data/mockData';
+import { SIGNUP_CONSENT_KEY } from '../lib/legal';
 
 interface SignupPageProps {
-  initialRole?: AccountRole;
   onNavigate: (path: string) => void;
   onSignupSuccess: (role: AccountRole, email: string) => void;
 }
 
-export const SignupPage: React.FC<SignupPageProps> = ({
-  initialRole = 'student',
-  onNavigate,
-  onSignupSuccess,
-}) => {
-  const { signupUser, loginWithGoogle, sendEmailVerificationLink, markEmailAsVerified } = useAuth();
-  const [role, setRole] = useState<AccountRole>(initialRole);
-  const [step, setStep] = useState<1 | 2 | 3>(1); // 1: role, 2: details & credentials, 3: success
-  const [registeredUid, setRegisteredUid] = useState<string>('');
-  const [isGoogleLoading, setIsGoogleLoading] = useState<boolean>(false);
+const GRADES = [
+  'الصف الأول الابتدائي', 'الصف الثاني الابتدائي', 'الصف الثالث الابتدائي',
+  'الصف الرابع الابتدائي', 'الصف الخامس الابتدائي', 'الصف السادس الابتدائي',
+  'الصف الأول الإعدادي', 'الصف الثاني الإعدادي', 'الصف الثالث الإعدادي',
+  'الصف الأول الثانوي', 'الصف الثاني الثانوي', 'الصف الثالث الثانوي',
+];
 
-  // Email verification state for Step 3
-  const [isAccountVerified, setIsAccountVerified] = useState(false);
-  const [isSendingLink, setIsSendingLink] = useState(false);
-  const [linkSentSuccess, setLinkSentSuccess] = useState(false);
-  const [resendTimer, setResendTimer] = useState(0);
-  const [activationCode, setActivationCode] = useState(['', '', '', '']);
-  const [isVerifyingCode, setIsVerifyingCode] = useState(false);
+const EXPERIENCE_OPTIONS = ['أقل من سنة', 'سنة - 3 سنوات', '3 - 5 سنوات', '5 - 10 سنوات', 'أكثر من 10 سنوات'];
 
-  React.useEffect(() => {
-    let timer: any;
-    if (resendTimer > 0) {
-      timer = setTimeout(() => setResendTimer((prev) => prev - 1), 1000);
-    }
-    return () => clearTimeout(timer);
-  }, [resendTimer]);
+const ROLE_CARDS: { role: AccountRole; icon: any; title: string; desc: string; tag: string }[] = [
+  { role: 'student', icon: GraduationCap, title: 'طالب', desc: 'احجز حصصك، تابع حضورك بالـ QR ودرجاتك لحظيًا', tag: 'الأكثر استخدامًا' },
+  { role: 'parent', icon: Users, title: 'ولي أمر', desc: 'تابع أبناءك: الحضور، الدرجات، والمدفوعات من مكان واحد', tag: 'متابعة كاملة' },
+  { role: 'teacher', icon: Briefcase, title: 'معلم', desc: 'أدارة مجموعاتك وحضورك وامتحاناتك وفواتيرك باحترافية', tag: 'للمدرسين' },
+];
 
-  const handleResendActivationLink = async () => {
-    if (resendTimer > 0 || isSendingLink) return;
-    setIsSendingLink(true);
-    try {
-      await sendEmailVerificationLink(email.trim());
-      setLinkSentSuccess(true);
-      setResendTimer(60);
-    } catch (e) {
-      console.warn('Resend error:', e);
-    } finally {
-      setIsSendingLink(false);
-    }
-  };
 
-  const handleQuickActivate = async () => {
-    setIsVerifyingCode(true);
-    setTimeout(async () => {
-      setIsVerifyingCode(false);
-      setIsAccountVerified(true);
-      if (registeredUid) {
-        await markEmailAsVerified(registeredUid);
-      }
-    }, 600);
-  };
+type Step = 1 | 2 | 3 | 4 | 5; // 1 role · 2 data · 3 credentials+consent · 4 email code · 5 success
 
-  // Form Fields
-  const [name, setName] = useState('');
+const GoogleIcon: React.FC = () => (
+  <svg viewBox="0 0 24 24" className="w-5 h-5 shrink-0" aria-hidden="true">
+    <path fill="#4285F4" d="M23.5 12.27c0-.85-.08-1.66-.22-2.45H12v4.64h6.44a5.52 5.52 0 0 1-2.39 3.62v3h3.87c2.26-2.09 3.58-5.16 3.58-8.81Z" />
+    <path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.94-2.91l-3.87-3c-1.07.72-2.45 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.96H1.29v3.1A12 12 0 0 0 12 24Z" />
+    <path fill="#FBBC05" d="M5.27 14.28a7.2 7.2 0 0 1 0-4.56V6.62H1.29a12 12 0 0 0 0 10.76l3.98-3.1Z" />
+    <path fill="#EA4335" d="M12 4.75c1.76 0 3.35.61 4.6 1.8l3.42-3.42A11.98 11.98 0 0 0 12 0 12 12 0 0 0 1.29 6.62l3.98 3.1C6.22 6.86 8.87 4.75 12 4.75Z" />
+  </svg>
+);
+
+export const SignupPage: React.FC<SignupPageProps> = ({ onNavigate, onSignupSuccess }) => {
+  const { signupUser, finishPasswordLogin, loginWithGoogle } = useAuth();
+
+  const [step, setStep] = useState<Step>(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [otpError, setOtpError] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+
+  /* step 1 — role */
+  const [role, setRole] = useState<AccountRole>('student');
+
+  /* step 2 — profile data */
+  const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [governorate, setGovernorate] = useState('القاهرة');
+  const [city, setCity] = useState('مدينة نصر');
+  const [grade, setGrade] = useState('الصف الثالث الثانوي');
+  const [subject, setSubject] = useState('الرياضيات');
+  const [experienceYears, setExperienceYears] = useState('3 - 5 سنوات');
+  const [studentJoinCode, setStudentJoinCode] = useState('');
+
+  /* step 3 — credentials + consent */
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [phone, setPhone] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState('');
-  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
-  const [governorate, setGovernorate] = useState('القاهرة');
-  const [area, setArea] = useState('مدينة نصر');
-  
-  // Student specific
-  const [grade, setGrade] = useState('الصف الثالث الثانوي');
-  const [parentPhone, setParentPhone] = useState('');
+  const [agreeTerms, setAgreeTerms] = useState(false);
+  const [agreePrivacy, setAgreePrivacy] = useState(false);
 
-  // Parent specific
-  const [studentJoinCode, setStudentJoinCode] = useState('');
-  const [isVerifyingStudent, setIsVerifyingStudent] = useState(false);
-  const [verifiedStudentPreview, setVerifiedStudentPreview] = useState<any | null>(null);
-  const [studentSearchError, setStudentSearchError] = useState('');
+  /* step 4 — code */
+  const [otpDigits, setOtpDigits] = useState<string[]>(Array(6).fill(''));
+  const [resendTimer, setResendTimer] = useState(0);
+  const [isSendingCode, setIsSendingCode] = useState(false);
+  const passwordRef = useRef('');
 
-  // Teacher specific
-  const [subject, setSubject] = useState('كيمياء');
-  const [experience, setExperience] = useState('5 سنوات');
+  const strength = useMemo(() => passwordStrength(password), [password]);
+  const roleInfo = ROLE_CARDS.find((r) => r.role === role)!;
 
-  const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [legalConsentAccepted, setLegalConsentAccepted] = useState<boolean>(() => {
-    try { return localStorage.getItem('hassty_signup_legal_consent_v1') === 'accepted'; } catch { return false; }
-  });
+  React.useEffect(() => {
+    if (resendTimer <= 0) return;
+    const t = setInterval(() => setResendTimer((v) => (v > 0 ? v - 1 : 0)), 1000);
+    return () => clearInterval(t);
+  }, [resendTimer]);
 
-  // Check if a redirect error occurred
-  useEffect(() => {
-    try {
-      const storedErr = localStorage.getItem('hassty_google_auth_error');
-      if (storedErr) {
-        const parsed = JSON.parse(storedErr);
-        if (parsed.code === 'auth/unauthorized-domain') {
-          setErrorMessage('نطاق الموقع غير معتمد في Supabase Auth Authorized Domains.');
-        } else {
-          setErrorMessage(parsed.message || 'تعذر استكمال تسجيل الدخول عبر Google.');
-        }
-        localStorage.removeItem('hassty_google_auth_error');
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
-
-  const handleStep1Select = (selected: AccountRole) => {
-    setRole(selected);
-    setStep(2);
+  const goStep = (s: Step) => {
+    setStep(s);
+    setErrorMessage('');
+    setSuccessMessage('');
   };
 
-  /**
-   * Handle One-Click Google Signup & Login
-   */
-  const handleGoogleSignup = async (selectedRole?: AccountRole) => {
-    const targetRole = selectedRole || role;
+  /* ============ step 2 validation ============ */
+  const validateData = (): string | null => {
+    if (fullName.trim().length < 3) return 'أدخل اسمك الكامل (3 أحرف على الأقل).';
+    if (!/^01[0125][0-9]{8}$/.test(phone.trim())) return 'أدخل رقم هاتف مصري صحيح (مثال: 01012345678).';
+    if (!governorate || !city) return 'اختر المحافظة والمدينة/المنطقة.';
+    if (role === 'student' && !grade) return 'اختر الصف الدراسي.';
+    if (role === 'teacher' && !subject) return 'اختر المادة الدراسية.';
+    return null;
+  };
+
+  /* ============ step 3: register ============ */
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage('');
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim().toLowerCase())) return setErrorMessage('أدخل بريدًا إلكترونيًا صحيحًا.');
+    if (strength.score < 2) return setErrorMessage('كلمة المرور ضعيفة — اجعلها 8 أحرف على الأقل وتتضمن حروفًا وأرقامًا.');
+    if (password !== confirmPassword) return setErrorMessage('كلمتا المرور غير متطابقتين.');
+    if (!agreeTerms || !agreePrivacy) return setErrorMessage('يجب الموافقة على الشروط وسياسة الخصوصية لإنشاء الحساب.');
+
+    const dataError = validateData();
+    if (dataError) return setErrorMessage(dataError);
+
+    setIsLoading(true);
+    try {
+      const res = await signupUser({
+        email: email.trim().toLowerCase(),
+        password,
+        role,
+        fullName: fullName.trim(),
+        phone: phone.trim(),
+        governorate,
+        city,
+        grade: role === 'student' ? grade : undefined,
+        subject: role === 'teacher' ? subject : undefined,
+        experienceYears: role === 'teacher' ? experienceYears : undefined,
+        studentJoinCode: role === 'parent' && studentJoinCode.trim() ? studentJoinCode.trim() : undefined,
+        consent: true,
+      });
+
+      if (!res.ok) {
+        setErrorMessage(res.error || 'تعذر إنشاء الحساب. حاول مجددًا.');
+        return;
+      }
+
+      /* mark consent locally — the app records it in legal_consents after login */
+      try { localStorage.setItem(SIGNUP_CONSENT_KEY, 'accepted'); } catch { /* ignore */ }
+
+      passwordRef.current = password;
+      setOtpDigits(Array(6).fill(''));
+      setResendTimer(res.resendAfter || 60);
+      goStep(4);
+      setSuccessMessage(`أرسلنا رمز التفعيل إلى ${res.maskedEmail || email}. فحص صندوق الوارد (والبريد غير الهام).`);
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'تعذر إنشاء الحساب.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /* ============ step 4: verify email code ============ */
+  const handleVerify = async (code?: string) => {
+    const fullCode = code || otpDigits.join('');
+    if (fullCode.length !== 6) {
+      setErrorMessage('أدخل رمز التفعيل المكوّن من 6 أرقام.');
+      setOtpError(true);
+      setTimeout(() => setOtpError(false), 700);
+      return;
+    }
+    setIsLoading(true);
+    setErrorMessage('');
+    try {
+      const res = await authApi.verifyCode({ email: email.trim().toLowerCase(), code: fullCode, purpose: 'signup_verify' });
+      if (!res.ok) {
+        setErrorMessage(res.error || 'رمز التفعيل غير صحيح.');
+        setOtpError(true);
+        setOtpDigits(Array(6).fill(''));
+        setTimeout(() => setOtpError(false), 700);
+        return;
+      }
+
+      /* account active → log in directly */
+      const session = await finishPasswordLogin(email.trim().toLowerCase(), passwordRef.current);
+      goStep(5);
+      setSuccessMessage(`تم تفعيل حسابك بنجاح 🎉 أهلًا بك ${session.name || ''} في حِصّتي`);
+      setTimeout(() => onSignupSuccess(session.role, session.email), 900);
+    } catch (err: any) {
+      const msg = String(err?.message || '');
+      setErrorMessage(msg.includes('Email not confirmed') ? 'لم يكتمل التفعيل بعد — تأكد من الرمز وحاول مجددًا.' : msg || 'حدث خطأ أثناء التفعيل.');
+      setOtpError(true);
+      setTimeout(() => setOtpError(false), 700);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    if (resendTimer > 0 || isSendingCode) return;
+    setIsSendingCode(true);
+    setErrorMessage('');
+    try {
+      const res = await authApi.sendCode(email.trim().toLowerCase(), 'signup_verify');
+      if (res.sent === false) {
+        setErrorMessage(res.message || 'تعذر إعادة إرسال الرمز.');
+      } else {
+        setResendTimer(res.resendAfter || 60);
+        setSuccessMessage('تم إرسال رمز جديد إلى بريدك.');
+        setOtpDigits(Array(6).fill(''));
+      }
+    } catch (e: any) {
+      setErrorMessage(e?.message || 'تعذر إعادة إرسال الرمز.');
+    } finally {
+      setIsSendingCode(false);
+    }
+  };
+
+  const handleGoogleSignup = async () => {
     setIsGoogleLoading(true);
     setErrorMessage('');
     try {
-      const session = await loginWithGoogle(targetRole, {
-        governorate,
-        area,
-        grade: targetRole === 'student' ? grade : undefined,
-        subject: targetRole === 'teacher' ? subject : undefined,
-        experience: targetRole === 'teacher' ? experience : undefined,
-        phone: phone || '',
-      });
-      if (session) {
-        onSignupSuccess(session.role, session.email);
-      }
+      await loginWithGoogle();
     } catch (err: any) {
-      console.warn('Google signup error:', err);
-      if (err?.code === 'auth/popup-closed-by-user') {
-        setErrorMessage('تم إغلاق نافذة تسجيل الدخول عبر Google قبل إكمال التسجيل.');
-      } else if (err?.code === 'auth/unauthorized-domain') {
-        setErrorMessage('نطاق الموقع يحتاج إلى إدراجه في Supabase Console (Authorized Domains). يمكنك التسجيل بالبريد وكلمة المرور.');
-      } else if (err?.code === 'auth/popup-blocked') {
-        setErrorMessage('المتصفح حظر النافذة المنبثقة. يرجى السماح بالنوافذ المنبثقة.');
-      } else {
-        setErrorMessage('تعذر التسجيل عبر Google. يرجى ملء النموذج أدناه والمتابعة.');
-      }
-    } finally {
+      setErrorMessage(err?.message || 'تعذر فتح Google.');
       setIsGoogleLoading(false);
     }
   };
 
-  /**
-   * Handle Photo Upload during Signup
-   */
-  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      setErrorMessage('يرجى اختيار ملف صورة صالح (JPEG أو PNG).');
-      return;
-    }
-
-    setIsUploadingPhoto(true);
-    setErrorMessage('');
-
-    try {
-      const compressed = await optimizeProfileImage(file, 400);
-      setAvatarUrl(compressed);
-      setIsUploadingPhoto(false);
-    } catch (err: any) {
-      setIsUploadingPhoto(false);
-      setErrorMessage(err.message || 'حدث خطأ أثناء معالجة الصورة.');
-    }
-  };
-
-  /**
-   * Quick check student code during parent signup
-   */
-  const handleVerifyStudentCode = async () => {
-    if (!studentJoinCode.trim()) {
-      setStudentSearchError('يرجى كتابة كود الطالب أو رقم هاتفه أولاً.');
-      setVerifiedStudentPreview(null);
-      return;
-    }
-    setIsVerifyingStudent(true);
-    setStudentSearchError('');
-    try {
-      const student = await findStudentByCodeOrPhone(studentJoinCode.trim());
-      if (student) {
-        setVerifiedStudentPreview(student);
-        setStudentSearchError('');
-      } else {
-        setVerifiedStudentPreview(null);
-        setStudentSearchError(`لم يتم العثور على طالب مسجل بهذا الكود (${studentJoinCode.trim()}). تأكد من كود الطالب أو رقم هاتفه.`);
-      }
-    } catch (err: any) {
-      setStudentSearchError('حدث خطأ أثناء البحث عن كود الطالب.');
-    } finally {
-      setIsVerifyingStudent(false);
-    }
-  };
-
-  /**
-   * Submit Real Supabase Email/Password & Profile Registration
-   */
-  const handleSubmitRegistration = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!legalConsentAccepted) {
-      setErrorMessage('يرجى الضغط على «أوافق وأتابع إنشاء الحساب» قبل إنشاء الحساب.');
-      return;
-    }
-    if (!name.trim() || !email.trim() || !password || !phone.trim()) {
-      setErrorMessage('يرجى ملء جميع الحقول المطلوبة.');
-      return;
-    }
-
-    if (password.length < 6) {
-      setErrorMessage('كلمة المرور يجب ألا تقل عن 6 أحرف أو أرقام.');
-      return;
-    }
-
-    setIsLoading(true);
-    setErrorMessage('');
-
-    try {
-      const session = await signupUser({
-        email: email.trim(),
-        password,
-        role,
-        name: name.trim(),
-        phone: phone.trim(),
-        avatarUrl: avatarUrl.trim(),
-        governorate,
-        area,
-        grade: role === 'student' ? grade : undefined,
-        subject: role === 'teacher' ? subject : undefined,
-        experience: role === 'teacher' ? experience : undefined,
-        parentPhone: role === 'student' ? parentPhone.trim() : undefined,
-        studentJoinCode: role === 'parent' && studentJoinCode.trim() ? studentJoinCode.trim() : undefined,
-      });
-
-      if (session?.uid) {
-        setRegisteredUid(session.uid);
-      }
-
-      // Automatically dispatch email verification link
-      try {
-        await sendEmailVerificationLink(email.trim());
-        setLinkSentSuccess(true);
-        setResendTimer(60);
-      } catch (sendErr) {
-        console.warn('Initial verification dispatch warning:', sendErr);
-      }
-
-      setIsLoading(false);
-      setStep(3); // Show real success confirmation
-    } catch (err: any) {
-      setIsLoading(false);
-      console.error('Signup error:', err);
-      const code = err?.code || '';
-      if (code === 'auth/email-already-in-use') {
-        setErrorMessage('هذا البريد الإلكتروني مسجل به حساب بالفعل. يرجى تسجيل الدخول أو استخدام بريد آخر.');
-      } else if (code === 'auth/weak-password') {
-        setErrorMessage('كلمة المرور ضعيفة. يرجى كتابة 6 خانات على الأقل.');
-      } else if (code === 'auth/invalid-email') {
-        setErrorMessage('صيغة البريد الإلكتروني غير صالحة.');
-      } else if (code === 'auth/network-request-failed') {
-        setErrorMessage('تعذر الاتصال بالخادم، يرجى التأكد من اتصال الإنترنت والمحاولة ثانية.');
-      } else {
-        const msg = String(err?.message || '');
-        if (msg.includes('auth/email-already-in-use')) {
-          setErrorMessage('هذا البريد الإلكتروني مسجل به حساب بالفعل. يرجى تسجيل الدخول.');
-        } else {
-          setErrorMessage('حدث خطأ أثناء إنشاء الحساب. يرجى التأكد من صحة البيانات والمحاولة مرة أخرى.');
-        }
-      }
-    }
-  };
-
-  const handleFinish = () => {
-    onNavigate('/verify-email');
-  };
+  /* ============================================================ */
+  const stepsMeta = [
+    { n: 1, label: 'نوع الحساب' },
+    { n: 2, label: 'بياناتك' },
+    { n: 3, label: 'الحساب' },
+    { n: 4, label: 'التفعيل' },
+  ];
+  const showSteps = step >= 1 && step <= 4;
 
   return (
-    <AuthShell onNavigate={onNavigate} miniTitle="انضم لمنظومة حِصّتي ✨">
+    <AuthShell onNavigate={onNavigate} miniTitle="انضم إلى حِصّتي ✨" width={step === 2 || step === 3 ? 'wide' : 'md'}>
+      <div className="card-lux bg-white border border-slate-200/90 rounded-3xl shadow-[0_24px_70px_-30px_rgba(30,58,138,0.35)] overflow-hidden anim-up" data-role={role}>
 
-      {/* ═══ بطاقة التسجيل الفخمة ═══ */}
-      <div className="card-lux bg-white border border-slate-200/90 rounded-3xl shadow-[0_20px_60px_-24px_rgba(30,58,138,0.25)] p-6 sm:p-7 space-y-5 anim-up">
-
-        {/* رأس البطاقة + مؤشر الخطوات */}
-        <div className="pb-4 border-b border-slate-100">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#2563EB] to-[#7C3AED] text-white flex items-center justify-center shadow-lg shadow-blue-600/30">
-              <QrCode className="w-5.5 h-5.5 stroke-[2.2]" />
+        {/* ---------- header + steps rail ---------- */}
+        <div className="px-7 pt-6 pb-5 bg-gradient-to-l from-[#EFF6FF] via-white to-[#F5F3FF] border-b border-slate-100">
+          <div className="flex items-center gap-3.5">
+            <div className="w-13 h-13 rounded-2xl bg-gradient-to-br from-[#2563EB] to-[#7C3AED] text-white flex items-center justify-center shadow-lg shadow-blue-500/30 shrink-0">
+              {step === 5 ? <CheckCircle2 className="w-6.5 h-6.5" /> : step === 4 ? <KeyRound className="w-6.5 h-6.5" /> : <Sparkles className="w-6.5 h-6.5" />}
             </div>
-            <div>
-              <h2 className="text-lg font-black text-slate-900 leading-tight">إنشاء حساب جديد</h2>
-              <p className="text-[11px] text-slate-500 font-semibold mt-0.5">منظومة الدروس الخصوصية الأذكى مع توثيق آمن بالبريد</p>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-xl font-black text-slate-900 leading-tight">
+                {step === 1 && 'إنشاء حساب جديد'}
+                {step === 2 && 'بياناتك الأساسية'}
+                {step === 3 && 'البريد وكلمة المرور'}
+                {step === 4 && 'تأكيد بريدك الإلكتروني'}
+                {step === 5 && 'حسابك جاهز!'}
+              </h1>
+              {showSteps && (
+                <div className="auth-steps mt-2.5">
+                  {stepsMeta.map((s, i) => (
+                    <React.Fragment key={s.n}>
+                      <div className={`dot ${step === s.n ? 'active' : step > s.n ? 'done' : ''}`} title={s.label} />
+                      {i < stepsMeta.length - 1 && <div className={`bar ${step > s.n ? 'active' : ''}`} />}
+                    </React.Fragment>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
-
-          <div className="auth-steps mt-3">
-            <div className={`dot ${step >= 1 ? 'active' : ''}`}>1</div>
-            <span className="text-[10px] font-black text-slate-500">اختيار النوع</span>
-            <div className={`bar ${step >= 2 ? 'active' : ''}`} />
-            <div className={`dot ${step >= 2 ? 'active' : ''}`}>2</div>
-            <span className="text-[10px] font-black text-slate-500">البيانات</span>
-            <div className={`bar ${step >= 3 ? 'active' : ''}`} />
-            <div className={`dot ${step >= 3 ? 'done' : ''}`}>{step >= 3 ? <CheckCircle2 className="w-3 h-3" /> : '3'}</div>
-            <span className={`text-[10px] font-black ${step >= 3 ? 'text-emerald-600' : 'text-slate-400'}`}>التفعيل</span>
           </div>
         </div>
 
-        {/* Step 1: Select Role */}
+        {errorMessage && (
+          <div className="mx-7 mt-5 flex items-start gap-2.5 bg-red-50 border border-red-200 text-red-700 rounded-2xl px-4 py-3 text-[13px] font-bold anim-fade">
+            <AlertCircle className="w-4.5 h-4.5 mt-0.5 shrink-0" />
+            <span>{errorMessage}</span>
+          </div>
+        )}
+        {successMessage && step === 4 && (
+          <div className="mx-7 mt-5 flex items-start gap-2.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-2xl px-4 py-3 text-[13px] font-bold anim-fade">
+            <CheckCircle2 className="w-4.5 h-4.5 mt-0.5 shrink-0" />
+            <span>{successMessage}</span>
+          </div>
+        )}
+
+        {/* ═══════════ STEP 1 — نوع الحساب ═══════════ */}
         {step === 1 && (
-          <div className="space-y-4 animate-step-prev">
-            
-            {errorMessage && (
-              <div className="p-3.5 bg-red-50 border border-red-200 rounded-2xl text-xs font-bold text-red-800 flex items-start gap-2 animate-fadeIn">
-                <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-                <div className="flex-1">{errorMessage}</div>
-              </div>
-            )}
+          <div className="p-7 space-y-4">
+            <p className="text-[13px] text-slate-500 font-semibold text-center mb-1">اختر نوع حسابك — كل نوع له عالمه الخاص المصمم له</p>
+            {ROLE_CARDS.map((card) => (
+              <button
+                key={card.role}
+                type="button"
+                data-role={card.role}
+                onClick={() => setRole(card.role)}
+                className={`role-card w-full p-5 text-right ${role === card.role ? 'selected' : ''}`}
+              >
+                <span className="role-check"><CheckCircle2 className="w-4 h-4" /></span>
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shrink-0" style={{ backgroundImage: 'var(--role-grad)' }}>
+                    <card.icon className="w-6 h-6" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <div className="text-base font-black text-slate-900">{card.title}</div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">{card.tag}</span>
+                    </div>
+                    <p className="text-xs text-slate-500 font-semibold leading-relaxed mt-1">{card.desc}</p>
+                  </div>
+                </div>
+              </button>
+            ))}
 
-            {/* Quick Google Sign Up Block */}
-            <div className="p-4 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 border border-blue-200/70 rounded-2xl space-y-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-black text-[#1E3A8A] flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 text-blue-600" />
-                  التسجيل السريع بحساب Google
-                </span>
-                <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-md">
-                  ضغطة واحدة
-                </span>
-              </div>
-              <p className="text-[11px] text-gray-600">
-                اختر نوع حسابك واضغط للتسجيل المباشر بدون الحاجة لإنشاء كلمة مرور:
-              </p>
-              <div className="grid grid-cols-3 gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => handleGoogleSignup('student')}
-                  disabled={isGoogleLoading}
-                  className="py-2.5 px-2 bg-white hover:bg-blue-600 hover:text-white text-[#1E3A8A] border border-blue-200 rounded-xl text-xs font-bold transition-all shadow-xs flex flex-col items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
-                >
-                  <span className="text-sm">👨‍🎓</span>
-                  <span>{isGoogleLoading ? 'جاري التحميل...' : 'طالب بـ Google'}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleGoogleSignup('parent')}
-                  disabled={isGoogleLoading}
-                  className="py-2.5 px-2 bg-white hover:bg-[#1E3A8A] hover:text-white text-[#1E3A8A] border border-blue-200 rounded-xl text-xs font-bold transition-all shadow-xs flex flex-col items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
-                >
-                  <span className="text-sm">👨‍👧</span>
-                  <span>{isGoogleLoading ? 'جاري التحميل...' : 'ولي أمر بـ Google'}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleGoogleSignup('teacher')}
-                  disabled={isGoogleLoading}
-                  className="py-2.5 px-2 bg-white hover:bg-emerald-600 hover:text-white text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold transition-all shadow-xs flex flex-col items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
-                >
-                  <span className="text-sm">👨‍🏫</span>
-                  <span>{isGoogleLoading ? 'جاري التحميل...' : 'معلم بـ Google'}</span>
-                </button>
-              </div>
+            <div className="bg-sky-50/70 border border-sky-100 rounded-2xl px-4 py-3 text-[12px] font-bold text-slate-600 flex items-center gap-2">
+              <UserCheck className="w-4.5 h-4.5 text-[#0EA5E9] shrink-0" />
+              <span>مساعد مدرس؟ التسجيل يتم عبر دعوة من المعلم — <button type="button" onClick={() => onNavigate('/assistant/signup')} className="text-[#0284C7] font-black underline cursor-pointer">سجّل كمساعد من هنا</button></span>
             </div>
 
-            <div className="relative flex items-center justify-center my-3">
-              <div className="border-t border-gray-200 w-full" />
-              <span className="bg-white px-3 text-[11px] text-gray-400 font-bold shrink-0">
-                أو تابع التسجيل اليدوي بتحديد النوع
-              </span>
-              <div className="border-t border-gray-200 w-full" />
-            </div>
-
-            <h3 className="text-sm font-bold text-[#1E3A8A] text-center mb-1">
-              الخطوة 1: حدد نوع الحساب المناسب لك
-            </h3>
-
-            {/* Student Card */}
-            <button
-              onClick={() => handleStep1Select('student')}
-              className={`w-full p-4.5 rounded-2xl border-2 text-right transition-all flex items-start gap-4 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] ${
-                role === 'student'
-                  ? 'border-[#2563EB] bg-[#EFF6FF] shadow-sm'
-                  : 'border-gray-200 hover:border-blue-200 bg-gray-50/50'
-              }`}
-            >
-              <div className="w-12 h-12 rounded-xl bg-[#2563EB] text-white flex items-center justify-center shrink-0 shadow-xs">
-                <Users className="w-6 h-6" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-bold text-[#1E3A8A]">حساب طالب</h4>
-                  <span className="text-[10px] font-bold text-[#2563EB] bg-blue-100 px-2 py-0.5 rounded-md">
-                    كارنيه QR رسمي
-                  </span>
-                </div>
-                <p className="text-xs text-[#6B7280] mt-1 leading-relaxed">
-                  احصل على بطاقة QR رقمية رسمية لتسجيل الحضور، وابحث عن أفضل المعلمين واحجز حصصك.
-                </p>
-              </div>
+            <button type="button" onClick={() => goStep(2)} className="auth-btn w-full p-3.5 rounded-2xl text-white font-black text-sm btn-primary-shine flex items-center justify-center gap-2">
+              متابعة كـ {roleInfo.title}
+              <ArrowRight className="w-4.5 h-4.5 rotate-180" />
             </button>
 
-            {/* Parent Card */}
-            <button
-              onClick={() => handleStep1Select('parent')}
-              className={`w-full p-4.5 rounded-2xl border-2 text-right transition-all flex items-start gap-4 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] ${
-                role === 'parent'
-                  ? 'border-[#1E3A8A] bg-blue-50 shadow-sm'
-                  : 'border-gray-200 hover:border-blue-200 bg-gray-50/50'
-              }`}
-            >
-              <div className="w-12 h-12 rounded-xl bg-[#1E3A8A] text-white flex items-center justify-center shrink-0 shadow-xs">
-                <ShieldCheck className="w-6 h-6" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-bold text-[#1E3A8A]">حساب ولي أمر</h4>
-                  <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md">
-                    متابعة لحظية
-                  </span>
-                </div>
-                <p className="text-xs text-[#6B7280] mt-1 leading-relaxed">
-                  تابع حضور وغياب أبنائك لحظياً، واستقبل تقارير الدروس والواجبات وسجل المدفوعات.
-                </p>
-              </div>
+            <button type="button" onClick={() => handleGoogleSignup()} disabled={isGoogleLoading} className="w-full p-3.5 rounded-2xl border-2 border-slate-200 bg-white text-slate-700 font-black text-sm flex items-center justify-center gap-2.5 hover:border-slate-300 hover:bg-slate-50 transition-colors disabled:opacity-60">
+              {isGoogleLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <GoogleIcon />}
+              التسجيل السريع بحساب Google
             </button>
 
-            {/* Teacher Card */}
-            <button
-              onClick={() => handleStep1Select('teacher')}
-              className={`w-full p-4.5 rounded-2xl border-2 text-right transition-all flex items-start gap-4 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] ${
-                role === 'teacher'
-                  ? 'border-[#10B981] bg-emerald-50 shadow-sm'
-                  : 'border-gray-200 hover:border-emerald-200 bg-gray-50/50'
-              }`}
-            >
-              <div className="w-12 h-12 rounded-xl bg-[#10B981] text-white flex items-center justify-center shrink-0 shadow-xs">
-                <BookOpen className="w-6 h-6" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-bold text-[#1E3A8A]">حساب معلم</h4>
-                  <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md">
-                    إدارة ذكية
-                  </span>
-                </div>
-                <p className="text-xs text-[#6B7280] mt-1 leading-relaxed">
-                  سجل حضور طلابك بماسح الـ QR في ثوانٍ، وأنشئ بروفايل موثق لاستقبال الحجوزات وإدارة المجموعات.
-                </p>
-              </div>
-            </button>
-
-            <div className="pt-2 text-center">
-              <p className="text-xs text-[#6B7280]">
-                لديك حساب بالفعل؟{' '}
-                <button
-                  onClick={() => onNavigate('/login')}
-                  className="text-[#2563EB] font-bold hover:underline cursor-pointer"
-                >
-                  تسجيل الدخول
-                </button>
-              </p>
-            </div>
+            <p className="text-center text-[13px] text-slate-500 font-semibold pt-1">
+              لديك حساب بالفعل؟{' '}
+              <button type="button" onClick={() => onNavigate('/login')} className="text-[#2563EB] font-black hover:text-[#1E40AF] cursor-pointer">سجّل الدخول</button>
+            </p>
           </div>
         )}
 
-        {/* Step 2: Form Details */}
+        {/* ═══════════ STEP 2 — البيانات ═══════════ */}
         {step === 2 && (
-          <div className="space-y-5 animate-step-next">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div>
-                <span className="text-[11px] font-black text-[#2563EB]">الخطوة 2: إدخال البيانات الشخصية</span>
-                <h3 className="text-base font-black text-slate-900">
-                  بيانات حساب {role === 'student' ? 'الطالب' : role === 'parent' ? 'ولي الأمر' : 'المعلم'}
-                </h3>
+          <div className="p-7 space-y-4">
+            <div className="flex items-center gap-3 bg-[#F8FAFF] border border-slate-200 rounded-2xl p-3.5">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0" style={{ backgroundImage: 'var(--role-grad)' }}>
+                <roleInfo.icon className="w-5 h-5" />
               </div>
-              <button
-                type="button"
-                onClick={() => setStep(1)}
-                className="text-xs text-slate-500 hover:text-[#2563EB] underline cursor-pointer"
-              >
-                تغيير النوع
-              </button>
+              <div className="text-[13px] font-black text-slate-700">تسجيل كـ {roleInfo.title}</div>
             </div>
 
-            {errorMessage && (
-              <div className="p-3.5 bg-red-50 border border-red-200 rounded-2xl text-xs font-bold text-red-800 flex items-start gap-2 animate-fadeIn">
-                <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-                <div className="flex-1">{errorMessage}</div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="relative">
+                <UserCheck className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="الاسم الكامل" className="auth-input w-full p-3.5 pr-11 text-sm" autoComplete="name" />
+              </div>
+              <div className="relative">
+                <Phone className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <input dir="ltr" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="01xxxxxxxxx" className="auth-input w-full p-3.5 pr-11 text-sm text-left" autoComplete="tel" />
+              </div>
+            </div>
+
+            <div className="border border-slate-200 rounded-2xl p-4 bg-white">
+              <div className="flex items-center gap-2 mb-3 text-xs font-black text-slate-600">
+                <MapPin className="w-4 h-4 text-[#2563EB]" />
+                المحافظة والمدينة
+              </div>
+              <LocationSelector
+                selectedGovernorate={governorate}
+                selectedCity={city}
+                onSelectGovernorate={setGovernorate}
+                onSelectCity={setCity}
+                showCitySelect
+                placeholder="اختر محافظتك ومدينتك"
+              />
+            </div>
+
+            {role === 'student' && (
+              <div className="relative">
+                <GraduationCap className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <select value={grade} onChange={(e) => setGrade(e.target.value)} className="auth-input w-full p-3.5 pr-11 text-sm appearance-none cursor-pointer">
+                  {GRADES.map((g) => <option key={g} value={g}>{g}</option>)}
+                </select>
               </div>
             )}
 
-            {/* One-Click Google Signup for selected role */}
-            <button
-              type="button"
-              onClick={() => handleGoogleSignup(role)}
-              disabled={isLoading || isGoogleLoading}
-              className="w-full py-3 px-4 bg-white hover:bg-slate-50 border-2 border-slate-200 hover:border-blue-400 text-slate-700 font-bold text-xs sm:text-sm rounded-xl transition-all shadow-xs flex items-center justify-center gap-3 cursor-pointer disabled:opacity-50 active:scale-[0.99]"
-            >
-              {isGoogleLoading ? (
-                <>
-                  <RefreshCw className="w-4 h-4 text-blue-600 animate-spin" />
-                  <span className="text-blue-700 font-bold">جاري التسجيل بـ Google...</span>
-                </>
-              ) : (
-                <>
-                  <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
-                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-                  </svg>
-                  <span>
-                    التسجيل السريع كـ {role === 'student' ? 'طالب' : role === 'parent' ? 'ولي أمر' : 'معلم'} بـ Google
-                  </span>
-                </>
-              )}
+            {role === 'teacher' && (
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="relative">
+                  <BookOpen className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <select value={subject} onChange={(e) => setSubject(e.target.value)} className="auth-input w-full p-3.5 pr-11 text-sm appearance-none cursor-pointer">
+                    {SUBJECTS_DATA.map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
+                  </select>
+                </div>
+                <div className="relative">
+                  <Award className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <select value={experienceYears} onChange={(e) => setExperienceYears(e.target.value)} className="auth-input w-full p-3.5 pr-11 text-sm appearance-none cursor-pointer">
+                    {EXPERIENCE_OPTIONS.map((x) => <option key={x} value={x}>{x}</option>)}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {role === 'parent' && (
+              <div className="bg-amber-50/80 border border-amber-100 rounded-2xl p-4">
+                <label className="text-xs font-black text-slate-700 flex items-center gap-2 mb-2">
+                  <Heart className="w-4 h-4 text-amber-500" />
+                  كود الطالب (اختياري)
+                </label>
+                <input dir="ltr" value={studentJoinCode} onChange={(e) => setStudentJoinCode(e.target.value)} placeholder="HASSTY-XXXXXX أو رقم هاتف الطالب" className="auth-input w-full p-3 text-sm text-left" />
+                <p className="text-[11px] text-slate-500 font-semibold mt-2 leading-relaxed">لو معك كود كارنيه ابنك، اكتبه هنا وسنرسل طلب ربط تلقائيًا بعد التفعيل — تقدر تضيفه لاحقًا من لوحة التحكم.</p>
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-1">
+              <button type="button" onClick={() => goStep(1)} className="px-5 p-3.5 rounded-2xl border-2 border-slate-200 text-slate-600 font-black text-sm hover:bg-slate-50 flex items-center gap-1.5">
+                <ArrowRight className="w-4 h-4" />
+                رجوع
+              </button>
+              <button
+                type="button"
+                onClick={() => { const err = validateData(); if (err) setErrorMessage(err); else goStep(3); }}
+                className="auth-btn flex-1 p-3.5 rounded-2xl text-white font-black text-sm btn-primary-shine flex items-center justify-center gap-2"
+              >
+                متابعة
+                <ArrowRight className="w-4.5 h-4.5 rotate-180" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ═══════════ STEP 3 — البريد وكلمة المرور + الموافقة ═══════════ */}
+        {step === 3 && (
+          <form onSubmit={handleRegister} className="p-7 space-y-4">
+            <div className="relative">
+              <Mail className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <input type="email" required dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="بريدك الإلكتروني" className="auth-input w-full p-3.5 pr-11 text-sm text-left" autoComplete="email" />
+            </div>
+            <p className="text-[11px] text-slate-400 font-semibold -mt-2">سيصلك رمز التفعيل على هذا البريد — تأكد أنه صحيح.</p>
+
+            <div className="relative">
+              <Lock className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <input type={showPassword ? 'text' : 'password'} required dir="ltr" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="كلمة المرور" className="auth-input w-full p-3.5 pr-11 pl-11 text-sm text-left" autoComplete="new-password" />
+              <button type="button" onClick={() => setShowPassword((v) => !v)} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" aria-label="إظهار كلمة المرور">
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
+            </div>
+
+            {password && (
+              <div className="space-y-1.5">
+                <div className="pw-meter"><div style={{ width: `${(strength.score / 4) * 100}%`, backgroundColor: ['#EF4444', '#F59E0B', '#F59E0B', '#10B981', '#10B981'][strength.score] }} /></div>
+                <div className="text-[11px] font-bold text-slate-500">قوة كلمة المرور: <span className={strength.score >= 3 ? 'text-emerald-600' : 'text-amber-600'}>{strength.label}</span></div>
+              </div>
+            )}
+
+            <div className="relative">
+              <Lock className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <input type={showPassword ? 'text' : 'password'} required dir="ltr" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="تأكيد كلمة المرور" className="auth-input w-full p-3.5 pr-11 text-sm text-left" autoComplete="new-password" />
+            </div>
+
+            {/* ---------- زر الموافقة ---------- */}
+            <div className="bg-[#F8FAFF] border border-slate-200 rounded-2xl p-4 space-y-3">
+              <div className="text-xs font-black text-slate-700 flex items-center gap-2">
+                <ShieldCheck className="w-4.5 h-4.5 text-[#2563EB]" />
+                الموافقة المطلوبة قبل إنشاء الحساب
+              </div>
+              <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                <input type="checkbox" checked={agreeTerms} onChange={(e) => setAgreeTerms(e.target.checked)} className="mt-1 w-4 h-4 accent-[#2563EB] cursor-pointer" />
+                <span className="text-[12px] font-bold text-slate-600 leading-relaxed">
+                  أوافق على{' '}
+                  <button type="button" onClick={(e) => { e.preventDefault(); onNavigate('/legal/terms'); }} className="text-[#2563EB] underline font-black cursor-pointer">الشروط والأحكام</button>
+                </span>
+              </label>
+              <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                <input type="checkbox" checked={agreePrivacy} onChange={(e) => setAgreePrivacy(e.target.checked)} className="mt-1 w-4 h-4 accent-[#2563EB] cursor-pointer" />
+                <span className="text-[12px] font-bold text-slate-600 leading-relaxed">
+                  أوافق على{' '}
+                  <button type="button" onClick={(e) => { e.preventDefault(); onNavigate('/legal/privacy'); }} className="text-[#2563EB] underline font-black cursor-pointer">سياسة الخصوصية</button>{' '}
+                  ومعالجة بياناتي لأغر المنصة التعليمية
+                </span>
+              </label>
+            </div>
+
+            <div className="flex gap-3">
+              <button type="button" onClick={() => goStep(2)} className="px-5 p-3.5 rounded-2xl border-2 border-slate-200 text-slate-600 font-black text-sm hover:bg-slate-50 flex items-center gap-1.5">
+                <ArrowRight className="w-4 h-4" />
+                رجوع
+              </button>
+              <button type="submit" disabled={isLoading || !agreeTerms || !agreePrivacy} className="auth-btn flex-1 p-3.5 rounded-2xl text-white font-black text-sm btn-primary-shine flex items-center justify-center gap-2 disabled:opacity-50">
+                {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
+                {isLoading ? 'جاري إنشاء الحساب...' : 'أوافق وأنشئ حسابي'}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* ═══════════ STEP 4 — رمز التفعيل ═══════════ */}
+        {step === 4 && (
+          <div className="p-7 space-y-5">
+            <div className="bg-[#F8FAFF] border border-slate-200 rounded-2xl px-4 py-3.5 text-center">
+              <div className="text-[11px] font-bold text-slate-400 mb-0.5">أدخل الرمز المُرسل إلى</div>
+              <div dir="ltr" className="text-sm font-black text-slate-700">{email}</div>
+            </div>
+
+            <OtpCodeInput value={otpDigits} onChange={setOtpDigits} onComplete={handleVerify} disabled={isLoading} hasError={otpError} />
+
+            <button onClick={() => handleVerify()} disabled={isLoading || otpDigits.join('').length !== 6} className="auth-btn w-full p-3.5 rounded-2xl text-white font-black text-sm btn-primary-shine flex items-center justify-center gap-2 disabled:opacity-50">
+              {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
+              {isLoading ? 'جاري التفعيل...' : 'تفعيل حسابي'}
             </button>
 
-            <div className="relative flex items-center justify-center my-1">
-              <div className="border-t border-gray-200 w-full" />
-              <span className="bg-white px-3 text-[11px] text-gray-400 font-bold shrink-0">
-                أو أكمل بيانات النموذج يدوياً
-              </span>
-              <div className="border-t border-gray-200 w-full" />
+            <div className="flex items-center justify-between text-[12px] font-bold">
+              <button type="button" onClick={handleResend} disabled={resendTimer > 0 || isSendingCode} className="text-[#2563EB] hover:text-[#1E40AF] cursor-pointer disabled:text-slate-400 flex items-center gap-1.5">
+                <RefreshCw className={`w-3.5 h-3.5 ${isSendingCode ? 'animate-spin' : ''}`} />
+                {resendTimer > 0 ? `إعادة الإرسال بعد ${resendTimer} ث` : 'إعادة إرسال الرمز'}
+              </button>
+              <button type="button" onClick={() => goStep(3)} className="text-slate-400 hover:text-slate-600 flex items-center gap-1 cursor-pointer">
+                <ArrowRight className="w-3.5 h-3.5" />
+                تعديل البريد
+              </button>
             </div>
-
-            <form onSubmit={handleSubmitRegistration} className="space-y-4">
-              
-              {/* Profile Photo Upload (Optional with live preview and default fallback) */}
-              <div className="p-4 bg-gray-50/80 border border-gray-200 rounded-2xl flex flex-col sm:flex-row items-center gap-4">
-                <div className="relative shrink-0">
-                  <img
-                    src={getCleanAvatarUrl(avatarUrl, role, name)}
-                    alt="معاينة الصورة"
-                    className="w-16 h-16 sm:w-18 sm:h-18 rounded-2xl object-cover border-2 border-white ring-2 ring-blue-100 shadow-xs bg-white"
-                  />
-                  {avatarUrl && (
-                    <button
-                      type="button"
-                      onClick={() => setAvatarUrl('')}
-                      className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center cursor-pointer shadow-xs"
-                      title="إزالة الصورة"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex-1 text-center sm:text-right space-y-1">
-                  <div className="flex items-center justify-center sm:justify-start gap-2">
-                    <span className="text-xs font-bold text-gray-800">الصورة الشخصية</span>
-                    <span className="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full font-bold">اختياري</span>
-                  </div>
-                  <p className="text-[11px] text-gray-500">
-                    يمكنك رفع صورتك الآن أو تركها لتطبيق الصورة الرمزية التلقائية.
-                  </p>
-                  
-                  <div className="pt-1">
-                    <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-blue-50 text-[#2563EB] border border-blue-200 rounded-xl text-xs font-bold cursor-pointer transition-all shadow-2xs active:scale-95">
-                      <Camera className="w-3.5 h-3.5" />
-                      <span>{isUploadingPhoto ? 'جاري التحميل...' : avatarUrl ? 'تغيير الصورة' : 'رفع صورة من جهازك'}</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handlePhotoSelect}
-                        disabled={isUploadingPhoto}
-                        className="hidden"
-                      />
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              {/* Full Name */}
-              <div>
-                <label className="block text-xs font-bold text-[#1F2937] mb-1.5">
-                  الاسم بالكامل <span className="text-[#EF4444]">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    required
-                    placeholder="مثال: أحمد محمد علي"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="w-full pl-4 pr-10 py-3 bg-gray-50 auth-input text-sm text-right focus:bg-white focus:outline-none focus:border-[#2563EB] transition-colors"
-                  />
-                  <User className="w-4 h-4 text-gray-400 absolute right-3.5 top-3.5" />
-                </div>
-              </div>
-
-              {/* Email & Password */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-[#1F2937] mb-1.5">
-                    البريد الإلكتروني <span className="text-[#EF4444]">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="email"
-                      required
-                      dir="ltr"
-                      placeholder="name@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full pl-4 pr-10 py-3 bg-gray-50 auth-input text-sm text-left focus:bg-white focus:outline-none focus:border-[#2563EB] transition-colors"
-                    />
-                    <Mail className="w-4 h-4 text-gray-400 absolute right-3.5 top-3.5" />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#1F2937] mb-1.5">
-                    كلمة المرور (6 خانات على الأقل) <span className="text-[#EF4444]">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      required
-                      dir="ltr"
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full pl-10 pr-10 py-3 bg-gray-50 auth-input text-sm text-left focus:bg-white focus:outline-none focus:border-[#2563EB] transition-colors"
-                    />
-                    <Lock className="w-4 h-4 text-gray-400 absolute right-3.5 top-3.5" />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute left-3.5 top-3.5 text-gray-400 hover:text-gray-600 cursor-pointer"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Phone & Location */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-[#1F2937] mb-1.5">
-                    رقم الهاتف المحمول <span className="text-[#EF4444]">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="tel"
-                      required
-                      dir="ltr"
-                      placeholder="010XXXXXXXX"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      className="w-full pl-4 pr-10 py-3 bg-gray-50 auth-input text-sm font-mono text-left focus:bg-white focus:outline-none focus:border-[#2563EB] transition-colors"
-                    />
-                    <Phone className="w-4 h-4 text-gray-400 absolute right-3.5 top-3.5" />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#1F2937] mb-1.5">
-                    المحافظة والمدينة <span className="text-[#EF4444]">*</span>
-                  </label>
-                  <LocationSelector
-                    selectedGovernorate={governorate}
-                    selectedCity={area}
-                    onSelectGovernorate={(gov) => setGovernorate(gov || 'القاهرة')}
-                    onSelectCity={(city) => setArea(city)}
-                    showCitySelect={true}
-                    placeholder="اختر المحافظة والمدينة"
-                  />
-                </div>
-              </div>
-
-              {/* Student Specific Fields */}
-              {role === 'student' && (
-                <div className="space-y-4 pt-2 border-t border-gray-100">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-[#1F2937] mb-1.5">
-                        السنة الدراسية <span className="text-[#EF4444]">*</span>
-                      </label>
-                      <select
-                        value={grade}
-                        onChange={(e) => setGrade(e.target.value)}
-                        className="w-full px-3.5 py-3 bg-gray-50 auth-input text-sm text-right focus:bg-white focus:outline-none focus:border-[#2563EB] cursor-pointer"
-                      >
-                        <option value="الصف الأول الابتدائي">الصف الأول الابتدائي</option>
-                        <option value="الصف الثاني الابتدائي">الصف الثاني الابتدائي</option>
-                        <option value="الصف الثالث الابتدائي">الصف الثالث الابتدائي</option>
-                        <option value="الصف الرابع الابتدائي">الصف الرابع الابتدائي</option>
-                        <option value="الصف الخامس الابتدائي">الصف الخامس الابتدائي</option>
-                        <option value="الصف السادس الابتدائي">الصف السادس الابتدائي</option>
-                        <option value="الصف الأول الإعدادي">الصف الأول الإعدادي</option>
-                        <option value="الصف الثاني الإعدادي">الصف الثاني الإعدادي</option>
-                        <option value="الصف الثالث الإعدادي">الصف الثالث الإعدادي</option>
-                        <option value="الصف الأول الثانوي">الصف الأول الثانوي</option>
-                        <option value="الصف الثاني الثانوي">الصف الثاني الثانوي</option>
-                        <option value="الصف الثالث الثانوي">الصف الثالث الثانوي</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-[#1F2937] mb-1.5">
-                        رقم هاتف ولي الأمر (لإشعارات الحضور)
-                      </label>
-                      <input
-                        type="tel"
-                        dir="ltr"
-                        placeholder="012XXXXXXXX"
-                        value={parentPhone}
-                        onChange={(e) => setParentPhone(e.target.value)}
-                        className="w-full px-3.5 py-3 bg-gray-50 auth-input text-sm font-mono text-left focus:bg-white focus:outline-none focus:border-[#2563EB]"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Parent Specific Fields */}
-              {role === 'parent' && (
-                <div className="space-y-4 pt-2 border-t border-gray-100">
-                  <div className="bg-blue-50/70 border border-blue-100 rounded-2xl p-4 text-right">
-                    <div className="flex items-center gap-2 mb-2 text-blue-900 font-bold text-xs">
-                      <ShieldCheck className="w-4 h-4 text-[#2563EB]" />
-                      <span>ربط حساب الابن / الطالب (اختياري عند التسجيل)</span>
-                    </div>
-                    <p className="text-xs text-blue-800/80 mb-3 leading-relaxed">
-                      أدخل كود بطاقة الطالب (الـ QR أو الكود التعريفي للطالب) وسيقوم النظام فور إتمام تسجيلك بإرسال طلب ربط رسمي إلى حساب الطالب، حيث يصله إشعار للموافقة أو الرفض.
-                    </p>
-
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <div className="relative flex-1">
-                        <input
-                          type="text"
-                          placeholder="مثال: HASSTY-ABC12345 أو رقم الهاتف"
-                          value={studentJoinCode}
-                          onChange={(e) => {
-                            setStudentJoinCode(e.target.value);
-                            if (verifiedStudentPreview) setVerifiedStudentPreview(null);
-                            if (studentSearchError) setStudentSearchError('');
-                          }}
-                          className="w-full pl-3 pr-3.5 py-2.5 bg-white border border-blue-200 rounded-xl text-sm font-mono text-left uppercase focus:outline-none focus:border-[#2563EB] shadow-2xs"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleVerifyStudentCode}
-                        disabled={isVerifyingStudent || !studentJoinCode.trim()}
-                        className="px-4 py-2.5 bg-[#2563EB] hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
-                      >
-                        {isVerifyingStudent ? (
-                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                        )}
-                        <span>تحقق من الكود</span>
-                      </button>
-                    </div>
-
-                    {/* Verification Result */}
-                    {verifiedStudentPreview && (
-                      <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-3 animate-in fade-in duration-200">
-                        <img
-                          src={getCleanAvatarUrl(verifiedStudentPreview.avatarUrl, 'student', verifiedStudentPreview.name)}
-                          alt={verifiedStudentPreview.name}
-                          className="w-10 h-10 rounded-lg object-cover border border-emerald-300 shrink-0 bg-white"
-                          referrerPolicy="no-referrer"
-                        />
-                        <div className="min-w-0 flex-1 text-right">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-black text-emerald-900 truncate">
-                              {verifiedStudentPreview.name}
-                            </span>
-                            <span className="text-[10px] font-bold bg-emerald-200/60 text-emerald-800 px-2 py-0.5 rounded-full">
-                              طالب معتمد
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-emerald-700 font-medium">
-                            {verifiedStudentPreview.grade || 'المرحلة الثانوية'} — كود:{' '}
-                            <span className="font-mono font-bold">{verifiedStudentPreview.qrCode || studentJoinCode}</span>
-                          </p>
-                          <p className="text-[10px] text-emerald-800 font-bold mt-0.5">
-                            ✓ سيتم إرسال طلب ربط فوري للابن للموافقة عليه بمجرد إنهاء التسجيل.
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    {studentSearchError && (
-                      <p className="text-xs text-red-600 font-medium mt-2 flex items-center gap-1">
-                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                        <span>{studentSearchError}</span>
-                      </p>
-                    )}
-
-                    <p className="text-[11px] text-gray-500 mt-2">
-                      💡 ملاحظة: يمكنك تخطي هذه الخطوة الآن وإضافة أو ربط أبنائك في أي وقت بعد تسجيل الدخول من لوحة تحكم ولي الأمر.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Teacher Specific Fields */}
-              {role === 'teacher' && (
-                <div className="space-y-4 pt-2 border-t border-gray-100">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-[#1F2937] mb-1.5">
-                        المادة الأساسية <span className="text-[#EF4444]">*</span>
-                      </label>
-                      <select
-                        value={subject}
-                        onChange={(e) => setSubject(e.target.value)}
-                        className="w-full px-3.5 py-3 bg-gray-50 auth-input text-sm text-right focus:bg-white focus:outline-none focus:border-[#2563EB] cursor-pointer"
-                      >
-                        {SUBJECTS_DATA.map((s) => (
-                          <option key={s.id} value={s.name}>{s.name}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-[#1F2937] mb-1.5">
-                        سنوات الخبرة
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="مثال: 5 سنوات"
-                        value={experience}
-                        onChange={(e) => setExperience(e.target.value)}
-                        className="w-full px-3.5 py-3 bg-gray-50 auth-input text-sm text-right focus:bg-white focus:outline-none focus:border-[#2563EB]"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="auth-btn w-full py-3.5 font-black text-sm rounded-2xl flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-4"
-              >
-                {isLoading ? (
-                  <span>جاري إنشاء وتفعيل الحساب...</span>
-                ) : (
-                  <>
-                    <span>إنشاء الحساب فوراً</span>
-                    <ArrowLeft className="w-4 h-4" />
-                  </>
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  try { localStorage.setItem('hassty_signup_legal_consent_v1', 'accepted'); } catch { /* ignore */ }
-                  setLegalConsentAccepted(true);
-                  setErrorMessage('');
-                }}
-                className={`w-full py-3.5 rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 ${
-                  legalConsentAccepted
-                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
-                    : 'bg-white hover:bg-blue-50 text-[#2563EB] border-2 border-[#2563EB]'
-                }`}
-              >
-                {legalConsentAccepted ? (
-                  <>
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>تمت الموافقة على الشروط ✓</span>
-                  </>
-                ) : (
-                  <>
-                    <ShieldCheck className="w-4 h-4" />
-                    <span>أوافق وأتابع إنشاء الحساب</span>
-                    <ArrowLeft className="w-4 h-4" />
-                  </>
-                )}
-              </button>
-
-            </form>
           </div>
         )}
 
-        {/* Step 3: Success Confirmation */}
-        {step === 3 && (
-          <div className="text-center space-y-5 animate-step-next">
-            <div className="flex items-center justify-center mb-1">
-              <div className="animate-success-ring w-16 h-16 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/40">
-                <CheckCircle2 className="w-9 h-9" />
+        {/* ═══════════ STEP 5 — نجاح ═══════════ */}
+        {step === 5 && (
+          <div className="p-10 flex flex-col items-center text-center anim-up">
+            <div className="relative w-20 h-20 mb-5">
+              <div className="absolute inset-0 rounded-full bg-emerald-400/20 animate-success-ring" />
+              <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 text-white flex items-center justify-center shadow-xl shadow-emerald-500/40">
+                <CheckCircle2 className="w-10 h-10" />
               </div>
             </div>
-
-            <div>
-              <h3 className="text-xl font-black text-[#1E3A8A]">
-                مرحباً بك في حِصّتي يا {name}! 🎉
-              </h3>
-              <p className="text-xs text-[#6B7280] mt-1 max-w-sm mx-auto">
-                تم إنشاء حسابك وتفعيله بنجاح. أرسلنا أيضاً رسالة تحقق رسمية إلى بريدك الإلكتروني.
-              </p>
-            </div>
-
-            {/* Email Verification Card specifically for Student and Parent Accounts */}
-            <div className="p-4 sm:p-5 bg-gradient-to-br from-blue-50/90 via-slate-50 to-indigo-50/50 border-2 border-blue-200/80 rounded-2xl text-right space-y-3.5 shadow-xs">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-[#1E3A8A] font-bold text-xs sm:text-sm">
-                  <div className="w-8 h-8 rounded-xl bg-[#2563EB] text-white flex items-center justify-center shrink-0">
-                    <Mail className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span>رابط تفعيل الحساب بالبريد</span>
-                    <span className="block text-[11px] text-gray-500 font-normal">
-                      {role === 'student' ? 'حساب الطالب' : role === 'parent' ? 'حساب ولي الأمر' : 'حساب المعلم'}
-                    </span>
-                  </div>
-                </div>
-                <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
-                  isAccountVerified 
-                    ? 'bg-emerald-100 text-emerald-800 border-emerald-200' 
-                    : 'bg-blue-100 text-[#2563EB] border-blue-200'
-                }`}>
-                  {isAccountVerified ? 'تم التفعيل والتوثيق' : 'رابط التفعيل مرسل'}
-                </span>
-              </div>
-
-              {/* Email Address Display */}
-              <div className="p-2.5 bg-white rounded-xl border border-blue-100 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span className="text-xs font-mono font-bold text-slate-800 truncate select-all" dir="ltr">
-                    {email}
-                  </span>
-                </div>
-                <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md shrink-0">
-                  موثق
-                </span>
-              </div>
-
-              <p className="text-xs text-gray-600 leading-relaxed">
-                أرسلنا رابط تفعيل رسمي وآمن إلى بريدك الإلكتروني. اضغط على الرابط في رسالتك الواردة أو قم بالتفعيل السريع الآن.
-              </p>
-
-              {/* Resend Link and Go to Verification */}
-              <div className="pt-2 border-t border-blue-100/80 flex flex-col sm:flex-row items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => onNavigate('/verify-email')}
-                  className="w-full sm:flex-1 py-2.5 px-3 rounded-xl font-bold text-xs bg-[#2563EB] hover:bg-[#1D4ED8] text-white shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-98"
-                >
-                  <ShieldCheck className="w-4 h-4" />
-                  <span>إدخال كود التفعيل (OTP)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleResendActivationLink}
-                  disabled={resendTimer > 0 || isSendingLink}
-                  className="w-full sm:w-auto py-2.5 px-3 rounded-xl border border-slate-200 hover:border-blue-300 bg-white hover:bg-blue-50/50 text-xs font-bold text-slate-700 hover:text-[#2563EB] transition-colors flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
-                >
-                  <Send className="w-3.5 h-3.5 text-[#2563EB]" />
-                  <span>
-                    {resendTimer > 0 
-                      ? `إعادة الإرسال (${resendTimer} ث)` 
-                      : 'إعادة إرسال الرابط'}
-                  </span>
-                </button>
-              </div>
-
-              {linkSentSuccess && (
-                <p className="text-[11px] text-emerald-700 font-bold text-center">
-                  ✓ تم إرسال رابط تفعيل إضافي إلى بريدك الإلكتروني بنجاح!
-                </p>
-              )}
-            </div>
-
-            {/* Teacher Telegram Support Box */}
-            {role === 'teacher' && (
-              <div className="p-5 bg-gradient-to-br from-[#EFF6FF] to-blue-50/60 border border-[#2563EB]/20 rounded-2xl text-right space-y-3 shadow-xs">
-                <div className="flex items-center gap-2.5 text-[#1E3A8A]">
-                  <div className="w-8 h-8 rounded-xl bg-[#2563EB] text-white flex items-center justify-center shrink-0">
-                    <ShieldCheck className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold">شارة المعلم المعتمد</h4>
-                    <p className="text-[11px] text-gray-500">تم تسجيل حسابك كمعلم في دليل منصة حِصّتي</p>
-                  </div>
-                </div>
-
-                <p className="text-xs text-gray-600 leading-relaxed">
-                  يمكنك الآن إضافة مجموعاتك وجداول الحصص وتوليد باركود الحضور للطلاب مباشرة.
-                </p>
-              </div>
-            )}
-
-            {/* Parent Child Link Notice */}
-            {role === 'parent' && studentJoinCode.trim() && (
-              <div className="p-5 bg-gradient-to-br from-emerald-50 to-blue-50/60 border border-emerald-200 rounded-2xl text-right space-y-2 shadow-xs">
-                <div className="flex items-center gap-2.5 text-emerald-900">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
-                    <ShieldCheck className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold">تم إرسال طلب ربط الطالب 👨‍👦</h4>
-                    <p className="text-[11px] text-emerald-700">تم إشعار حساب الطالب بالطلب بنجاح</p>
-                  </div>
-                </div>
-
-                <p className="text-xs text-gray-700 leading-relaxed">
-                  أرسلنا إشعاراً واضحاً إلى حساب الطالب للموافقة على طلب الربط. بمجرد قيام الطالب بالضغط على <strong>موافقة</strong> من حسابه، ستظهر لك بياناته وحصصه في لوحة تحكمك تلقائياً.
-                </p>
-              </div>
-            )}
-
-              <button
-                onClick={handleFinish}
-                className="auth-btn w-full py-3.5 font-black text-sm rounded-2xl flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <span>المتابعة إلى صفحة التوثيق وتأكيد الرمز</span>
-                <ArrowLeft className="w-4 h-4" />
-              </button>
+            <h2 className="text-xl font-black text-slate-900">تم إنشاء وتفعيل حسابك</h2>
+            <p className="mt-2 text-sm text-slate-500 font-semibold leading-relaxed">{successMessage}</p>
+            <p className="mt-1 text-xs text-slate-400 font-bold">جاري نقلك إلى لوحة التحكم...</p>
           </div>
         )}
-
       </div>
-
     </AuthShell>
   );
 };
-

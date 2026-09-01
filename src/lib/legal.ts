@@ -58,3 +58,14 @@ export async function recordRequiredSignupConsents(userId: string) {
 
   await Promise.all(required);
 }
+
+/* مفتاح الموافقة المحلي — توحيد التخزين عبر كل صفحات المصادقة */
+export const SIGNUP_CONSENT_KEY = 'hassty_signup_legal_consent_v1';
+
+export function hasRecentSignupConsent(): boolean {
+  try { return localStorage.getItem(SIGNUP_CONSENT_KEY) === 'accepted'; } catch { return false; }
+}
+
+export function markSignupConsentAccepted(): void {
+  try { localStorage.setItem(SIGNUP_CONSENT_KEY, 'accepted'); } catch { /* ignore */ }
+}

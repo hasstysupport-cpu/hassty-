@@ -10,7 +10,7 @@ import { DashboardSidebar } from './components/common/DashboardSidebar';
 import { Footer } from './components/Footer';
 import { DevDisclaimerFloatingPill } from './components/common/DevDisclaimerFloatingPill';
 import { ToastProvider } from './components/common/ui';
-import { LegalConsentGate,hasRecentSignupConsent } from './components/common/LegalConsentGate';
+import { hasRecentSignupConsent } from './lib/legal';
 import { HomePage } from './pages/HomePage';
 import { SearchResultsPage } from './pages/SearchResultsPage';
 import { TeacherProfilePage } from './pages/TeacherProfilePage';
@@ -118,7 +118,7 @@ export default function App(){
  const [initialAdminToken]=useState<string|null>(()=>typeof window!=='undefined'?new URLSearchParams(window.location.search).get('authKey'):null);
  if(isAdminAppRoute)return <ToastProvider><Suspense fallback={<PageLoader/>}><HasstyAdminApp onSwitchToPublicApp={()=>setCurrentPath('/')} initialToken={initialAdminToken}/></Suspense></ToastProvider>;
  if(isAssistantSignupRoute&&!isLoggedIn)return <AssistantSignupPage onNavigate={handleNavigate}/>;
- if(isSignupRoute&&!isLoggedIn)return <div className="min-h-screen w-full bg-[#F8FAFF] text-[#1F2937] font-['IBM_Plex_Sans_Arabic',sans-serif] antialiased">{!signupLegalAccepted?<LegalConsentGate onAccept={()=>setSignupLegalAccepted(true)} onNavigate={handleNavigate}/>:<SignupPage onNavigate={handleNavigate} onSignupSuccess={handleLogin}/>}</div>;
+ if(isSignupRoute&&!isLoggedIn)return <div className="min-h-screen w-full bg-[#F8FAFF] text-[#1F2937] font-['IBM_Plex_Sans_Arabic',sans-serif] antialiased"><SignupPage onNavigate={handleNavigate} onSignupSuccess={handleLogin}/></div>;
  if(isLoggedIn&&needsProfileSetup&&!isUnverified&&currentPath==='/setup-profile')return <div className="min-h-screen bg-[#F7FAFF] text-[#1F2937] font-['IBM_Plex_Sans_Arabic',sans-serif] antialiased"><ProfileSetupPage onComplete={handleLogin} onLogout={handleLogout}/><DevDisclaimerFloatingPill/></div>;
  const legalMatch=currentPath.match(/^\/legal\/(terms|privacy|teacher|cookies|acceptable|refund|rights)$/); if(legalMatch)return <LegalPage section={legalMatch[1] as LegalSection} onNavigate={handleNavigate}/>;
  return <ToastProvider><div data-role={currentRole} className="min-h-screen bg-[#F8FAFF] text-[#1F2937] flex flex-col antialiased">

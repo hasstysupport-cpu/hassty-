@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowLeft, CheckCircle2, ShieldCheck, UserCheck } from 'lucide-react';
 
-const CONSENT_KEY = 'hassty_signup_legal_consent_v1';
+import { SIGNUP_CONSENT_KEY as CONSENT_KEY } from '../../lib/legal';
 
 interface LegalConsentGateProps {
   onAccept: () => void;

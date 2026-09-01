@@ -36,7 +36,31 @@
       "destination": "http://54.85.197.100:3000/api/v1/:path*"
     },
     {
-      "source": "/(.*)",
+      "source": "/api/auth/register",
+      "destination": "/api/auth/register"
+    },
+    {
+      "source": "/api/auth/verify-code",
+      "destination": "/api/auth/verify-code"
+    },
+    {
+      "source": "/api/auth/send-code",
+      "destination": "/api/auth/send-code"
+    },
+    {
+      "source": "/api/auth/login-check",
+      "destination": "/api/auth/login-check"
+    },
+    {
+      "source": "/api/auth/reset-password",
+      "destination": "/api/auth/reset-password"
+    },
+    {
+      "source": "/api/auth/profile-complete",
+      "destination": "/api/auth/profile-complete"
+    },
+    {
+      "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ]
