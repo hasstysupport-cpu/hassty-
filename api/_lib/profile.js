@@ -97,6 +97,23 @@ export async function patchProfile({ userId, role, data, existing }) {
   await dbUpdate('profiles', patch, `id=eq.${userId}`);
 }
 
+/* Purge role-specific leftovers from any earlier (unverified) signup
+   before recreating the profile with a different role. Safe on brand-new
+   accounts — verified accounts never reach this path. */
+async function purgeRoleLeftovers(userId) {
+  await dbDelete('tutor_profiles', `user_id=eq.${userId}`).catch(() => {});
+  await dbDelete('assistant_profiles', `user_id=eq.${userId}`).catch(() => {});
+  await dbDelete('assistant_verification_requests', `assistant_id=eq.${userId}`).catch(() => {});
+}
+
+/* Recreate the auto-created profile row with the CURRENT signup role
+   (register recovery path — the DB trigger blocks role UPDATEs). */
+export async function resetProfileForRole({ userId, email, role, data }) {
+  await purgeRoleLeftovers(userId);
+  await dbDelete('profiles', `id=eq.${userId}`);
+  return createProfile({ userId, email, role, data });
+}
+
 /* Complete the profile whatever state it is in:
    - missing row → INSERT
    - role mismatch (legacy recovery / google default-student) → DELETE + INSERT
@@ -113,7 +130,8 @@ export async function ensureProfile({ userId, email, role, data }) {
     await createProfile({ userId, email, role, data });
   } else if ((existing.role || 'student') !== role) {
     // role must change → triggers block UPDATE → recreate the row
-    // (safe: brand-new accounts have no FK references yet)
+    // (safe: unverified accounts have no FK references yet; purge defensively)
+    await purgeRoleLeftovers(userId);
     await dbDelete('profiles', `id=eq.${userId}`);
     await createProfile({ userId, email, role, data });
   } else {

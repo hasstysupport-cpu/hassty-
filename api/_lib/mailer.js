@@ -154,8 +154,18 @@ const TEMPLATES = {
 };
 
 /* ---------- Sender ---------- */
+/* الروابط تختلف حسب الغرض:
+   - signup_verify  → صفحة التفعيل (تفعيل تلقائي بالرابط)
+   - password_reset → فتح نافذة الاستعادة في صفحة الدخول مع الرمز جاهزًا
+   - login_otp      → العودة لصفحة الدخول (الرمز يُدخل حيث بدأت العملية) */
 export async function sendAuthEmail({ to, purpose, code, name = '', extraQuery = '' }) {
-  const link = `${SITE_URL}/verify-email?auto=1&purpose=${purpose}&code=${code}&email=${encodeURIComponent(to)}${extraQuery}`;
+  const enc = encodeURIComponent(to);
+  const links = {
+    signup_verify: `${SITE_URL}/verify-email?auto=1&purpose=signup_verify&code=${code}&email=${enc}${extraQuery}`,
+    login_otp: `${SITE_URL}/login`,
+    password_reset: `${SITE_URL}/login?reset=1&code=${code}&email=${enc}${extraQuery}`,
+  };
+  const link = links[purpose] || links.signup_verify;
   const tpl = TEMPLATES[purpose];
   if (!tpl) throw new Error(`Unknown email purpose: ${purpose}`);
 

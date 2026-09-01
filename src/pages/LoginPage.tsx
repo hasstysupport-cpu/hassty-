@@ -61,6 +61,25 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigate, onLoginSuccess
   const [forgotError, setForgotError] = useState('');
   const [forgotInfo, setForgotInfo] = useState('');
 
+  /* ---------- reset-password email link (?reset=1&code=..&email=..) ----------
+     رابط "تغيير كلمة المرور" في الإيميل يفتح نافذة الاستعادة والرمز جاهز */
+  React.useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('reset') === '1' && params.get('code') && params.get('email')) {
+        const linkEmail = params.get('email') || '';
+        const linkCode = (params.get('code') || '').replace(/\D/g, '').slice(0, 6).split('');
+        setEmail(linkEmail);
+        setResetCode(Array.from({ length: 6 }, (_, i) => linkCode[i] || ''));
+        setShowForgot(true);
+        setForgotStep(2);
+        setForgotInfo('أدخل الرمز المُرسل في بريدك ثم كلمة مرورك الجديدة.');
+        window.history.replaceState({}, document.title, '/login');
+      }
+    } catch { /* ignore malformed params */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     if (resendTimer <= 0) return;
     const t = setInterval(() => setResendTimer((v) => (v > 0 ? v - 1 : 0)), 1000);

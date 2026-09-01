@@ -62,7 +62,9 @@ export const VerifyEmailPage: React.FC<VerifyEmailPageProps> = ({ onNavigate, on
     setIsLoading(true);
     setErrorMessage('');
     try {
-      const res = await authApi.verifyCode({ email: targetEmail, code, purpose: purpose === 'login_otp' ? 'signup_verify' : 'signup_verify' });
+      /* رابط التفعيل التلقائي مخصص لتفعيل الحساب فقط — باقي الأغراض
+         لها مساراتها (الاستعادة: /login?reset=1 — دخول: /login) */
+      const res = await authApi.verifyCode({ email: targetEmail, code, purpose: 'signup_verify' });
       if (res.ok) {
         setActivatedRole((res.role as AccountRole) || 'student');
         setActivatedName(res.name || '');

@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import {
   GraduationCap, Users, Briefcase, CheckCircle2, AlertCircle, Loader2, Mail, Lock, Eye, EyeOff,
-  RefreshCw, ArrowRight, Phone, MapPin, BookOpen, Sparkles, ShieldCheck, UserCheck, Award, KeyRound, Heart,
+  RefreshCw, ArrowRight, Phone, MapPin, BookOpen, Sparkles, ShieldCheck, UserCheck, Award, KeyRound, Heart, ChevronDown,
 } from 'lucide-react';
 import { AccountRole } from '../types';
 import { useAuth } from '../lib/AuthContext';
@@ -27,9 +27,9 @@ const GRADES = [
 const EXPERIENCE_OPTIONS = ['أقل من سنة', 'سنة - 3 سنوات', '3 - 5 سنوات', '5 - 10 سنوات', 'أكثر من 10 سنوات'];
 
 const ROLE_CARDS: { role: AccountRole; icon: any; title: string; desc: string; tag: string }[] = [
-  { role: 'student', icon: GraduationCap, title: 'طالب', desc: 'احجز حصصك، تابع حضورك بالـ QR ودرجاتك لحظيًا', tag: 'الأكثر استخدامًا' },
-  { role: 'parent', icon: Users, title: 'ولي أمر', desc: 'تابع أبناءك: الحضور، الدرجات، والمدفوعات من مكان واحد', tag: 'متابعة كاملة' },
-  { role: 'teacher', icon: Briefcase, title: 'معلم', desc: 'أدارة مجموعاتك وحضورك وامتحاناتك وفواتيرك باحترافية', tag: 'للمدرسين' },
+  { role: 'student', icon: GraduationCap, title: 'طالب', desc: 'احجز حصصك، وتابع حضورك بالـ QR ودرجاتك لحظيًا', tag: 'الأكثر استخدامًا' },
+  { role: 'parent', icon: Users, title: 'ولي أمر', desc: 'تابع أبناءك: الحضور والدرجات والمدفوعات من مكان واحد', tag: 'متابعة كاملة' },
+  { role: 'teacher', icon: Briefcase, title: 'معلم', desc: 'أدر مجموعاتك وحضورك وامتحاناتك وفواتيرك باحترافية', tag: 'للمدرسين' },
 ];
 
 
@@ -254,7 +254,9 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onNavigate, onSignupSucc
                 <div className="auth-steps mt-2.5">
                   {stepsMeta.map((s, i) => (
                     <React.Fragment key={s.n}>
-                      <div className={`dot ${step === s.n ? 'active' : step > s.n ? 'done' : ''}`} title={s.label} />
+                      <div className={`dot ${step === s.n ? 'active' : step > s.n ? 'done' : ''}`} title={s.label}>
+                        {step > s.n ? <CheckCircle2 className="w-3 h-3" /> : s.n}
+                      </div>
                       {i < stepsMeta.length - 1 && <div className={`bar ${step > s.n ? 'active' : ''}`} />}
                     </React.Fragment>
                   ))}
@@ -287,10 +289,10 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onNavigate, onSignupSucc
                 type="button"
                 data-role={card.role}
                 onClick={() => setRole(card.role)}
-                className={`role-card w-full p-5 text-right ${role === card.role ? 'selected' : ''}`}
+                className={`role-card w-full p-4.5 text-right flex flex-col ${role === card.role ? 'selected' : ''}`}
               >
                 <span className="role-check"><CheckCircle2 className="w-4 h-4" /></span>
-                <div className="flex items-start gap-4">
+                <div className="flex items-center gap-4 min-h-12">
                   <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shrink-0" style={{ backgroundImage: 'var(--role-grad)' }}>
                     <card.icon className="w-6 h-6" />
                   </div>
@@ -365,8 +367,9 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onNavigate, onSignupSucc
 
             {role === 'student' && (
               <div className="relative">
-                <GraduationCap className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <select value={grade} onChange={(e) => setGrade(e.target.value)} className="auth-input w-full p-3.5 pr-11 text-sm appearance-none cursor-pointer">
+                <GraduationCap className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                <ChevronDown className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400 pointer-events-none" />
+                <select value={grade} onChange={(e) => setGrade(e.target.value)} className="auth-input w-full p-3.5 pr-11 pl-11 text-sm appearance-none cursor-pointer">
                   {GRADES.map((g) => <option key={g} value={g}>{g}</option>)}
                 </select>
               </div>
@@ -375,14 +378,16 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onNavigate, onSignupSucc
             {role === 'teacher' && (
               <div className="grid sm:grid-cols-2 gap-4">
                 <div className="relative">
-                  <BookOpen className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                  <select value={subject} onChange={(e) => setSubject(e.target.value)} className="auth-input w-full p-3.5 pr-11 text-sm appearance-none cursor-pointer">
+                  <BookOpen className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                  <ChevronDown className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400 pointer-events-none" />
+                  <select value={subject} onChange={(e) => setSubject(e.target.value)} className="auth-input w-full p-3.5 pr-11 pl-11 text-sm appearance-none cursor-pointer">
                     {SUBJECTS_DATA.map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
                   </select>
                 </div>
                 <div className="relative">
-                  <Award className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                  <select value={experienceYears} onChange={(e) => setExperienceYears(e.target.value)} className="auth-input w-full p-3.5 pr-11 text-sm appearance-none cursor-pointer">
+                  <Award className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                  <ChevronDown className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400 pointer-events-none" />
+                  <select value={experienceYears} onChange={(e) => setExperienceYears(e.target.value)} className="auth-input w-full p-3.5 pr-11 pl-11 text-sm appearance-none cursor-pointer">
                     {EXPERIENCE_OPTIONS.map((x) => <option key={x} value={x}>{x}</option>)}
                   </select>
                 </div>
@@ -401,7 +406,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onNavigate, onSignupSucc
             )}
 
             <div className="flex gap-3 pt-1">
-              <button type="button" onClick={() => goStep(1)} className="px-5 p-3.5 rounded-2xl border-2 border-slate-200 text-slate-600 font-black text-sm hover:bg-slate-50 flex items-center gap-1.5">
+              <button type="button" onClick={() => goStep(1)} className="px-5 p-3.5 rounded-2xl border-2 border-slate-200 bg-white text-slate-600 font-black text-sm hover:bg-slate-50 flex items-center gap-1.5 shrink-0">
                 <ArrowRight className="w-4 h-4" />
                 رجوع
               </button>
@@ -452,15 +457,15 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onNavigate, onSignupSucc
                 <ShieldCheck className="w-4.5 h-4.5 text-[#2563EB]" />
                 الموافقة المطلوبة قبل إنشاء الحساب
               </div>
-              <label className="flex items-start gap-2.5 cursor-pointer select-none">
-                <input type="checkbox" checked={agreeTerms} onChange={(e) => setAgreeTerms(e.target.checked)} className="mt-1 w-4 h-4 accent-[#2563EB] cursor-pointer" />
+              <label className="flex items-start gap-3 cursor-pointer select-none bg-white border border-slate-100 rounded-xl px-3 py-2.5 hover:border-slate-200 transition-colors">
+                <input type="checkbox" checked={agreeTerms} onChange={(e) => setAgreeTerms(e.target.checked)} className="mt-0.5 w-4.5 h-4.5 accent-[#2563EB] cursor-pointer shrink-0" />
                 <span className="text-[12px] font-bold text-slate-600 leading-relaxed">
                   أوافق على{' '}
                   <button type="button" onClick={(e) => { e.preventDefault(); onNavigate('/legal/terms'); }} className="text-[#2563EB] underline font-black cursor-pointer">الشروط والأحكام</button>
                 </span>
               </label>
-              <label className="flex items-start gap-2.5 cursor-pointer select-none">
-                <input type="checkbox" checked={agreePrivacy} onChange={(e) => setAgreePrivacy(e.target.checked)} className="mt-1 w-4 h-4 accent-[#2563EB] cursor-pointer" />
+              <label className="flex items-start gap-3 cursor-pointer select-none bg-white border border-slate-100 rounded-xl px-3 py-2.5 hover:border-slate-200 transition-colors">
+                <input type="checkbox" checked={agreePrivacy} onChange={(e) => setAgreePrivacy(e.target.checked)} className="mt-0.5 w-4.5 h-4.5 accent-[#2563EB] cursor-pointer shrink-0" />
                 <span className="text-[12px] font-bold text-slate-600 leading-relaxed">
                   أوافق على{' '}
                   <button type="button" onClick={(e) => { e.preventDefault(); onNavigate('/legal/privacy'); }} className="text-[#2563EB] underline font-black cursor-pointer">سياسة الخصوصية</button>{' '}
@@ -470,7 +475,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onNavigate, onSignupSucc
             </div>
 
             <div className="flex gap-3">
-              <button type="button" onClick={() => goStep(2)} className="px-5 p-3.5 rounded-2xl border-2 border-slate-200 text-slate-600 font-black text-sm hover:bg-slate-50 flex items-center gap-1.5">
+              <button type="button" onClick={() => goStep(2)} className="px-5 p-3.5 rounded-2xl border-2 border-slate-200 bg-white text-slate-600 font-black text-sm hover:bg-slate-50 flex items-center gap-1.5 shrink-0">
                 <ArrowRight className="w-4 h-4" />
                 رجوع
               </button>
@@ -502,7 +507,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onNavigate, onSignupSucc
                 <RefreshCw className={`w-3.5 h-3.5 ${isSendingCode ? 'animate-spin' : ''}`} />
                 {resendTimer > 0 ? `إعادة الإرسال بعد ${resendTimer} ث` : 'إعادة إرسال الرمز'}
               </button>
-              <button type="button" onClick={() => goStep(3)} className="text-slate-400 hover:text-slate-600 flex items-center gap-1 cursor-pointer">
+              <button type="button" onClick={() => goStep(3)} className="bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl px-3.5 py-2 flex items-center gap-1.5 cursor-pointer transition-colors">
                 <ArrowRight className="w-3.5 h-3.5" />
                 تعديل البريد
               </button>

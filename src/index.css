@@ -534,6 +534,9 @@ form button[type="submit"] + button[type="button"] {
   outline: none;
   transition: all 0.2s var(--ease-spring);
 }
+@media (max-width: 420px) {
+  .auth-otp { width: 2.55rem; height: 3rem; font-size: 1.25rem; }
+}
 .auth-otp:focus {
   border-color: #2563EB;
   background: #fff;
@@ -621,16 +624,18 @@ form button[type="submit"] + button[type="button"] {
 /* مؤشر خطوات متدرج */
 .auth-steps { display: flex; align-items: center; gap: 0.5rem; }
 .auth-steps .dot {
-  width: 1.6rem; height: 1.6rem;
+  width: 1.7rem; height: 1.7rem;
   border-radius: 9999px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 0.6875rem; font-weight: 900;
+  font-size: 0.7rem; font-weight: 900;
   background: #EEF2F7; color: #94A3B8;
+  flex-shrink: 0;
   transition: all 0.3s var(--ease-lux);
 }
 .auth-steps .dot.active {
   background-image: linear-gradient(135deg, #2563EB, #7C3AED);
   color: #fff;
+  transform: scale(1.12);
   box-shadow: 0 8px 18px -6px rgba(37,99,235,0.5);
 }
 .auth-steps .dot.done {

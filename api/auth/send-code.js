@@ -8,7 +8,7 @@
 import {
   readJsonBody, jsonOk, jsonErr, ARABIC_ERRORS, EMAIL_REGEX, maskEmail,
 } from '../_lib/config.js';
-import { findPendingByEmail, findProfileByEmail, findAuthUserByEmail, dbInsert, getUserById } from '../_lib/supabase.js';
+import { findPendingByEmail, findProfileByEmail, findAuthUserByEmail, dbUpsert, getUserById } from '../_lib/supabase.js';
 import { issueCode } from '../_lib/codes.js';
 import { sendAuthEmail } from '../_lib/mailer.js';
 
@@ -33,7 +33,7 @@ export default async function handler(req, res) {
         const legacy = await findAuthUserByEmail(email);
         if (legacy && !legacy.email_confirmed_at) {
           userId = legacy.id;
-          await dbInsert('auth_pending_users', [{ email, user_id: userId, role: legacy.user_metadata?.role || 'student' }]);
+          await dbUpsert('auth_pending_users', [{ email, user_id: userId, role: legacy.user_metadata?.role || 'student' }], 'email');
         }
       }
 
