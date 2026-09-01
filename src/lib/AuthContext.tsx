@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AccountRole } from '../types';
 import { supabase } from './supabase';
 import { authApi, getDeviceId, setStoredToken } from './authApi';
@@ -111,6 +111,9 @@ function cleanOAuthUrl() {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserSession | null>(null);
   const [loading, setLoading] = useState(true);
+  /* during the 2-step login (password → OTP) the intermediate session must NOT
+     be persisted — the auth listener is suppressed until the flow completes */
+  const suppressAuthEvents = useRef(false);
 
   const persistSession = (session: UserSession | null) => {
     setUser(session);
@@ -152,6 +155,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     void hydrate();
 
     const { data: listener } = supabase.auth.onAuthStateChange(async (_event, authSession) => {
+      if (suppressAuthEvents.current) return; // login flow owns persistence
       if (!mounted) return;
       if (!authSession?.user) {
         persistSession(null);
@@ -176,68 +180,73 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const beginPasswordLogin = async (email: string, password: string): Promise<LoginFlowResult> => {
     if (!supabase) throw new Error('Supabase غير مُهيأ.');
     const cleanEmail = email.trim().toLowerCase();
-
-    const { data, error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
-    if (error) {
-      const msg = String(error.message || '');
-      if (msg.includes('Email not confirmed')) {
-        // pending activation → caller switches to the activation panel
-        return { status: 'unconfirmed', email: cleanEmail, name: '' };
+    suppressAuthEvents.current = true;
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
+      if (error) {
+        const msg = String(error.message || '');
+        if (msg.includes('Email not confirmed')) {
+          return { status: 'unconfirmed', email: cleanEmail, name: '' };
+        }
+        throw error;
       }
-      throw error;
-    }
-    const user = data.user;
-    if (!user) throw new Error('تعذر تسجيل الدخول.');
+      const user = data.user;
+      if (!user) throw new Error('تعذر تسجيل الدخول.');
 
-    const profile = await getProfile(user.id);
+      const profile = await getProfile(user.id);
 
-    /* confirmed user without a profile (legacy / google) → let the app route
-       them to profile setup instead of hard-failing */
-    if (!profile) {
-      if (!user.email_confirmed_at) {
-        await supabase.auth.signOut();
-        return { status: 'unconfirmed', email: cleanEmail, name: user.user_metadata?.full_name || '' };
+      /* confirmed user without a profile (legacy / google) → let the app route
+         them to profile setup instead of hard-failing */
+      if (!profile) {
+        if (!user.email_confirmed_at) {
+          await supabase.auth.signOut();
+          return { status: 'unconfirmed', email: cleanEmail, name: user.user_metadata?.full_name || '' };
+        }
+        const session = mapProfileToSession(user, null);
+        persistSession(session);
+        return { status: 'complete', session };
       }
-      const session = mapProfileToSession(user, null);
+
+      /* new-device check → OTP (session revoked until the code is confirmed) */
+      if (user.email_confirmed_at) {
+        try {
+          const check = await authApi.loginCheck(getDeviceId());
+          if (check.ok && check.otpRequired) {
+            await supabase.auth.signOut();
+            return { status: 'otp_required', email: cleanEmail, name: profile.full_name || '' };
+          }
+        } catch (e: any) {
+          // network hiccup — Supabase already verified the password; proceed safely
+          console.warn('login-check warning:', e?.message || e);
+        }
+      }
+
+      const session = mapProfileToSession(user, profile);
       persistSession(session);
       return { status: 'complete', session };
+    } finally {
+      suppressAuthEvents.current = false;
     }
-
-    /* new-device check → OTP (session revoked until the code is confirmed) */
-    if (user.email_confirmed_at) {
-      try {
-        const check = await authApi.loginCheck(getDeviceId());
-        if (check.ok && check.otpRequired) {
-          await supabase.auth.signOut();
-          return { status: 'otp_required', email: cleanEmail, name: profile.full_name || '' };
-        }
-      } catch (e: any) {
-        // network hiccup — Supabase already verified the password; proceed safely
-        console.warn('login-check warning:', e?.message || e);
-      }
-    }
-
-    const session = mapProfileToSession(user, profile);
-    persistSession(session);
-    return { status: 'complete', session };
   };
 
   /* Re-login after OTP / activation success (password stays in the caller's memory) */
   const finishPasswordLogin = async (email: string, password: string): Promise<UserSession> => {
     if (!supabase) throw new Error('Supabase غير مُهيأ.');
-    const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
-    if (error) throw error;
-    if (!data.user) throw new Error('تعذر إكمال تسجيل الدخول.');
-    const { data: authUser } = await supabase.auth.getUser();
-    const profile = await getProfile(data.user.id);
-    if (!profile) {
-      const session = mapProfileToSession(authUser?.user || data.user, null);
+    suppressAuthEvents.current = true;
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
+      if (error) throw error;
+      if (!data.user) throw new Error('تعذر إكمال تسجيل الدخول.');
+      const { data: authUser } = await supabase.auth.getUser();
+      const profile = await getProfile(data.user.id);
+      const session = profile
+        ? mapProfileToSession(data.user, profile)
+        : mapProfileToSession(authUser?.user || data.user, null);
       persistSession(session);
       return session;
+    } finally {
+      suppressAuthEvents.current = false;
     }
-    const session = mapProfileToSession(data.user, profile);
-    persistSession(session);
-    return session;
   };
 
   /* ================= GOOGLE ================= */
