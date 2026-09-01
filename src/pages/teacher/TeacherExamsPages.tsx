@@ -190,13 +190,26 @@ export const TeacherExamDetailPage: React.FC<{ examId: string; onNavigate: (p: s
     try {
       // Detect conflicts: students with another exam at overlapping time, or a lesson at same time
       const examStart = new Date(exam.starts_at); const examEnd = new Date(examStart.getTime() + (Number(exam.duration_minutes) || 60) * 60000);
+      const examDay = (exam.exam_date || examStart.toISOString()).toString().slice(0, 10);
       const studentIds = groupStudents.map((s) => s.student_id).filter(Boolean);
       const [otherExams, lessons] = await Promise.all([
-        supabase.from('exam_assignments').select('student_id,exam_id,slot_id').in('student_id', studentIds).neq('exam_id', examId),
-        supabase.from('lesson_sessions').select('id,group_id,starts_at,ends_at').eq('tutor_id', exam.tutor_id).gte('starts_at', examStart.toISOString().slice(0, 10) + 'T00:00').lte('starts_at', examStart.toISOString().slice(0, 10) + 'T23:59'),
+        supabase.from('exam_assignments').select('student_id,exam_id,slot_id,exams(exam_date,starts_at,duration_minutes)').in('student_id', studentIds).neq('exam_id', examId),
+        supabase.from('lesson_sessions').select('id,group_id,starts_at,ends_at').eq('tutor_id', exam.tutor_id).gte('starts_at', examDay + 'T00:00').lte('starts_at', examDay + 'T23:59'),
       ]);
       const studentGroupsOfExam = new Set([exam.group_id]);
-      const conflictingExams = new Set((otherExams.data || []).map((o: any) => o.student_id));
+      // conflict = another exam for the same student ON THE SAME DAY (with overlap tolerance), or an overlapping lesson
+      const conflictingExams = new Set(
+        (otherExams.data || [])
+          .filter((o: any) => {
+            const otherDay = (o.exams?.exam_date || (o.exams?.starts_at ? String(o.exams.starts_at).slice(0, 10) : '')).toString().slice(0, 10);
+            if (otherDay !== examDay) return false;
+            const otherStart = o.exams?.starts_at ? new Date(o.exams.starts_at).getTime() : NaN;
+            const otherEnd = otherStart + (Number(o.exams?.duration_minutes) || 60) * 60000;
+            if (isNaN(otherStart)) return true; // same day, unknown time → treat as conflict
+            return otherStart < examEnd.getTime() && examStart.getTime() < otherEnd;
+          })
+          .map((o: any) => o.student_id)
+      );
       const lessonGroupIds = new Set((lessons.data || []).map((l: any) => l.group_id).filter(Boolean));
       // deterministic distribution: round-robin over slots by capacity
       const capacity = slots.map((s) => ({ id: s.id, cap: Number(s.capacity || 35), used: 0 }));
