@@ -10,7 +10,7 @@ import { supabase } from '../../lib/supabase';
 const AR = 'font-[\'IBM_Plex_Sans_Arabic\',sans-serif]';
 
 /* ---------- Count-up: numbers that glide into place (luxury detail) ---------- */
-function useCountUp(value: string | number, duration = 850): string | number {
+export function useCountUp(value: string | number, duration = 850): string | number {
   const numeric = typeof value === 'number' && Number.isFinite(value) ? value : null;
   const match = typeof value === 'string' ? value.trim().match(/^(\d+)(\D*)$/) : null;
   const target = numeric ?? (match ? Number(match[1]) : null);

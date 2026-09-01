@@ -22,8 +22,8 @@ export const TeacherCTASection: React.FC<TeacherCTASectionProps> = ({ onJoinAsTe
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="max-w-4xl mx-auto text-center">
           
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/20 text-blue-200 text-xs font-semibold mb-6">
+        {/* Badge */}
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/20 text-blue-200 text-xs font-bold mb-6">
             <Presentation className="w-4 h-4 text-[#2563EB] bg-white rounded-full p-0.5" />
             <span>انضم لمجتمع معلمي مصر المتميزين</span>
           </div>
@@ -58,7 +58,7 @@ export const TeacherCTASection: React.FC<TeacherCTASectionProps> = ({ onJoinAsTe
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <button
               onClick={onJoinAsTeacher}
-              className="w-full sm:w-auto px-8 py-4 bg-[#2563EB] hover:bg-blue-600 text-white font-bold text-base rounded-xl transition-all shadow-lg hover:shadow-blue-500/25 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
+              className="hs-cta-btn w-full sm:w-auto px-8 py-4 text-white font-black text-base rounded-2xl flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
               id="teacher-cta-join-btn"
             >
               <span>انضم كمدرس الآن</span>

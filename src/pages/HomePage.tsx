@@ -1,6 +1,7 @@
 import React from 'react';
 import { useSEO } from '../lib/useSEO';
 import { HeroSection } from '../components/HeroSection';
+import { StatsBand } from '../components/StatsBand';
 import { ProblemSolutionSection } from '../components/ProblemSolutionSection';
 import { HowItWorksSection } from '../components/HowItWorksSection';
 import { FindTutorStepsSection } from '../components/FindTutorStepsSection';
@@ -35,6 +36,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onOpenQRSimulato
   return (
     <div className="hs-home-shell flex flex-col bg-white overflow-hidden">
       <ScrollReveal direction="up" delay={0} className="contents"><HeroSection onSearch={handleSearch} onOpenQRSimulator={handleQRSimulator} /></ScrollReveal>
+      <StatsBand />
       <ScrollReveal direction="up" delay={40}><ProblemSolutionSection /></ScrollReveal>
       <ScrollReveal direction="up" delay={70}><HowItWorksSection onOpenAuth={handleAuth} onOpenTutorSearch={() => onNavigate('/search')} onOpenQRSimulator={handleQRSimulator} /></ScrollReveal>
       <ScrollReveal direction="up" delay={80}><FindTutorStepsSection onOpenTutorSearch={() => onNavigate('/search')} /></ScrollReveal>

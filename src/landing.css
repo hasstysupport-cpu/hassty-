@@ -110,3 +110,144 @@
     opacity: 1 !important;
   }
 }
+
+/* ============================================================
+   LUXURY HOME LAYER — تطبيق نظام الفخامة على الصفحة الرئيسية
+   ============================================================ */
+
+/* عنوان قسم فخم: نقطة متدرجة + خط سفلي متدرج */
+.hs-sec-head { position: relative; }
+.hs-sec-head .hs-sec-badge {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  padding: 0.35rem 0.9rem; border-radius: 999px;
+  background: linear-gradient(135deg, #EFF6FF, #F5F3FF);
+  border: 1px solid #DBEAFE;
+  color: #1E40AF; font-size: 0.75rem; font-weight: 800;
+}
+.hs-sec-head h2 .hs-grad, .hs-grad {
+  background-image: linear-gradient(135deg, #2563EB, #7C3AED);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.hs-sec-head .hs-sec-line {
+  position: absolute; bottom: -14px; right: 50%; transform: translateX(50%);
+  width: 64px; height: 3.5px; border-radius: 999px;
+  background-image: linear-gradient(90deg, #2563EB, #7C3AED, transparent);
+}
+
+/* بطاقة بحث الهيرو الفخمة */
+.hs-hero-card {
+  position: relative;
+  border-radius: 26px;
+  background: rgba(255,255,255,0.96);
+  backdrop-filter: blur(12px);
+  border: 1px solid #DBEAFE;
+  box-shadow: 0 24px 60px -22px rgba(30, 58, 138, 0.22), 0 8px 20px -12px rgba(37, 99, 235, 0.15);
+  transition: transform 0.35s var(--ease-lux), box-shadow 0.35s var(--ease-lux), border-color 0.35s var(--ease-lux);
+}
+.hs-hero-card::before {
+  content: ''; position: absolute; top: 0; right: 18px; left: 18px; height: 3px;
+  border-radius: 999px; background-image: linear-gradient(90deg, #2563EB, #7C3AED, #0EA5E9);
+  opacity: 0.75;
+}
+.hs-hero-card:hover {
+  transform: translateY(-3px);
+  border-color: #93C5FD;
+  box-shadow: 0 30px 70px -24px rgba(30, 58, 138, 0.3);
+}
+
+/* زر البحث الرئيسي بلمعة تسحب */
+.hs-search-btn {
+  position: relative; overflow: hidden;
+  background-image: linear-gradient(135deg, #2563EB 0%, #4F46E5 55%, #7C3AED 100%);
+  background-size: 160% 160%;
+  box-shadow: 0 14px 30px -10px rgba(37, 99, 235, 0.55);
+  transition: transform 0.25s var(--ease-lux), box-shadow 0.25s var(--ease-lux), background-position 0.6s var(--ease-lux);
+}
+.hs-search-btn:hover { transform: translateY(-2px); background-position: 100% 100%; box-shadow: 0 20px 38px -12px rgba(79, 70, 229, 0.6); }
+.hs-search-btn::after {
+  content: ''; position: absolute; top: 0; bottom: 0; width: 38%; right: -45%;
+  background: linear-gradient(105deg, transparent, rgba(255,255,255,0.35), transparent);
+  transform: skewX(-18deg);
+  animation: auth-shine 3.6s var(--ease-lux) infinite;
+}
+
+/* باند الإحصائيات المتدرج (Hero-Lux style) */
+.hs-stats-band {
+  position: relative; overflow: hidden; isolation: isolate;
+  background-image: linear-gradient(140deg, #1E3A8A 0%, #1D4ED8 45%, #4338CA 100%);
+  background-size: 200% 200%;
+  animation: grad-pan 14s var(--ease-lux) infinite;
+}
+.hs-stats-band .hs-stats-blob {
+  position: absolute; border-radius: 9999px; filter: blur(46px);
+  background: radial-gradient(circle, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0) 70%);
+  pointer-events: none;
+}
+.hs-stat-num {
+  font-variant-numeric: tabular-nums;
+  background-image: linear-gradient(180deg, #ffffff, #C7D2FE);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+
+/* بطاقة نوع الحساب الفخمة — تدرج حسب الدور */
+.hs-role-card {
+  position: relative; overflow: hidden;
+  transition: transform 0.4s var(--ease-lux), box-shadow 0.4s var(--ease-lux), border-color 0.4s var(--ease-lux);
+}
+.hs-role-card:hover { transform: translateY(-8px); }
+.hs-role-card .hs-role-glow {
+  position: absolute; top: -70px; left: -70px; width: 210px; height: 210px; border-radius: 999px;
+  filter: blur(52px); opacity: 0.16; pointer-events: none;
+  transition: opacity 0.4s var(--ease-lux);
+}
+.hs-role-card:hover .hs-role-glow { opacity: 0.3; }
+.hs-role-card.hs-role-student { --rc1: #3B82F6; --rc2: #8B5CF6; }
+.hs-role-card.hs-role-parent   { --rc1: #F59E0B; --rc2: #EC4899; }
+.hs-role-card.hs-role-teacher  { --rc1: #10B981; --rc2: #0D9488; }
+.hs-role-card.hs-role-assistant{ --rc1: #0EA5E9; --rc2: #06B6D4; }
+.hs-role-card .hs-role-glow { background-image: linear-gradient(135deg, var(--rc1), var(--rc2)); }
+.hs-role-card .hs-role-icon {
+  background-image: linear-gradient(135deg, var(--rc1), var(--rc2));
+  color: #fff;
+  box-shadow: 0 10px 24px -8px var(--rc1);
+  transition: transform 0.35s var(--ease-spring);
+}
+.hs-role-card:hover .hs-role-icon { transform: rotate(-5deg) scale(1.08); }
+.hs-role-card .hs-role-cta {
+  background-image: linear-gradient(135deg, var(--rc1), var(--rc2));
+  color: #fff;
+  box-shadow: 0 10px 24px -10px var(--rc1);
+  transition: transform 0.25s var(--ease-lux), box-shadow 0.25s var(--ease-lux);
+}
+.hs-role-card .hs-role-cta:hover { transform: translateY(-2px); box-shadow: 0 14px 30px -10px var(--rc2); }
+.hs-role-card .hs-role-tick { background-image: linear-gradient(135deg, var(--rc1), var(--rc2)); color: #fff; }
+
+/* الرقائق (chips) المتدرجة داخل الأقسام */
+.hs-chip-lux {
+  position: relative;
+  border: 1px solid #E2E8F0;
+  background: #fff;
+  border-radius: 999px;
+  box-shadow: 0 6px 18px -10px rgba(15, 23, 42, 0.18);
+  transition: transform 0.3s var(--ease-lux), box-shadow 0.3s var(--ease-lux), border-color 0.3s var(--ease-lux);
+}
+.hs-chip-lux:hover { transform: translateY(-3px) scale(1.03); border-color: #BFDBFE; box-shadow: 0 12px 26px -12px rgba(37, 99, 235, 0.35); }
+
+/* سحب اللمعة على زر CTA المعلمين */
+.hs-cta-btn {
+  position: relative; overflow: hidden;
+  background-image: linear-gradient(135deg, #2563EB, #4F46E5);
+  box-shadow: 0 16px 34px -12px rgba(37, 99, 235, 0.65);
+  transition: transform 0.25s var(--ease-lux), box-shadow 0.25s var(--ease-lux);
+}
+.hs-cta-btn:hover { transform: translateY(-2px); box-shadow: 0 22px 42px -14px rgba(79, 70, 229, 0.7); }
+.hs-cta-btn::after {
+  content: ''; position: absolute; top: 0; bottom: 0; width: 38%; right: -45%;
+  background: linear-gradient(105deg, transparent, rgba(255,255,255,0.4), transparent);
+  transform: skewX(-18deg);
+  animation: auth-shine 3.4s var(--ease-lux) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hs-search-btn::after, .hs-cta-btn::after, .hs-stats-band { animation: none !important; }
+}

@@ -25,33 +25,35 @@ export const Navbar: React.FC<NavbarProps> = ({
   ];
 
   return (
-    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-200">
+    <header className="sticky top-0 z-40 bg-white/85 backdrop-blur-xl backdrop-saturate-150 border-b border-slate-200/70" style={{ boxShadow: '0 1px 0 rgba(37,99,235,0.06), 0 8px 24px -18px rgba(30,58,138,0.25)' }}>
+      {/* خط الهوية المتدرج */}
+      <div className="h-[2.5px] w-full bg-gradient-to-l from-[#2563EB] via-[#7C3AED] to-[#0EA5E9]" aria-hidden="true" />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20">
-          
+        <div className="flex items-center justify-between h-16 sm:h-[70px]">
+
           {/* Logo (Right side in RTL) */}
           <a href="#hero" className="flex items-center gap-3 group focus:outline-none" id="nav-logo">
-            <div className="w-11 h-11 rounded-xl bg-[#2563EB] flex items-center justify-center text-white shadow-sm group-hover:bg-[#1D4ED8] transition-colors">
-              <QrCode className="w-6 h-6 stroke-[2.2]" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#2563EB] to-[#7C3AED] flex items-center justify-center text-white shadow-md shadow-blue-600/25 group-hover:scale-105 transition-transform">
+              <QrCode className="w-5.5 h-5.5 stroke-[2.2]" />
             </div>
             <div className="flex flex-col text-right">
-              <span className="text-2xl font-black tracking-tight text-[#1E3A8A] flex items-center gap-1.5">
+              <span className="text-xl sm:text-2xl font-black tracking-tight text-[#1E3A8A] flex items-center gap-1.5">
                 حِصّتي
-                <span className="w-2 h-2 rounded-full bg-[#2563EB]"></span>
+                <span className="w-2 h-2 rounded-full bg-gradient-to-br from-[#2563EB] to-[#7C3AED] animate-pulse-subtle"></span>
               </span>
-              <span className="text-[11px] font-medium text-[#6B7280] -mt-1">
+              <span className="text-[10px] sm:text-[11px] font-semibold text-[#6B7280] -mt-0.5">
                 منصة المدرسين وحضور الـ QR
               </span>
             </div>
           </a>
 
           {/* Desktop Navigation Links (Center) */}
-          <nav className="hidden md:flex items-center gap-8">
+          <nav className="hidden md:flex items-center gap-7">
             {navLinks.map((link) => (
               <a
                 key={link.label}
                 href={link.href}
-                className="text-base font-medium text-[#1F2937] hover:text-[#2563EB] transition-colors"
+                className="relative text-sm font-bold text-[#1F2937] hover:text-[#2563EB] transition-colors after:absolute after:-bottom-1.5 after:right-0 after:left-0 after:h-0.5 after:rounded-full after:bg-gradient-to-l after:from-[#2563EB] after:to-[#7C3AED] after:scale-x-0 after:transition-transform after:duration-300 hover:after:scale-x-100"
               >
                 {link.label}
               </a>
@@ -83,7 +85,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             {/* Register Button (Filled Primary Blue) */}
             <button
               onClick={() => onOpenAuth('register')}
-              className="px-4 py-2 text-sm font-semibold text-white bg-[#2563EB] rounded-lg hover:bg-[#1D4ED8] transition-colors shadow-sm cursor-pointer flex items-center gap-1.5"
+              className="auth-btn px-4 py-2 text-sm font-black text-white rounded-xl cursor-pointer flex items-center gap-1.5 active:scale-[0.97]"
               id="nav-register-btn"
             >
               <User className="w-4 h-4 stroke-[2]" />

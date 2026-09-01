@@ -93,31 +93,32 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onSearch, onOpenQRSimu
             
             {/* Pill Badge */}
             <div className="flex items-center gap-2 mb-4">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/90 border border-blue-200 text-[#1E3A8A] text-xs font-bold shadow-2xs">
+              <div className="hs-chip-lux inline-flex items-center gap-1.5 px-3 py-1.5 text-[#1E3A8A] text-xs font-bold anim-up">
                 <span>🇪🇬</span>
                 <span>تغطية شاملة لجميع المحافظات والمراحل من ابتدائي حتى ثانوي</span>
               </div>
             </div>
 
             {/* Bold Headline */}
-            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black text-[#1E3A8A] leading-[1.3] tracking-tight mb-3">
+            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black text-[#1E3A8A] leading-[1.3] tracking-tight mb-3 anim-up" style={{ animationDelay: '80ms' }}>
               اعثر على أفضل{' '}
-              <span className="text-[#2563EB] relative inline-block">
+              <span className="hs-grad relative inline-block font-black">
                 المدرسين الخصوصيين
-                <span className="absolute bottom-1 right-0 left-0 h-2 bg-blue-200/50 -z-10 rounded-full"></span>
+                <span className="absolute bottom-1 right-0 left-0 h-2.5 bg-gradient-to-l from-blue-200/60 to-violet-200/60 -z-10 rounded-full"></span>
               </span>{' '}
               القريبين منك
             </h1>
 
             {/* Subheadline */}
-            <p className="text-sm sm:text-base text-[#4B5563] leading-relaxed max-w-2xl mb-6 font-normal">
+            <p className="text-sm sm:text-base text-[#4B5563] leading-relaxed max-w-2xl mb-6 font-normal anim-up" style={{ animationDelay: '160ms' }}>
               منصة متكاملة تربطك بأفضل المدرسين المعتمدين في منطقتك، مع نظام تتبع عادل للحضور والواجبات لضمان التزام وتفوق الأبناء.
             </p>
 
             {/* Search Card */}
             <form
               onSubmit={handleSubmit}
-              className="w-full bg-white border border-blue-100 rounded-3xl p-4 sm:p-6 shadow-xl shadow-blue-900/5 hover:border-blue-300 transition-all relative z-10"
+              className="hs-hero-card w-full p-4 sm:p-6 relative z-10 anim-up"
+              style={{ animationDelay: '240ms' }}
               id="hero-search-card"
             >
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mb-3.5">
@@ -180,7 +181,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onSearch, onOpenQRSimu
               {/* Full-width Search Button */}
               <button
                 type="submit"
-                className="w-full py-3.5 px-6 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-base rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md hover:shadow-blue-500/25 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99]"
+                className="hs-search-btn w-full py-3.5 px-6 text-white font-black text-base rounded-2xl flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
                 id="hero-search-submit-btn"
               >
                 <Search className="w-5 h-5 stroke-[2.2]" />
@@ -225,18 +226,18 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onSearch, onOpenQRSimu
 
           {/* Left Column: Flat-Illustration Graphic */}
           <div className="lg:col-span-5 relative flex items-center justify-center mt-4 lg:mt-0">
-            
+
             {/* Flat Illustration / Live Student Card preview widget */}
-            <div className="w-full max-w-md relative bg-gradient-to-b from-blue-50/60 to-white border border-blue-100 rounded-3xl p-5 sm:p-6 shadow-xs">
-              
+            <div className="card-lux w-full max-w-md relative bg-gradient-to-b from-blue-50/60 to-white border border-blue-100 rounded-3xl p-5 sm:p-6 shadow-lg shadow-blue-900/10 anim-up" style={{ animationDelay: '320ms' }}>
+
               {/* Top Card Bar */}
               <div className="flex items-center justify-between pb-3 mb-4 border-b border-blue-100/80">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-lg bg-[#2563EB] text-white flex items-center justify-center">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#2563EB] to-[#7C3AED] text-white flex items-center justify-center shadow-lg shadow-blue-600/30">
                     <GraduationCap className="w-5 h-5 stroke-[2]" />
                   </div>
                   <div>
-                    <h2 className="text-sm font-bold text-[#1E3A8A]">بطاقة الطالب والمتابعة</h2>
+                    <h2 className="text-sm font-black text-[#1E3A8A]">بطاقة الطالب والمتابعة</h2>
                     <p className="text-[11px] text-[#6B7280]">منظومة الحضور والواجبات</p>
                   </div>
                 </div>

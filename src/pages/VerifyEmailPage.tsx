@@ -32,6 +32,8 @@ import {
 } from '../lib/securityService';
 import { whatsappService } from '../lib/whatsappService';
 
+import { AuthShell } from '../components/common/AuthShell';
+
 interface VerifyEmailPageProps {
   onNavigate: (path: string) => void;
   onVerificationSuccess?: (role: string) => void;
@@ -447,10 +449,10 @@ export const VerifyEmailPage: React.FC<VerifyEmailPageProps> = ({
   };
 
   return (
-    <div className="min-h-[calc(100vh-80px)] bg-slate-50/50 py-4 sm:py-8 px-3 sm:px-6 flex items-center justify-center font-['IBM_Plex_Sans_Arabic',sans-serif] text-right antialiased">
-      
+    <AuthShell onNavigate={onNavigate} width="wide" miniTitle="التحقق الأمني من بريدك ✉️">
+
       {/* Spacious Container without heavy restrictive mobile borders */}
-      <div className="w-full max-w-xl mx-auto bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-sm p-4 sm:p-8 space-y-6">
+      <div className="card-lux w-full bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-[0_20px_60px_-24px_rgba(30,58,138,0.25)] p-4 sm:p-8 space-y-6 anim-up">
 
         {/* VIEW 1: Main 6-Digit OTP View */}
         {!showOtherMethods ? (
@@ -530,11 +532,7 @@ export const VerifyEmailPage: React.FC<VerifyEmailPageProps> = ({
                       onChange={(e) => handleDigitChange(idx, e.target.value)}
                       onKeyDown={(e) => handleKeyDown(idx, e)}
                       placeholder="•"
-                      className={`w-11 h-13 sm:w-13 sm:h-15 text-center text-xl sm:text-2xl font-black rounded-xl sm:rounded-2xl border-2 transition-all outline-none shadow-2xs ${
-                        digit 
-                          ? 'border-blue-600 bg-blue-50/50 text-blue-900 ring-2 ring-blue-100 scale-102' 
-                          : 'border-slate-300 bg-white text-slate-900 placeholder:text-slate-300 focus:border-blue-600 focus:ring-2 focus:ring-blue-100'
-                      } disabled:opacity-50 disabled:bg-slate-100`}
+                      className={`auth-otp w-11 h-13 sm:w-13 sm:h-15 ${isVerified ? 'done' : digit ? 'filled' : ''} disabled:opacity-60`}
                     />
                   ))}
                 </div>
@@ -560,12 +558,12 @@ export const VerifyEmailPage: React.FC<VerifyEmailPageProps> = ({
                 type="button"
                 onClick={() => handleAutoVerify()}
                 disabled={isLoading || isVerified || otpDigits.join('').length !== 6}
-                className={`w-full py-3.5 px-4 rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm text-white flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer ${
+                className={`w-full py-3.5 px-4 rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm text-white flex items-center justify-center gap-2 transition-all cursor-pointer ${
                   isVerified
-                    ? 'bg-emerald-600'
+                    ? 'bg-gradient-to-l from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/30'
                     : otpDigits.join('').length === 6
-                    ? 'bg-blue-600 hover:bg-blue-700 active:scale-[0.99] shadow-blue-500/25'
-                    : 'bg-slate-300 cursor-not-allowed text-slate-500 shadow-none'
+                    ? 'auth-btn'
+                    : 'bg-slate-300 cursor-not-allowed text-slate-500'
                 }`}
               >
                 {isLoading ? (
@@ -858,7 +856,7 @@ export const VerifyEmailPage: React.FC<VerifyEmailPageProps> = ({
 
       </div>
 
-    </div>
+    </AuthShell>
   );
 };
 

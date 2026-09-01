@@ -30,6 +30,7 @@ import { LocationSelector } from '../components/common/LocationSelector';
 import { useAuth } from '../lib/AuthContext';
 import { getCleanAvatarUrl, optimizeProfileImage } from '../lib/avatarHelper';
 import { findStudentByCodeOrPhone } from '../lib/parentStudentService';
+import { AuthShell } from '../components/common/AuthShell';
 
 interface SignupPageProps {
   initialRole?: AccountRole;
@@ -312,42 +313,38 @@ export const SignupPage: React.FC<SignupPageProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFF] py-12 sm:px-6 lg:px-8 text-right font-['IBM_Plex_Sans_Arabic',sans-serif]">
-      
-      <div className="max-w-xl mx-auto px-4">
-        
-        {/* Header */}
-        <div className="text-center mb-8">
-          <button
-            onClick={() => onNavigate('/')}
-            className="inline-flex items-center gap-2.5 mb-3 group cursor-pointer"
-          >
-            <div className="w-11 h-11 rounded-2xl bg-[#2563EB] flex items-center justify-center text-white shadow-xs">
-              <QrCode className="w-6 h-6 stroke-[2.2]" />
+    <AuthShell onNavigate={onNavigate} miniTitle="انضم لمنظومة حِصّتي ✨">
+
+      {/* ═══ بطاقة التسجيل الفخمة ═══ */}
+      <div className="card-lux bg-white border border-slate-200/90 rounded-3xl shadow-[0_20px_60px_-24px_rgba(30,58,138,0.25)] p-6 sm:p-7 space-y-5 anim-up">
+
+        {/* رأس البطاقة + مؤشر الخطوات */}
+        <div className="pb-4 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#2563EB] to-[#7C3AED] text-white flex items-center justify-center shadow-lg shadow-blue-600/30">
+              <QrCode className="w-5.5 h-5.5 stroke-[2.2]" />
             </div>
-            <span className="text-2xl font-black text-[#1E3A8A] tracking-tight">
-              حِصّتي
-            </span>
-          </button>
+            <div>
+              <h2 className="text-lg font-black text-slate-900 leading-tight">إنشاء حساب جديد</h2>
+              <p className="text-[11px] text-slate-500 font-semibold mt-0.5">منظومة الدروس الخصوصية الأذكى مع توثيق آمن بالبريد</p>
+            </div>
+          </div>
 
-          <h2 className="text-2xl font-black text-[#1E3A8A]">
-            إنشاء حساب جديد
-          </h2>
-          <p className="mt-1 text-xs text-[#6B7280]">
-            انضم لمنظومة الدروس الخصوصية الأذكى في مصر مع توثيق آمن بالبريد الإلكتروني
-          </p>
-
-          {/* Stepper Dots */}
-          <div className="flex items-center justify-center gap-2 mt-4">
-            <div className={`w-8 h-2 rounded-full transition-all ${step >= 1 ? 'bg-[#2563EB]' : 'bg-gray-200'}`} />
-            <div className={`w-8 h-2 rounded-full transition-all ${step >= 2 ? 'bg-[#2563EB]' : 'bg-gray-200'}`} />
-            <div className={`w-8 h-2 rounded-full transition-all ${step >= 3 ? 'bg-emerald-500' : 'bg-gray-200'}`} />
+          <div className="auth-steps mt-3">
+            <div className={`dot ${step >= 1 ? 'active' : ''}`}>1</div>
+            <span className="text-[10px] font-black text-slate-500">اختيار النوع</span>
+            <div className={`bar ${step >= 2 ? 'active' : ''}`} />
+            <div className={`dot ${step >= 2 ? 'active' : ''}`}>2</div>
+            <span className="text-[10px] font-black text-slate-500">البيانات</span>
+            <div className={`bar ${step >= 3 ? 'active' : ''}`} />
+            <div className={`dot ${step >= 3 ? 'done' : ''}`}>{step >= 3 ? <CheckCircle2 className="w-3 h-3" /> : '3'}</div>
+            <span className={`text-[10px] font-black ${step >= 3 ? 'text-emerald-600' : 'text-slate-400'}`}>التفعيل</span>
           </div>
         </div>
 
         {/* Step 1: Select Role */}
         {step === 1 && (
-          <div className="bg-white border border-[#E5E7EB] rounded-3xl p-6 sm:p-8 shadow-xs space-y-4 animate-step-prev">
+          <div className="space-y-4 animate-step-prev">
             
             {errorMessage && (
               <div className="p-3.5 bg-red-50 border border-red-200 rounded-2xl text-xs font-bold text-red-800 flex items-start gap-2 animate-fadeIn">
@@ -504,18 +501,18 @@ export const SignupPage: React.FC<SignupPageProps> = ({
 
         {/* Step 2: Form Details */}
         {step === 2 && (
-          <div className="bg-white border border-[#E5E7EB] rounded-3xl p-6 sm:p-8 shadow-xs space-y-5 animate-step-next">
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+          <div className="space-y-5 animate-step-next">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
-                <span className="text-[11px] font-bold text-[#2563EB]">الخطوة 2: إدخال البيانات الشخصية</span>
-                <h3 className="text-base font-bold text-[#1E3A8A]">
+                <span className="text-[11px] font-black text-[#2563EB]">الخطوة 2: إدخال البيانات الشخصية</span>
+                <h3 className="text-base font-black text-slate-900">
                   بيانات حساب {role === 'student' ? 'الطالب' : role === 'parent' ? 'ولي الأمر' : 'المعلم'}
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className="text-xs text-[#6B7280] hover:text-[#2563EB] underline cursor-pointer"
+                className="text-xs text-slate-500 hover:text-[#2563EB] underline cursor-pointer"
               >
                 تغيير النوع
               </button>
@@ -622,7 +619,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({
                     placeholder="مثال: أحمد محمد علي"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full pl-4 pr-10 py-3 bg-gray-50 border border-[#E5E7EB] rounded-xl text-sm text-right focus:bg-white focus:outline-none focus:border-[#2563EB] transition-colors"
+                    className="w-full pl-4 pr-10 py-3 bg-gray-50 auth-input text-sm text-right focus:bg-white focus:outline-none focus:border-[#2563EB] transition-colors"
                   />
                   <User className="w-4 h-4 text-gray-400 absolute right-3.5 top-3.5" />
                 </div>
@@ -642,7 +639,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({
                       placeholder="name@example.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full pl-4 pr-10 py-3 bg-gray-50 border border-[#E5E7EB] rounded-xl text-sm text-left focus:bg-white focus:outline-none focus:border-[#2563EB] transition-colors"
+                      className="w-full pl-4 pr-10 py-3 bg-gray-50 auth-input text-sm text-left focus:bg-white focus:outline-none focus:border-[#2563EB] transition-colors"
                     />
                     <Mail className="w-4 h-4 text-gray-400 absolute right-3.5 top-3.5" />
                   </div>
@@ -660,7 +657,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({
                       placeholder="••••••••"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full pl-10 pr-10 py-3 bg-gray-50 border border-[#E5E7EB] rounded-xl text-sm text-left focus:bg-white focus:outline-none focus:border-[#2563EB] transition-colors"
+                      className="w-full pl-10 pr-10 py-3 bg-gray-50 auth-input text-sm text-left focus:bg-white focus:outline-none focus:border-[#2563EB] transition-colors"
                     />
                     <Lock className="w-4 h-4 text-gray-400 absolute right-3.5 top-3.5" />
                     <button
@@ -688,7 +685,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({
                       placeholder="010XXXXXXXX"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      className="w-full pl-4 pr-10 py-3 bg-gray-50 border border-[#E5E7EB] rounded-xl text-sm font-mono text-left focus:bg-white focus:outline-none focus:border-[#2563EB] transition-colors"
+                      className="w-full pl-4 pr-10 py-3 bg-gray-50 auth-input text-sm font-mono text-left focus:bg-white focus:outline-none focus:border-[#2563EB] transition-colors"
                     />
                     <Phone className="w-4 h-4 text-gray-400 absolute right-3.5 top-3.5" />
                   </div>
@@ -720,7 +717,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({
                       <select
                         value={grade}
                         onChange={(e) => setGrade(e.target.value)}
-                        className="w-full px-3.5 py-3 bg-gray-50 border border-[#E5E7EB] rounded-xl text-sm text-right focus:bg-white focus:outline-none focus:border-[#2563EB] cursor-pointer"
+                        className="w-full px-3.5 py-3 bg-gray-50 auth-input text-sm text-right focus:bg-white focus:outline-none focus:border-[#2563EB] cursor-pointer"
                       >
                         <option value="الصف الأول الابتدائي">الصف الأول الابتدائي</option>
                         <option value="الصف الثاني الابتدائي">الصف الثاني الابتدائي</option>
@@ -747,7 +744,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({
                         placeholder="012XXXXXXXX"
                         value={parentPhone}
                         onChange={(e) => setParentPhone(e.target.value)}
-                        className="w-full px-3.5 py-3 bg-gray-50 border border-[#E5E7EB] rounded-xl text-sm font-mono text-left focus:bg-white focus:outline-none focus:border-[#2563EB]"
+                        className="w-full px-3.5 py-3 bg-gray-50 auth-input text-sm font-mono text-left focus:bg-white focus:outline-none focus:border-[#2563EB]"
                       />
                     </div>
                   </div>
@@ -849,7 +846,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({
                       <select
                         value={subject}
                         onChange={(e) => setSubject(e.target.value)}
-                        className="w-full px-3.5 py-3 bg-gray-50 border border-[#E5E7EB] rounded-xl text-sm text-right focus:bg-white focus:outline-none focus:border-[#2563EB] cursor-pointer"
+                        className="w-full px-3.5 py-3 bg-gray-50 auth-input text-sm text-right focus:bg-white focus:outline-none focus:border-[#2563EB] cursor-pointer"
                       >
                         {SUBJECTS_DATA.map((s) => (
                           <option key={s.id} value={s.name}>{s.name}</option>
@@ -866,7 +863,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({
                         placeholder="مثال: 5 سنوات"
                         value={experience}
                         onChange={(e) => setExperience(e.target.value)}
-                        className="w-full px-3.5 py-3 bg-gray-50 border border-[#E5E7EB] rounded-xl text-sm text-right focus:bg-white focus:outline-none focus:border-[#2563EB]"
+                        className="w-full px-3.5 py-3 bg-gray-50 auth-input text-sm text-right focus:bg-white focus:outline-none focus:border-[#2563EB]"
                       />
                     </div>
                   </div>
@@ -876,7 +873,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-3.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-sm rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-4"
+                className="auth-btn w-full py-3.5 font-black text-sm rounded-2xl flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-4"
               >
                 {isLoading ? (
                   <span>جاري إنشاء وتفعيل الحساب...</span>
@@ -921,9 +918,11 @@ export const SignupPage: React.FC<SignupPageProps> = ({
 
         {/* Step 3: Success Confirmation */}
         {step === 3 && (
-          <div className="bg-white border border-[#E5E7EB] rounded-3xl p-6 sm:p-8 shadow-xs text-center space-y-5 animate-step-next">
-            <div className="w-16 h-16 rounded-full bg-emerald-100 text-[#10B981] flex items-center justify-center mx-auto shadow-xs animate-bounce">
-              <CheckCircle2 className="w-10 h-10" />
+          <div className="text-center space-y-5 animate-step-next">
+            <div className="flex items-center justify-center mb-1">
+              <div className="animate-success-ring w-16 h-16 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/40">
+                <CheckCircle2 className="w-9 h-9" />
+              </div>
             </div>
 
             <div>
@@ -1046,19 +1045,19 @@ export const SignupPage: React.FC<SignupPageProps> = ({
               </div>
             )}
 
-            <button
-              onClick={handleFinish}
-              className="w-full py-3.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-sm rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer active:scale-95"
-            >
-              <span>المتابعة إلى صفحة التوثيق وتأكيد الرمز</span>
-              <ArrowLeft className="w-4 h-4" />
-            </button>
+              <button
+                onClick={handleFinish}
+                className="auth-btn w-full py-3.5 font-black text-sm rounded-2xl flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>المتابعة إلى صفحة التوثيق وتأكيد الرمز</span>
+                <ArrowLeft className="w-4 h-4" />
+              </button>
           </div>
         )}
 
       </div>
 
-    </div>
+    </AuthShell>
   );
 };
 

@@ -114,16 +114,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-gray-200 overflow-hidden my-8 text-right animate-scaleUp">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/55 backdrop-blur-sm overflow-y-auto">
+      <div className="card-lux dialog-lux bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden my-8 text-right">
         
         {/* Modal Header */}
-        <div className="p-5 sm:p-6 border-b border-gray-200 flex items-center justify-between bg-[#F8FAFF]">
+        <div className="p-5 sm:p-6 border-b border-slate-100 flex items-center justify-between bg-gradient-to-l from-[#EFF6FF] via-white to-[#F5F3FF]">
           <div>
-            <h2 className="text-xl font-bold text-[#1E3A8A]">
+            <h2 className="text-xl font-black text-slate-900">
               {mode === 'login' ? 'تسجيل الدخول إلى حصتي' : 'إنشاء حساب جديد'}
             </h2>
-            <p className="text-xs text-[#6B7280]">
+            <p className="text-xs text-[#6B7280] font-semibold">
               {mode === 'login' ? 'أدخل بريدك الإلكتروني وكلمة المرور' : 'اختر نوع الحساب وأكمل بياناتك للبدء'}
             </p>
           </div>
@@ -149,7 +149,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 onClick={() => setRole('student')}
                 className={`py-2 px-2 rounded-xl text-xs font-bold flex flex-col items-center gap-1 transition-all cursor-pointer ${
                   role === 'student'
-                    ? 'bg-[#2563EB] text-white shadow-xs'
+                    ? 'chip-grad'
                     : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
                 }`}
                 id="tab-role-student"
@@ -164,7 +164,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 onClick={() => setRole('parent')}
                 className={`py-2 px-2 rounded-xl text-xs font-bold flex flex-col items-center gap-1 transition-all cursor-pointer ${
                   role === 'parent'
-                    ? 'bg-[#2563EB] text-white shadow-xs'
+                    ? 'chip-grad'
                     : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
                 }`}
                 id="tab-role-parent"
@@ -179,7 +179,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 onClick={() => setRole('teacher')}
                 className={`py-2 px-2 rounded-xl text-xs font-bold flex flex-col items-center gap-1 transition-all cursor-pointer ${
                   role === 'teacher'
-                    ? 'bg-[#2563EB] text-white shadow-xs'
+                    ? 'chip-grad'
                     : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
                 }`}
                 id="tab-role-teacher"
@@ -365,7 +365,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-3 bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-50 text-white font-bold text-sm rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer mt-2"
+                className="auth-btn w-full py-3 disabled:opacity-50 text-white font-black text-sm rounded-2xl flex items-center justify-center gap-2 cursor-pointer mt-2"
                 id="btn-auth-submit"
               >
                 <span>
