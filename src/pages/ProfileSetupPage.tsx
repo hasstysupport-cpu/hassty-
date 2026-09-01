@@ -45,6 +45,8 @@ export const ProfileSetupPage: React.FC<ProfileSetupPageProps> = ({ onComplete, 
   const [agreePrivacy, setAgreePrivacy] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
+  const [setupLegalAccepted, setSetupLegalAccepted] = useState(false);
+  const [setupLegalBlocked, setSetupLegalBlocked] = useState(false); // setup-legal-consent-v1
 
   const roleInfo = ROLE_CARDS.find((r) => r.role === role)!;
   const nameReady = fullName.trim().length >= 3 || (user?.name || '').trim().length >= 3;
@@ -246,7 +248,15 @@ export const ProfileSetupPage: React.FC<ProfileSetupPageProps> = ({ onComplete, 
                 <ArrowRight className="w-4.5 h-4.5 rotate-180" />
               </button>
             </div>
-          </form>
+          
+          <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-4">
+            <label className="flex items-start gap-3 cursor-pointer" dir="rtl">
+              <input type="checkbox" checked={setupLegalAccepted} onChange={(e) => { setSetupLegalAccepted(e.target.checked); setSetupLegalBlocked(false); }} className="mt-1 w-5 h-5 accent-blue-600 shrink-0" />
+              <span className="text-xs sm:text-sm text-slate-700 leading-6">أوافق على <button type="button" onClick={() => window.open('/legal/terms','_blank','noopener,noreferrer')} className="font-black text-blue-700 underline">شروط الاستخدام</button> و<button type="button" onClick={() => window.open('/legal/privacy','_blank','noopener,noreferrer')} className="font-black text-blue-700 underline">سياسة الخصوصية</button>، وأؤكد أن البيانات التي قدمتها صحيحة.</span>
+            </label>
+            {setupLegalBlocked && <p className="mt-2 text-xs font-black text-red-600">لا يمكن إنهاء إعداد الحساب قبل الموافقة على الشروط والخصوصية.</p>}
+          </div>
+</form>
         </div>
       </div>
 
