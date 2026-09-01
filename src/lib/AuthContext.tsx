@@ -341,6 +341,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!supabase || !user?.uid) throw new Error('لا يوجد مستخدم مسجل.');
     const metadataPatch = { ...(user.profileData || {}), ...(updates.profileData || {}) };
     delete (metadataPatch as any).role;
+    // Teachers complete their profile through ProfileSetupPage, which sends
+    // subject/experienceYears/bio as top-level updates. Persist them into
+    // profiles.metadata as well, otherwise App's profile-completion check
+    // (metadata.subject) never passes and email teachers stay stuck on
+    // /setup-profile forever. The Google first-login path already writes them.
+    if (updates.subject !== undefined) metadataPatch.subject = updates.subject;
+    if (updates.experienceYears !== undefined) metadataPatch.experienceYears = String(updates.experienceYears ?? '');
+    if (updates.bio !== undefined) metadataPatch.bio = updates.bio;
 
     const profilePatch: Record<string, any> = {
       ...(updates.name !== undefined ? { full_name: updates.name } : {}),
