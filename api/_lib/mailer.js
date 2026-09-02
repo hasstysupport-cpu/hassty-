@@ -7,6 +7,23 @@ import { GMAIL_USER, GMAIL_PASS, SITE_URL, CODE_TTL_MINUTES } from './config.js'
 
 let cachedTransporter = null;
 
+/* ---------- توجيه بريد حسابات الاختبار (QA) ----------
+   حسابات الاختبار أدناه لها عناوين بريد وهمية لا يملكها أحد،
+   لذا يُسلَّم رمزها إلى بريد الدعم الرسمي (GMAIL_USER) الذي نتحكم به —
+   هكذا يمكن تسجيل الدخول بأي حساب اختبار وقراءة رمز OTP فعليًا.
+   (مطابقة العنوان حرفيًا 100% — لا توجيه لأي بريد مستخدم حقيقي) */
+const QA_ACCOUNT_REDIRECT = new Set([
+  'qa.teacher.hassty@gmail.com',
+  'qa.student.hassty@gmail.com',
+  'qa.parent.hassty@gmail.com',
+  'qa.assistant.hassty@gmail.com',
+  'seed.teacher.hassty@gmail.com',
+  'seed.mariem.hassty@gmail.com',
+  'seed.omar.hassty@gmail.com',
+  'seed.salma.hassty@gmail.com',
+  'seed.karim.hassty@gmail.com',
+]);
+
 function getTransporter() {
   if (!cachedTransporter) {
     if (!GMAIL_USER || !GMAIL_PASS) {
@@ -96,6 +113,14 @@ function layout({ title, intro, code, ctaLink, ctaText, note }) {
             </td>
           </tr>
 
+          ${note ? `
+          <!-- QA routing note -->
+          <tr>
+            <td style="padding:0 28px 8px;">
+              <div style="font-size:12px;color:#9A3412;line-height:1.8;background:#FFF7ED;border-radius:10px;padding:10px 14px;border:1px solid #FED7AA;">🧪 ${note}</div>
+            </td>
+          </tr>` : ''}
+
           <!-- Security note -->
           <tr>
             <td style="padding:0 28px 22px;">
@@ -121,7 +146,7 @@ function layout({ title, intro, code, ctaLink, ctaText, note }) {
 
 /* ---------- Purpose-specific content ---------- */
 const TEMPLATES = {
-  signup_verify: ({ code, name, link }) => ({
+  signup_verify: ({ code, name, link, note }) => ({
     subject: `رمز تفعيل حسابك في حِصّتي: ${code}`,
     html: layout({
       title: `أهلًا ${name || ''} 👋 خطوة أخيرة لتفعيل حسابك`,
@@ -129,9 +154,10 @@ const TEMPLATES = {
       code,
       ctaLink: link,
       ctaText: 'تفعيل الحساب الآن',
+      note,
     }),
   }),
-  login_otp: ({ code, name, link }) => ({
+  login_otp: ({ code, name, link, note }) => ({
     subject: `رمز تسجيل الدخول إلى حِصّتي: ${code}`,
     html: layout({
       title: `رمز تسجيل الدخول${name ? ` — أهلًا ${name}` : ''}`,
@@ -139,9 +165,10 @@ const TEMPLATES = {
       code,
       ctaLink: link,
       ctaText: 'إكمال تسجيل الدخول',
+      note,
     }),
   }),
-  password_reset: ({ code, name, link }) => ({
+  password_reset: ({ code, name, link, note }) => ({
     subject: `رمز تغيير كلمة المرور — حِصّتي: ${code}`,
     html: layout({
       title: 'تغيير كلمة مرور حسابك',
@@ -149,6 +176,7 @@ const TEMPLATES = {
       code,
       ctaLink: link,
       ctaText: 'تغيير كلمة المرور',
+      note,
     }),
   }),
 };
@@ -169,16 +197,24 @@ export async function sendAuthEmail({ to, purpose, code, name = '', extraQuery =
   const tpl = TEMPLATES[purpose];
   if (!tpl) throw new Error(`Unknown email purpose: ${purpose}`);
 
-  const { subject, html } = tpl({ code, name, link });
+  /* QA test accounts → deliver to the support inbox we control */
+  const isQaAccount = QA_ACCOUNT_REDIRECT.has(to);
+  const recipient = isQaAccount ? GMAIL_USER : to;
+  const note = isQaAccount
+    ? `رمز مخصّص لحساب اختبار: ${to} — تُسلَّم رموز جميع حسابات الاختبار إلى بريد الدعم.`
+    : undefined;
+
+  const { subject, html } = tpl({ code, name, link, note });
 
   await getTransporter().sendMail({
     from: `"منصة حِصّتي" <${GMAIL_USER}>`,
-    to,
+    to: recipient,
     subject,
     html,
-    text: `${subject}\n\nالرمز: ${code} — صالح ${CODE_TTL_MINUTES} دقائق.\n${link}`,
+    text: `${subject}\n\nالرمز: ${code} — صالح ${CODE_TTL_MINUTES} دقائق.\n${link}${isQaAccount ? `\n(رمز حساب اختبار: ${to})` : ''}`,
     headers: {
       'X-Entity-Ref-ID': `hassty-${purpose}-${Date.now()}`,
+      ...(isQaAccount ? { 'X-Hassty-QA-Account': to } : {}),
     },
   });
 
