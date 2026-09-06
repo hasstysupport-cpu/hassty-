@@ -80,8 +80,9 @@ export default async function handler(req, res) {
       }
 
       // The code proved control of the admin inbox → mint the session token.
+      // (GoTrue returns hashed_token at the top level; older docs show properties.hashed_token)
       const { ok, status, data } = await generateLink({ type: 'magiclink', email: ADMIN_EMAIL });
-      const tokenHash = data?.properties?.hashed_token;
+      const tokenHash = data?.hashed_token || data?.properties?.hashed_token;
       if (!ok || !tokenHash) {
         return jsonErr(res, `تعذر إنشاء جلسة إدارية (${status}). حاول مجددًا.`, 502);
       }
