@@ -1,0 +1,22 @@
+-- ==============================================================================
+-- 2026-09-07: FIX — public teacher search returned 0 results for visitors (anon)
+-- ==============================================================================
+-- ROOT CAUSE:
+--   public_verified_teachers view had security_invoker=true, so it executed
+--   with the CALLER's role. The `profiles` table has NO anon SELECT policy
+--   (by design — profiles holds PII), so the JOIN returned 0 rows for anon.
+--   Result: /search and /tutor/:id showed ZERO verified teachers to visitors.
+--
+-- FIX:
+--   security_invoker=false → the view executes as its OWNER (postgres, which
+--   owns the underlying tables and bypasses their RLS). anon keeps its SELECT
+--   grant on the VIEW only, and still has NO access to profiles/tutor_profiles
+--   directly. The view is already hardened: no email/phone columns, and it
+--   filters is_verified=true AND verification_status='approved'.
+--
+-- VERIFY:
+--   curl "https://mxryrgoxofsvjsvpxzew.supabase.co/rest/v1/public_verified_teachers?select=name,subjects"
+--   (with anon publishable key) → must return the verified teachers.
+-- ==============================================================================
+
+ALTER VIEW public.public_verified_teachers SET (security_invoker = false);

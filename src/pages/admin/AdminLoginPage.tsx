@@ -149,7 +149,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
 
       if (res.success) {
         setStep('otp_verify');
-        setSuccessMessage('تم إرسال كود التحقق المكون من 6 أرقام ورابط الدخول السري إلى البريد الإداري الرسمي (hasstysupport@gmail.com).');
+        setSuccessMessage('تم إرسال كود التحقق المكون من 6 أرقام إلى البريد الإداري الرسمي (hasstysupport@gmail.com). صلاحية الكود 10 دقائق.');
         setCooldown(60);
       } else {
         setErrorMessage(res.error || 'تعذر إرسال الكود. يرجى التأكد من إعدادات البريد الإداري.');

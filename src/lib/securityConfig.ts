@@ -54,7 +54,9 @@ type AdminAuthResult = {
   error?: string;
 };
 
-/** Send a real Supabase Auth email OTP. This creates no local-only admin identity. */
+/** Issue the admin login OTP through the PLATFORM mailer (/api/auth/admin-otp).
+ *  Was: supabase.auth.signInWithOtp — Supabase's built-in email is capped
+ *  (~2/hour on the free tier) and silently throttles, locking the admin out. */
 export async function requestAdminMagicLink(targetEmail: string = OFFICIAL_ADMIN_EMAIL): Promise<{
   success: boolean;
   message?: string;
@@ -67,37 +69,57 @@ export async function requestAdminMagicLink(targetEmail: string = OFFICIAL_ADMIN
   if (email !== OFFICIAL_ADMIN_EMAIL) {
     return { success: false, error: 'غير مصرح بهذا البريد الإداري.' };
   }
-  if (!supabase) return { success: false, error: 'Supabase غير مهيأ.' };
 
-  const { error } = await supabase.auth.signInWithOtp({
-    email: OFFICIAL_ADMIN_EMAIL,
-    options: {
-      shouldCreateUser: false,
-      emailRedirectTo: `${window.location.origin}${SECRET_ADMIN_ROUTE}`,
-    },
-  });
-  if (error) return { success: false, error: error.message };
-
-  return {
-    success: true,
-    message: 'تم إرسال رمز الدخول الإداري الحقيقي إلى البريد المعتمد.',
-    maskedEmail: 'h***t@gmail.com',
-    expiresInSeconds: 3600,
-    secretRoute: SECRET_ADMIN_ROUTE,
-  };
+  try {
+    const res = await fetch('/api/auth/admin-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'send', email }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.ok) {
+      return { success: false, error: data?.error || `تعذر إرسال الكود (${res.status}).` };
+    }
+    return {
+      success: true,
+      message: 'تم إرسال رمز الدخول الإداري إلى البريد المعتمد.',
+      maskedEmail: 'h***t@gmail.com',
+      expiresInSeconds: data.expiresIn || 600,
+      secretRoute: SECRET_ADMIN_ROUTE,
+    };
+  } catch {
+    return { success: false, error: 'تعذر الاتصال بالخادم. تحقق من اتصالك وحاول مجددًا.' };
+  }
 }
 
-/** Verify the Supabase Auth OTP, establishing a real authenticated session. */
+/** Verify the platform-issued OTP, then exchange a server-minted single-use
+ *  magic-link token (returned only after the code passes) for a real session. */
 export async function verifyAdminMagicToken(tokenOrCode: string): Promise<AdminAuthResult> {
   const token = tokenOrCode.trim();
   if (!token) return { valid: false, error: 'كود التحقق مطلوب.' };
   if (!supabase) return { valid: false, error: 'Supabase غير مهيأ.' };
   if (!/^\d{6}$/.test(token)) return { valid: false, error: 'كود الدخول يجب أن يكون 6 أرقام.' };
 
+  let tokenHash = '';
+  try {
+    const res = await fetch('/api/auth/admin-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'verify', code: token }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.ok) {
+      return { valid: false, error: data?.error || 'رمز الدخول غير صالح أو منتهي.' };
+    }
+    tokenHash = String(data.token_hash || '');
+  } catch {
+    return { valid: false, error: 'تعذر الاتصال بالخادم. حاول مجددًا.' };
+  }
+  if (!tokenHash) return { valid: false, error: 'رمز الدخول غير صالح أو منتهي.' };
+
   const { data, error } = await supabase.auth.verifyOtp({
-    email: OFFICIAL_ADMIN_EMAIL,
-    token,
-    type: 'email',
+    token_hash: tokenHash,
+    type: 'magiclink',
   });
   if (error || !data.user) {
     return { valid: false, error: error?.message || 'رمز الدخول غير صالح أو منتهي.' };

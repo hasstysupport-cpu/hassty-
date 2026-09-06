@@ -48,6 +48,14 @@ export function listUsers({ page = 1, perPage = 100 } = {}) {
   return authFetch(`admin/users?page=${page}&per_page=${perPage}`);
 }
 
+/* Mint a single-use magic link token (hashed_token) for an EXISTING user.
+   Used by the admin gate: /api/auth/admin-otp verifies the platform-issued
+   OTP first, then returns hashed_token for the client to exchange via
+   supabase.auth.verifyOtp({ token_hash, type: 'magiclink' }). */
+export function generateLink(payload) {
+  return authFetch('admin/generate_link', { method: 'POST', body: payload });
+}
+
 /* ---------- PostgREST (service role, bypasses RLS) ---------- */
 
 async function dbFetch(path, { method = 'GET', body, query = '', prefer } = {}) {
