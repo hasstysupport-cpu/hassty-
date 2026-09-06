@@ -1,0 +1,66 @@
+/* Isolated mobile fixes for the Google first-login profile setup screen.
+   The existing visual design stays intact; this only corrects sizing, spacing,
+   overflow and touch layout on narrow screens. */
+
+@media (max-width: 639px) {
+  body:has(.role-card) {
+    overflow-x: hidden;
+  }
+
+  body:has(.role-card) .card-lux {
+    width: calc(100vw - 24px) !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    margin-inline: auto !important;
+    border-radius: 24px !important;
+  }
+
+  body:has(.role-card) .card-lux > form {
+    padding: 16px !important;
+  }
+
+  body:has(.role-card) .card-lux > .bg-gradient-to-l {
+    padding: 18px 16px 16px !important;
+  }
+
+  body:has(.role-card) .card-lux > .anim-fade {
+    margin-inline: 16px !important;
+  }
+
+  body:has(.role-card) .card-lux .grid-cols-3 {
+    grid-template-columns: 1fr !important;
+  }
+
+  body:has(.role-card) .card-lux .role-card {
+    width: 100%;
+    min-width: 0;
+  }
+
+  body:has(.role-card) .card-lux .auth-input,
+  body:has(.role-card) .card-lux input,
+  body:has(.role-card) .card-lux select,
+  body:has(.role-card) .card-lux textarea {
+    box-sizing: border-box;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  body:has(.role-card) .card-lux button[type="submit"] {
+    min-height: 48px;
+  }
+
+  body:has(.role-card) .card-lux .flex.gap-3 {
+    flex-direction: column-reverse;
+  }
+
+  body:has(.role-card) .card-lux .flex.gap-3 > button {
+    width: 100%;
+  }
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  body:has(.role-card) .card-lux {
+    width: min(92vw, 720px);
+    margin-inline: auto;
+  }
+}
