@@ -37,7 +37,7 @@ export const StudentPaymentsPageV2: React.FC = () => {
   useEffect(() => { void load(); }, [user?.uid]);
   useEffect(() => {
     if (!supabase || !user?.uid) return;
-    const channel = supabase.channel(`student-payments-${user.uid}`).on('postgres_changes', { event: '*', schema: 'public', table: 'payment_records', filter: `student_id=eq.${user.uid}` }, () => { void load(); }).subscribe();
+    const channel = supabase.channel(`student-payments-${user.uid}-${Date.now().toString(36)}`).on('postgres_changes', { event: '*', schema: 'public', table: 'payment_records', filter: `student_id=eq.${user.uid}` }, () => { void load(); }).subscribe();
     return () => { void supabase.removeChannel(channel); };
   }, [user?.uid]);
   const filtered = useMemo(() => filter === 'all' ? payments : payments.filter(p => p.subject === filter), [filter, payments]);

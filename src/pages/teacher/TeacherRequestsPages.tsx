@@ -34,7 +34,7 @@ export const TeacherEnrollmentRequestsPage: React.FC<{ onNavigate?: (p: string) 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
     if (!supabase || !user?.uid) return;
-    const ch = supabase.channel(`enrollment-req-${user.uid}`).on('postgres_changes', { event: '*', schema: 'public', table: 'booking_requests', filter: `tutor_id=eq.${user.uid}` }, () => void load()).subscribe();
+    const ch = supabase.channel(`enrollment-req-${user.uid}-${Date.now().toString(36)}`).on('postgres_changes', { event: '*', schema: 'public', table: 'booking_requests', filter: `tutor_id=eq.${user.uid}` }, () => void load()).subscribe();
     return () => { void supabase.removeChannel(ch); };
   }, [user?.uid, load]);
 

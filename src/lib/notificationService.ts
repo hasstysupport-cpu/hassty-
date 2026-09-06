@@ -27,8 +27,11 @@ export function subscribeToNotifications(userId: string, onChange: (items: AppNo
     if (!disposed) onChange((data || []) as AppNotification[]);
   };
   void load();
+  // Unique per subscription: supabase-js caches channels by name — reusing a
+  // name while the previous channel is still tearing down throws
+  // "cannot add postgres_changes callbacks after subscribe()".
   const channel = supabase
-    .channel(`notifications:${userId}`)
+    .channel(`notifications:nav:${userId}:${Date.now().toString(36)}`)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` }, () => void load())
     .subscribe((status) => {
       if ((status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') && !disposed) onError?.(new Error(`Notifications realtime: ${status}`));

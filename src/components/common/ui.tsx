@@ -370,7 +370,7 @@ export function useRealtimeTable<T = any>(table: string, query: { column: string
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
     if (!supabase || !query || query.value === '') return;
-    const channel = supabase.channel(`${table}-rt-${query.column}-${query.value}`).on('postgres_changes', { event: '*', schema: 'public', table, filter: `${query.column}=eq.${query.value}` }, () => void load()).subscribe();
+    const channel = supabase.channel(`${table}-rt-${query.column}-${query.value}-${Date.now().toString(36)}`).on('postgres_changes', { event: '*', schema: 'public', table, filter: `${query.column}=eq.${query.value}` }, () => void load()).subscribe();
     return () => { void supabase.removeChannel(channel); };
   }, [table, query?.column, query?.value, load]);
   return { rows, loading, error, reload: load, setRows };

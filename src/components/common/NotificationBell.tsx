@@ -22,7 +22,7 @@ export const NotificationBell: React.FC<Props> = ({ onNavigate }) => {
   useEffect(() => {
     void load();
     if (!supabase || !user?.uid) return;
-    const channel = supabase.channel(`notification-bell:${user.uid}`).on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.uid}` }, () => void load()).subscribe();
+    const channel = supabase.channel(`notification-bell:${user.uid}:${Date.now().toString(36)}`).on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.uid}` }, () => void load()).subscribe();
     return () => { void supabase.removeChannel(channel); };
   }, [user?.uid]);
 
