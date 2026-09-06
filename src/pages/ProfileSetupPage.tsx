@@ -92,16 +92,16 @@ export const ProfileSetupPage: React.FC<ProfileSetupPageProps> = ({ onComplete, 
   };
 
   return (
-    <div dir="rtl" className="min-h-screen bg-[#F6F9FF] text-right font-['IBM_Plex_Sans_Arabic',sans-serif] flex flex-col">
-      {/* خلفية ناعمة */}
+    <div dir="rtl" className="min-h-screen bg-[#F6F9FF] text-right font-['IBM_Plex_Sans_Arabic',sans-serif] flex flex-col relative overflow-x-clip">
+      {/* خلفية ناعمة — مقصوصة داخل الصفحة حتى لا تُحدِث تمريرًا أفقيًا على الموبايل */}
       <div className="absolute top-[-120px] left-[-120px] w-[380px] h-[380px] bg-blue-400/10 rounded-full blur-3xl pointer-events-none" aria-hidden="true" />
       <div className="absolute bottom-[-140px] right-[-100px] w-[360px] h-[360px] bg-indigo-400/10 rounded-full blur-3xl pointer-events-none" aria-hidden="true" />
 
-      <div className="flex-1 flex items-center justify-center px-4 py-10 relative z-10">
+      <div className="flex-1 flex items-center justify-center px-4 py-6 sm:py-10 relative z-10">
         <div className="w-full max-w-2xl card-lux bg-white border border-slate-200/90 rounded-3xl shadow-[0_24px_70px_-30px_rgba(30,58,138,0.35)] overflow-hidden anim-up" data-role={role}>
 
           {/* header */}
-          <div className="px-7 pt-7 pb-5 bg-gradient-to-l from-[#EFF6FF] via-white to-[#F5F3FF] border-b border-slate-100">
+          <div className="px-5 sm:px-7 pt-5 sm:pt-7 pb-4 sm:pb-5 bg-gradient-to-l from-[#EFF6FF] via-white to-[#F5F3FF] border-b border-slate-100">
             <div className="flex items-center gap-3.5">
               <div className="w-13 h-13 rounded-2xl bg-gradient-to-br from-[#2563EB] to-[#7C3AED] text-white flex items-center justify-center shadow-lg shadow-blue-500/30 shrink-0">
                 <Sparkles className="w-6.5 h-6.5" />
@@ -117,13 +117,13 @@ export const ProfileSetupPage: React.FC<ProfileSetupPageProps> = ({ onComplete, 
           </div>
 
           {error && (
-            <div className="mx-7 mt-5 flex items-start gap-2.5 bg-red-50 border border-red-200 text-red-700 rounded-2xl px-4 py-3 text-[13px] font-bold anim-fade">
+            <div className="mx-5 sm:mx-7 mt-4 sm:mt-5 flex items-start gap-2.5 bg-red-50 border border-red-200 text-red-700 rounded-2xl px-4 py-3 text-[13px] font-bold anim-fade">
               <AlertCircle className="w-4.5 h-4.5 mt-0.5 shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
-          <form onSubmit={handleSave} className="p-7 space-y-5">
+          <form onSubmit={handleSave} className="p-5 sm:p-7 space-y-4 sm:space-y-5">
             {/* ---------- role ---------- */}
             <div className="space-y-2.5">
               <div className="text-xs font-black text-slate-600">١. اختر نوع حسابك</div>

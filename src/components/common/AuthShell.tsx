@@ -69,7 +69,7 @@ export const AuthShell: React.FC<AuthShellProps> = ({ children, miniTitle, onNav
     <div dir="rtl" className="min-h-screen bg-[#F6F9FF] flex flex-col lg:flex-row text-right font-['IBM_Plex_Sans_Arabic',sans-serif]">
 
       {/* ══════════════ لوحة الهوية (يمين — سطح المكتب) ══════════════ */}
-      <aside className="auth-brand hidden lg:flex lg:w-[46%] xl:w-[44%] flex-col justify-between p-10 xl:p-14 text-white">
+      <aside className="auth-brand hidden lg:flex lg:w-[46%] xl:w-[44%] flex-col justify-between p-10 xl:p-14 text-white overflow-hidden">
 
         {/* زخارف متحركة */}
         <div className="auth-blob w-[420px] h-[420px] -top-32 -right-24 opacity-70" aria-hidden="true" />
@@ -154,9 +154,9 @@ export const AuthShell: React.FC<AuthShellProps> = ({ children, miniTitle, onNav
       </aside>
 
       {/* ══════════════ منطقة النموذج (يسار) ══════════════ */}
-      <main className="flex-1 flex flex-col min-h-screen relative">
+      <main className="flex-1 flex flex-col min-h-screen relative overflow-x-clip">
 
-        {/* خلفية ناعمة */}
+        {/* خلفية ناعمة — مقصوصة حتى لا تُحدث تمريرًا أفقيًا على الموبايل */}
         <div className="absolute top-[-120px] left-[-120px] w-[380px] h-[380px] bg-blue-400/8 rounded-full blur-3xl pointer-events-none" aria-hidden="true" />
         <div className="absolute bottom-[-140px] right-[-100px] w-[360px] h-[360px] bg-indigo-400/8 rounded-full blur-3xl pointer-events-none" aria-hidden="true" />
 
