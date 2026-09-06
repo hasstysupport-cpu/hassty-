@@ -104,6 +104,9 @@ export default function App(){
  const handleNavigate=(path:string)=>{if(path.startsWith('/tutor/'))setSelectedTutorId(path.replace('/tutor/',''));setCurrentPath(path)};
  const handleSearchWithParams=(subject:string,governorate:string,city='')=>{setSearchSubject(subject);setSearchGovernorate(governorate);setSearchCity(city);setCurrentPath('/search')};
  const handleLogin=(role:AccountRole)=>{if(role==='admin')setCurrentPath(SECRET_ADMIN_ROUTE);else setCurrentPath(`/${role}/dashboard`)};
+ /* إكمال بيانات حساب Google: صفّر علامة الحاجة للإعداد في نفس لحظة التنقل
+    حتى لا يرتد المستخدم لصفحة الإعداد بعد الحفظ (حالة سباق قديمة) */
+ const handleProfileSetupComplete=(role:AccountRole)=>{setNeedsProfileSetup(false);handleLogin(role)};
  const handleLogout=()=>{void logout();setNeedsProfileSetup(false);setCurrentPath('/')};
  const handleSelectTutor=(id:string)=>{setSelectedTutorId(id);setCurrentPath(`/tutor/${id}`)};
  const isDashboardRoute=currentPath.startsWith('/student')||currentPath.startsWith('/parent')||currentPath.startsWith('/teacher')||currentPath.startsWith('/assistant');
@@ -119,7 +122,7 @@ export default function App(){
  if(isAdminAppRoute)return <ToastProvider><Suspense fallback={<PageLoader/>}><HasstyAdminApp onSwitchToPublicApp={()=>setCurrentPath('/')} initialToken={initialAdminToken}/></Suspense></ToastProvider>;
  if(isAssistantSignupRoute&&!isLoggedIn)return <AssistantSignupPage onNavigate={handleNavigate}/>;
  if(isSignupRoute&&!isLoggedIn)return <div className="min-h-screen w-full bg-[#F8FAFF] text-[#1F2937] font-['IBM_Plex_Sans_Arabic',sans-serif] antialiased"><SignupPage onNavigate={handleNavigate} onSignupSuccess={handleLogin}/></div>;
- if(isLoggedIn&&needsProfileSetup&&!isUnverified&&currentPath==='/setup-profile')return <div className="min-h-screen bg-[#F7FAFF] text-[#1F2937] font-['IBM_Plex_Sans_Arabic',sans-serif] antialiased"><ProfileSetupPage onComplete={handleLogin} onLogout={handleLogout}/><DevDisclaimerFloatingPill/></div>;
+ if(isLoggedIn&&needsProfileSetup&&!isUnverified&&currentPath==='/setup-profile')return <div className="min-h-screen bg-[#F7FAFF] text-[#1F2937] font-['IBM_Plex_Sans_Arabic',sans-serif] antialiased"><ProfileSetupPage onComplete={handleProfileSetupComplete} onLogout={handleLogout}/><DevDisclaimerFloatingPill/></div>;
  const legalMatch=currentPath.match(/^\/legal\/(terms|privacy|teacher|cookies|acceptable|refund|rights)$/); if(legalMatch)return <LegalPage section={legalMatch[1] as LegalSection} onNavigate={handleNavigate}/>;
  return <ToastProvider><div data-role={currentRole} className="min-h-screen bg-[#F8FAFF] text-[#1F2937] flex flex-col antialiased">
   {isLoggedIn&&isDashboardRoute&&!isUnverified&&!needsProfileSetup?<LoggedInNavbar currentRole={currentRole} currentPath={currentPath} userName={user?.name} userAvatar={user?.avatarUrl||user?.profileData?.avatarUrl} onNavigate={handleNavigate} onRoleChange={(r)=>setCurrentPath(`/${r}/dashboard`)} onLogout={handleLogout}/>:<PublicNavbar currentPath={currentPath} isLoggedIn={isLoggedIn&&!isUnverified&&!needsProfileSetup} user={user} currentRole={currentRole} onNavigate={handleNavigate} onOpenLogin={()=>handleNavigate('/login')} onOpenSignup={()=>handleNavigate('/signup')} onLogout={handleLogout}/>}

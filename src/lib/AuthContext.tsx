@@ -35,6 +35,9 @@ interface AuthContextType {
   /** Server-side registration → pending account + emailed code */
   signupUser: (data: SignupData) => Promise<{ ok: boolean; userId?: string; maskedEmail?: string; expiresIn?: number; error?: string; code?: string }>;
   updateUserProfile: (data: Partial<any>) => Promise<void>;
+  /** إعادة قراءة الملف من قاعدة البيانات وتحديث جلسة الواجهة فورًا
+      (تُستخدم بعد إكمال بيانات حساب Google حتى تصل اللوحة بالدور الجديد) */
+  refreshUser: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -332,8 +335,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     persistSession(null);
   };
 
+  /* إعادة قراءة الملف من الـDB وتحديث جلسة الواجهة (بعد إكمال بيانات Google) */
+  const refreshUser = async () => {
+    if (!supabase) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return;
+    try {
+      const profile = await getProfile(session.user.id);
+      persistSession(mapProfileToSession(session.user, profile));
+    } catch {
+      /* تجاهل — الجلسة الحالية تبقى كما هي */
+    }
+  };
+
   const value = useMemo(
-    () => ({ user, loading, beginPasswordLogin, finishPasswordLogin, loginWithGoogle, signupUser, updateUserProfile, logout }),
+    () => ({ user, loading, beginPasswordLogin, finishPasswordLogin, loginWithGoogle, signupUser, updateUserProfile, refreshUser, logout }),
     [user, loading],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -29,7 +29,7 @@ const ROLE_CARDS: { role: AccountRole; icon: any; title: string; desc: string }[
 ];
 
 export const ProfileSetupPage: React.FC<ProfileSetupPageProps> = ({ onComplete, onLogout }) => {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const googleFirstLogin = typeof window !== 'undefined' && Boolean(localStorage.getItem('hassty_google_login_started_at'));
 
   const [role, setRole] = useState<AccountRole>('student');
@@ -83,6 +83,9 @@ export const ProfileSetupPage: React.FC<ProfileSetupPageProps> = ({ onComplete, 
         return;
       }
       try { localStorage.setItem(SIGNUP_CONSENT_KEY, 'accepted'); } catch { /* ignore */ }
+      /* حدّث الجلسة من قاعدة البيانات أولًا حتى تفتح اللوحة بالدور والبيانات
+         الجديدة مباشرة — بدونها كانت الصفحة ترتد لصفحة الإعداد مرة أخرى */
+      try { await refreshUser(); } catch { /* ignore */ }
       onComplete((res.role as AccountRole) || role);
     } catch (err: any) {
       setError(err?.message || 'تعذر حفظ البيانات.');
