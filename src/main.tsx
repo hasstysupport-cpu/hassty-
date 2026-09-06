@@ -5,6 +5,7 @@ import { AuthProvider } from './lib/AuthContext.tsx';
 import { ProfileCompletionGate } from './components/common/ProfileCompletionGate';
 import { LegalPage, type LegalSection } from './pages/LegalPage';
 import './index.css';
+import './profile-setup-responsive.css';
 
 const legalPathToSection = (path: string): LegalSection | null => {
   const match = path.match(/^\/legal\/(terms|privacy|teacher|acceptable|refund|cookies|rights)$/);
