@@ -95,7 +95,7 @@ const PageLoader: React.FC = () => (
 );
 
 export default function App(){
- const {user,logout}=useAuth();
+ const {user,logout,loading:authLoading}=useAuth();
  const [currentPath,setCurrentPath]=useState<string>(()=>typeof window!=='undefined'?window.location.pathname||'/':'/');
  const isLoggedIn=!!user; const currentRole:AccountRole=user?.role||'student';
  /* معرّف المدرس يُهيّأ من الـ URL عند الدخول المباشر (محركات البحث/مشاركة الروابط)
@@ -125,8 +125,10 @@ export default function App(){
  useEffect(()=>{if(!needsProfileSetup||!isLoggedIn||isAdminAppRoute||isUnverified)return;if(currentPath!=='/setup-profile')setCurrentPath('/setup-profile')},[needsProfileSetup,isLoggedIn,isAdminAppRoute,isUnverified,currentPath]);
  useEffect(()=>{if(isLoggedIn&&!isUnverified&&!needsProfileSetup&&!isCheckingProfile&&(currentPath==='/login'||currentPath==='/signup'||currentPath==='/setup-profile'))handleLogin(currentRole)},[isLoggedIn,currentRole,currentPath,isUnverified,needsProfileSetup,isCheckingProfile]);
  useEffect(()=>{if(isUnverified&&(isDashboardRoute||currentPath==='/'))setCurrentPath('/verify-email')},[isUnverified,isDashboardRoute,currentPath]);
+ /* الزائر غير المسجّل يفتح رابط لوحة تحكم → يحوّل لصفحة الدخول (بدل 404/فراغ) */
+ useEffect(()=>{if(!authLoading&&!isLoggedIn&&isDashboardRoute&&currentPath!=='/assistant/signup')setCurrentPath('/login')},[authLoading,isLoggedIn,isDashboardRoute,currentPath]);
  /* SEO: عناوين ديناميكية لمساحات العمل + منع فهرسة الصفحات الخاصة في محركات البحث */
- useEffect(()=>{const robots=document.querySelector('meta[name="robots"]');const isAssistantSignup=currentPath==='/assistant/signup';if(isAdminAppRoute){document.title='لوحة الإدارة | منصة حصتي';if(robots)robots.setAttribute('content','noindex, nofollow')}else if(isDashboardRoute&&!isAssistantSignup){document.title=`${dashboardTitles[currentPath]||'لوحة التحكم'} | منصة حصتي`;if(robots)robots.setAttribute('content','noindex, nofollow')}},[currentPath,isDashboardRoute,isAdminAppRoute]);
+ useEffect(()=>{const robots=document.querySelector('meta[name="robots"]');const isAssistantSignup=currentPath==='/assistant/signup';if(isAdminAppRoute){document.title='لوحة الإدارة | منصة حصتي';if(robots)robots.setAttribute('content','noindex, nofollow')}else if(isDashboardRoute&&!isAssistantSignup){document.title=`${dashboardTitles[currentPath]||'لوحة التحكم'} | منصة حصتي`;if(robots)robots.setAttribute('content','noindex, nofollow')}},[currentPath,isDashboardRoute,isAdminAppRoute,isLoggedIn]);
  const [initialAdminToken]=useState<string|null>(()=>typeof window!=='undefined'?new URLSearchParams(window.location.search).get('authKey'):null);
  if(isAdminAppRoute)return <ToastProvider><Suspense fallback={<PageLoader/>}><HasstyAdminApp onSwitchToPublicApp={()=>setCurrentPath('/')} initialToken={initialAdminToken}/></Suspense></ToastProvider>;
  if(isAssistantSignupRoute&&!isLoggedIn)return <AssistantSignupPage onNavigate={handleNavigate}/>;
