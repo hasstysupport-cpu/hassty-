@@ -190,6 +190,30 @@
   </head>
   <body class="bg-white text-[#1F2937] font-['IBM_Plex_Sans_Arabic',sans-serif] antialiased selection:bg-[#EFF6FF] selection:text-[#2563EB]">
     <div id="root"></div>
+    <!-- شبكة الأمان 2: حارس الإقلاع — لو استمر تحميل الجافاسكريبت أكثر من 9 ثوانٍ
+         بدون رندر أي محتوى (اتصال ضعيف / حزمة فاشلة)، نعرض بطاقة عربية بدل شاشة بيضاء -->
+    <script>
+      (function () {
+        try {
+          window.addEventListener('load', function () {
+            setTimeout(function () {
+              var root = document.getElementById('root');
+              if (!root || root.firstElementChild) return; // التطبيق يعمل — لا تدخل
+              root.innerHTML =
+                '<div dir="rtl" style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px;font-family:sans-serif;background:#F6F9FF">' +
+                '<div style="max-width:420px;width:100%;background:#fff;border:1px solid #E2E8F0;border-radius:24px;padding:28px;text-align:center;box-shadow:0 24px 70px -30px rgba(30,58,138,.35)">' +
+                '<div style="width:52px;height:52px;margin:0 auto 14px;border-radius:16px;background:linear-gradient(135deg,#2563EB,#7C3AED);display:flex;align-items:center;justify-content:center">' +
+                '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg></div>' +
+                '<h1 style="font-size:17px;font-weight:900;color:#1E3A8A;margin:0 0 6px">التطبيق تأخر في التحميل</h1>' +
+                '<p style="font-size:13px;color:#4B5563;line-height:1.8;margin:0 0 18px">بياناتك في أمان. غالبًا السبب ضعف مؤقت في الاتصال — اضغط زر التحديث بالأسفل، ولو استمرت المشكلة جرّب إغلاق التبويب وفتحه من جديد.</p>' +
+                '<button onclick="location.reload()" style="width:100%;padding:12px;font-size:14px;font-weight:800;color:#fff;background:linear-gradient(to left,#2563EB,#7C3AED);border:0;border-radius:12px;cursor:pointer">تحديث الصفحة</button>' +
+                '<a href="/" style="display:block;margin-top:10px;font-size:13px;font-weight:700;color:#2563EB;text-decoration:none">العودة للرئيسية</a>' +
+                '</div></div>';
+            }, 9000);
+          });
+        } catch (e) { /* ignore */ }
+      })();
+    </script>
     <!-- محتوى بديل لغير مفعّلي الجافاسكريبت وزواحف الـ AI التي لا تنفّذ JS -->
     <noscript>
       <div style="max-width:720px;margin:40px auto;padding:0 20px;font-family:system-ui,sans-serif;direction:rtl;text-align:right;line-height:1.9;color:#1F2937">

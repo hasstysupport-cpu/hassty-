@@ -1,5 +1,5 @@
 /** @license SPDX-License-Identifier: Apache-2.0 */
-import React,{useState,useEffect,lazy,Suspense} from 'react';
+import React,{useState,useEffect,useRef,lazy,Suspense} from 'react';
 import { AccountRole } from './types';
 import { useAuth } from './lib/AuthContext';
 import { supabase } from './lib/supabase';
@@ -95,7 +95,7 @@ const PageLoader: React.FC = () => (
 );
 
 export default function App(){
- const {user,logout,loading:authLoading}=useAuth();
+ const {user,logout,loading:authLoading,refreshUser}=useAuth();
  const [currentPath,setCurrentPath]=useState<string>(()=>typeof window!=='undefined'?window.location.pathname||'/':'/');
  const isLoggedIn=!!user; const currentRole:AccountRole=user?.role||'student';
  /* معرّف المدرس يُهيّأ من الـ URL عند الدخول المباشر (محركات البحث/مشاركة الروابط)
@@ -114,8 +114,7 @@ export default function App(){
  const handleSelectTutor=(id:string)=>{setSelectedTutorId(id);setCurrentPath(`/tutor/${id}`)};
  const isDashboardRoute=currentPath.startsWith('/student')||currentPath.startsWith('/parent')||currentPath.startsWith('/teacher')||currentPath.startsWith('/assistant');
  const isAdminAppRoute=currentPath.startsWith(SECRET_ADMIN_ROUTE)||currentPath.startsWith('/admin')||(typeof window!=='undefined'&&window.location.hostname.startsWith('admin.'));
- const isUnverified=isLoggedIn&&!user?.emailVerified&&user?.role!=='admin'&&user?.role!=='assistant';
- const isSignupRoute=currentPath==='/signup'; const isAssistantSignupRoute=currentPath==='/assistant/signup';
+ const isUnverified=isLoggedIn&&!user?.emailVerified&&user?.role!=='admin'&&user?.role!=='assistant'; const isSignupRoute=currentPath==='/signup'; const isAssistantSignupRoute=currentPath==='/assistant/signup';
  /* المسارات العامة المعروفة — أي مسار آخر يعرض صفحة 404 */
  const knownPublicPaths=['/','/search','/about','/contact','/for-teachers','/login','/signup','/assistant/signup','/verify-email','/setup-profile','/whatsapp-studio'];
  const legalMatch0=currentPath.match(/^\/legal\/(terms|privacy|teacher|cookies|acceptable|refund|rights)$/);
@@ -124,11 +123,34 @@ export default function App(){
  useEffect(()=>{if(!user?.uid||!signupLegalAccepted||user.role==='admin')return;void recordRequiredSignupConsents(user.uid).catch(()=>{})},[user?.uid,signupLegalAccepted,user?.role]);
  useEffect(()=>{if(!needsProfileSetup||!isLoggedIn||isAdminAppRoute||isUnverified)return;if(currentPath!=='/setup-profile')setCurrentPath('/setup-profile')},[needsProfileSetup,isLoggedIn,isAdminAppRoute,isUnverified,currentPath]);
  useEffect(()=>{if(isLoggedIn&&!isUnverified&&!needsProfileSetup&&!isCheckingProfile&&(currentPath==='/login'||currentPath==='/signup'||currentPath==='/setup-profile'))handleLogin(currentRole)},[isLoggedIn,currentRole,currentPath,isUnverified,needsProfileSetup,isCheckingProfile]);
- useEffect(()=>{if(isUnverified&&(isDashboardRoute||currentPath==='/'))setCurrentPath('/verify-email')},[isUnverified,isDashboardRoute,currentPath]);
+ /* التحقق غير المؤكّد → صفحة التأكيد. شبكة الأمان 3: قبل التحويل نعيد مزامنة
+    الجلسة من الخادم مرة واحدة — جلسة قديمة من localStorage (محفوظة لحظة السباق
+    قبل تفعيل البريد، أو بعد فشل المزامنة لضعف الاتصال) كانت تسبب حلقة تحويل
+    متكررة تنتهي بشاشة بيضاء عند ال refresh */
+ useEffect(()=>{if(!(isUnverified&&(isDashboardRoute||currentPath==='/')))return;
+   let resynced=false;try{resynced=sessionStorage.getItem('hassty_verified_resync')==='1'}catch{}
+   if(!resynced){try{sessionStorage.setItem('hassty_verified_resync','1')}catch{};void refreshUser();return /* استنى المزامنة قبل أي تحويل */}
+   setCurrentPath('/verify-email');
+ },[isUnverified,isDashboardRoute,currentPath,refreshUser]);
  /* الزائر غير المسجّل يفتح رابط لوحة تحكم → يحوّل لصفحة الدخول (بدل 404/فراغ) */
  useEffect(()=>{if(!authLoading&&!isLoggedIn&&isDashboardRoute&&currentPath!=='/assistant/signup')setCurrentPath('/login')},[authLoading,isLoggedIn,isDashboardRoute,currentPath]);
  /* SEO: عناوين ديناميكية لمساحات العمل + منع فهرسة الصفحات الخاصة في محركات البحث */
  useEffect(()=>{const robots=document.querySelector('meta[name="robots"]');const isAssistantSignup=currentPath==='/assistant/signup';if(isAdminAppRoute){document.title='لوحة الإدارة | منصة حصتي';if(robots)robots.setAttribute('content','noindex, nofollow')}else if(isDashboardRoute&&!isAssistantSignup){document.title=`${dashboardTitles[currentPath]||'لوحة التحكم'} | منصة حصتي`;if(robots)robots.setAttribute('content','noindex, nofollow')}},[currentPath,isDashboardRoute,isAdminAppRoute,isLoggedIn]);
+ /* شبكة الأمان 4: كاشف حلقات التحويل — أكثر من 10 تغييرات مسار خلال 5 ثوانٍ
+    (تنقل آلي لا نهائي بسبب تعارض حالة) → نوقف الشجرة ونعرض شاشة استرداد
+    بدل الانهيار في «Maximum update depth» وشاشة بيضاء */
+ const [loopDetected,setLoopDetected]=useState(false); const navTimesRef=useRef<number[]>([]);
+ useEffect(()=>{if(loopDetected)return;const now=Date.now();const t=navTimesRef.current;t.push(now);while(t.length&&now-t[0]>5000)t.shift();if(t.length>10){t.length=0;setLoopDetected(true);try{sessionStorage.setItem('hassty_loop_detected','1')}catch{}}},[currentPath,loopDetected]);
+ if(loopDetected){return <div dir="rtl" className="min-h-screen bg-[#F6F9FF] flex items-center justify-center px-4 py-10 font-sans">
+   <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl shadow-[0_24px_70px_-30px_rgba(30,58,138,0.35)] p-6 text-center">
+     <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-gradient-to-br from-[#2563EB] to-[#7C3AED] text-white flex items-center justify-center"><svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></div>
+     <h1 className="text-base font-black text-[#1E3A8A] mb-2">توقف مؤقت في التنقل</h1>
+     <p className="text-sm text-[#4B5563] leading-relaxed mb-5">اكتشفنا تحويلات متكررة غير طبيعية — غالبًا بسبب حالة قديمة في المتصفح. بياناتك في أمان، اضغط تحديث الصفحة للمتابعة.</p>
+     <div className="grid grid-cols-2 gap-2.5">
+       <button onClick={()=>window.location.reload()} className="px-4 py-2.5 text-sm font-black text-white rounded-xl bg-gradient-to-l from-[#2563EB] to-[#7C3AED] cursor-pointer">تحديث الصفحة</button>
+       <button onClick={()=>{void logout();try{sessionStorage.clear()}catch{};window.location.assign('/')}} className="px-4 py-2.5 text-sm font-bold text-[#1E3A8A] border border-slate-300 rounded-xl hover:bg-slate-50 cursor-pointer">خروج آمن</button>
+     </div>
+   </div></div>}
  const [initialAdminToken]=useState<string|null>(()=>typeof window!=='undefined'?new URLSearchParams(window.location.search).get('authKey'):null);
  if(isAdminAppRoute)return <ToastProvider><Suspense fallback={<PageLoader/>}><HasstyAdminApp onSwitchToPublicApp={()=>setCurrentPath('/')} initialToken={initialAdminToken}/></Suspense></ToastProvider>;
  if(isAssistantSignupRoute&&!isLoggedIn)return <AssistantSignupPage onNavigate={handleNavigate}/>;
@@ -165,7 +187,7 @@ export default function App(){
      '/teacher/dashboard','/teacher/assistants','/teacher/assistants/search','/teacher/students','/teacher/groups','/teacher/scan','/teacher/attendance','/teacher/attendance/disputes','/teacher/payments','/teacher/availability','/teacher/profile','/teacher/reviews','/teacher/notifications','/teacher/calendar','/teacher/messages','/teacher/assignments','/teacher/assignment-submissions','/teacher/sessions','/teacher/enrollment-requests','/teacher/transfers','/teacher/makeup','/teacher/student-notes','/teacher/exams','/teacher/gradebook',
      '/assistant/dashboard','/assistant/groups','/assistant/students','/assistant/attendance','/assistant/payments','/assistant/invitations','/assistant/notifications','/assistant/calendar','/assistant/messages','/assistant/profile','/assistant/verification',
    ].includes(currentPath)&&!/\/teacher\/(students|exams)\/[^/]+$/.test(currentPath)&&<NotFoundPage variant="dashboard" onNavigate={handleNavigate} dashboardPath={`/${currentRole}/dashboard`}/>}
-  </Suspense></main></div>:<main key={currentPath} className="flex-1 page-transition">{isCheckingProfile&&isLoggedIn&&!isUnverified&&isKnownPublicPath&&currentPath!=='/setup-profile'&&<div className="max-w-3xl mx-auto px-4 py-8 text-center text-xs text-slate-500">جاري تجهيز بيانات حسابك...</div>} {currentPath==='/'&&<HomePage onNavigate={handleNavigate} onSelectTutor={handleSelectTutor} onSearchWithParams={handleSearchWithParams}/>} {currentPath==='/search'&&<SearchResultsPage onNavigate={handleNavigate} onSelectTutor={handleSelectTutor} initialSubject={searchSubject} initialGovernorate={searchGovernorate} initialCity={searchCity}/>} {currentPath.startsWith('/tutor')&&<TeacherProfilePage tutorId={selectedTutorId} onNavigate={handleNavigate} onSelectTutor={handleSelectTutor}/>} {currentPath==='/about'&&<AboutPage onNavigate={handleNavigate}/>} {currentPath==='/contact'&&<ContactPage/>} {currentPath==='/for-teachers'&&<ForTeachersPage onNavigate={handleNavigate}/>} {currentPath==='/login'&&<LoginPage onNavigate={handleNavigate} onLoginSuccess={handleLogin}/>} {(currentPath==='/verify-email'||isUnverified)&&<VerifyEmailPage onNavigate={handleNavigate} onVerificationSuccess={handleLogin}/>} {currentPath==='/whatsapp-studio'&&<Suspense fallback={<PageLoader/>}><WhatsAppStudioPage/></Suspense>}{!isKnownPublicPath&&!isUnverified&&<NotFoundPage onNavigate={handleNavigate}/>}</main>}
+  </Suspense></main></div>:<main key={currentPath} className="flex-1 page-transition">{isCheckingProfile&&isLoggedIn&&!isUnverified&&isKnownPublicPath&&currentPath!=='/setup-profile'&&<div className="max-w-3xl mx-auto px-4 py-8 text-center text-xs text-slate-500">جاري تجهيز بيانات حسابك...</div>} {currentPath==='/'&&<HomePage onNavigate={handleNavigate} onSelectTutor={handleSelectTutor} onSearchWithParams={handleSearchWithParams}/>} {currentPath==='/search'&&<SearchResultsPage onNavigate={handleNavigate} onSelectTutor={handleSelectTutor} initialSubject={searchSubject} initialGovernorate={searchGovernorate} initialCity={searchCity}/>} {currentPath.startsWith('/tutor')&&<TeacherProfilePage tutorId={selectedTutorId} onNavigate={handleNavigate} onSelectTutor={handleSelectTutor}/>} {currentPath==='/about'&&<AboutPage onNavigate={handleNavigate}/>} {currentPath==='/contact'&&<ContactPage onNavigate={handleNavigate}/>} {currentPath==='/for-teachers'&&<ForTeachersPage onNavigate={handleNavigate}/>} {currentPath==='/login'&&<LoginPage onNavigate={handleNavigate} onLoginSuccess={handleLogin}/>} {(currentPath==='/verify-email'||isUnverified)&&<VerifyEmailPage onNavigate={handleNavigate} onVerificationSuccess={handleLogin}/>} {currentPath==='/whatsapp-studio'&&<Suspense fallback={<PageLoader/>}><WhatsAppStudioPage/></Suspense>}{!isKnownPublicPath&&!isUnverified&&<NotFoundPage onNavigate={handleNavigate}/>}</main>}
   {!isDashboardRoute&&!isLoggedIn&&<Footer onNavigate={handleNavigate}/>}<DevDisclaimerFloatingPill/>
  </div></ToastProvider>;
 }

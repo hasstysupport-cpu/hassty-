@@ -40,7 +40,19 @@ export const ProfileSetupPage: React.FC<ProfileSetupPageProps> = ({ onComplete, 
 
   const googleFirstLogin = typeof window !== 'undefined' && Boolean(localStorage.getItem('hassty_google_login_started_at'));
 
-  const [role, setRole] = useState<AccountRole>('student');
+  /* الدور يبدأ من دور المستخدم الفعلي (ولي أمر سجّل كولي أمر يبقى ولي أمر)
+     — كان يبدأ «طالب» افتراضيًا فيكمل البعض إعداده بدور خاطئ.
+     لحسابات Google: نقرأ الدور المعلّق المحفوظ لحظة اختياره قبل الـ OAuth */
+  const initialRole = ((): AccountRole => {
+    const fromSession = user?.role;
+    if (fromSession === 'parent' || fromSession === 'teacher' || fromSession === 'student') return fromSession;
+    try {
+      const pending = typeof window !== 'undefined' ? localStorage.getItem('hassty_pending_role') : null;
+      if (pending === 'parent' || pending === 'teacher' || pending === 'student') return pending;
+    } catch { /* ignore */ }
+    return 'student';
+  })();
+  const [role, setRole] = useState<AccountRole>(initialRole);
   const [fullName, setFullName] = useState(user?.name || '');
   const [phone, setPhone] = useState(user?.phone || '');
   const [governorate, setGovernorate] = useState(user?.governorate || 'القاهرة');
@@ -75,7 +87,7 @@ export const ProfileSetupPage: React.FC<ProfileSetupPageProps> = ({ onComplete, 
     setIsSaving(true);
     try {
       const res = await authApi.profileComplete({
-        role,
+        role: role as 'student' | 'parent' | 'teacher',
         fullName: fullName.trim() || user?.name || '',
         phone: phone.trim(),
         governorate,
