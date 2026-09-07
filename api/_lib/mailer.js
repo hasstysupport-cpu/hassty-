@@ -17,6 +17,8 @@ const QA_ACCOUNT_REDIRECT = new Set([
   'qa.student.hassty@gmail.com',
   'qa.parent.hassty@gmail.com',
   'qa.assistant.hassty@gmail.com',
+  'qa.newparent.hassty@gmail.com',
+  'qa.newstudent.hassty@gmail.com',
   'seed.teacher.hassty@gmail.com',
   'seed.mariem.hassty@gmail.com',
   'seed.omar.hassty@gmail.com',
