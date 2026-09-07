@@ -20,7 +20,6 @@ export interface OtpSendResult {
   whatsappSent: boolean;
   gatewayError?: string;
   expiresInSeconds: number;
-  debugCode?: string;
   error?: string;
 }
 
@@ -59,8 +58,12 @@ export interface InteractiveListSection {
 }
 
 
-const DIRECT_WHATSAPP_SERVER = 'http://54.85.197.100:3000';
-
+/**
+ * SECURITY: direct gateway fallback removed (2026-09-07 hardening).
+ * The WhatsApp gateway address must never be hardcoded in the browser bundle
+ * — all traffic goes through the server-side proxy (`/api/v1/*`) which keeps
+ * the API key server-side and can enforce TLS + rate limits.
+ */
 async function postGatewayApi(endpoint: string, body: any): Promise<any> {
   try {
     const res = await fetch(endpoint, {
@@ -72,19 +75,9 @@ async function postGatewayApi(endpoint: string, body: any): Promise<any> {
     if (res.ok && contentType.includes('application/json')) {
       return await res.json();
     }
-  } catch (e) {
-    console.warn(`Local proxy to ${endpoint} failed, attempting direct gateway:`, e);
-  }
-
-  try {
-    const directRes = await fetch(`${DIRECT_WHATSAPP_SERVER}${endpoint}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    return await directRes.json();
+    return { success: false, error: `Gateway proxy غير متاح (${res.status})` };
   } catch (err: any) {
-    return { success: false, error: err?.message || 'فشل الاتصال بسيرفر الواتساب' };
+    return { success: false, error: err?.message || 'فشل الاتصال بخدمة الواتساب' };
   }
 }
 
@@ -109,25 +102,10 @@ export const whatsappService = {
         };
       }
     } catch (e: any) {
-      console.warn('Express proxy check failed, attempting direct WhatsApp gateway check:', e);
+      console.warn('WhatsApp gateway status check unavailable:', e);
     }
 
-    // Fallback: Direct server check for Vercel / static hosting
-    try {
-      const directRes = await fetch(`${DIRECT_WHATSAPP_SERVER}/api/v1/status`);
-      const data = await directRes.json();
-      return {
-        success: data.success === true,
-        connected: data.connected === true || data.data?.whatsapp === 'connected',
-        whatsapp: data.data?.whatsapp || (data.connected ? 'connected' : 'disconnected'),
-        session: data.data?.session,
-        uptime: data.data?.uptime,
-        data: data.data,
-        error: data.error,
-      };
-    } catch (err: any) {
-      return { success: false, connected: false, error: err?.message || 'Network error' };
-    }
+    return { success: false, connected: false, error: 'خدمة الواتساب غير مهيأة على الخادم حالياً' };
   },
 
   /**
@@ -214,16 +192,14 @@ export const whatsappService = {
   },
 
   /**
-   * 11. Send WhatsApp OTP (with Simulated Verification Mode & Instant Test PIN Support)
+   * 11. Send WhatsApp OTP (server-side gateway only — never client-side codes)
    */
   async requestOtp(number: string, purpose: 'login' | 'signup' = 'login'): Promise<OtpSendResult> {
-    const cleanNum = number.replace(/\D/g, '') || '01012345678';
-    const simulatedCode = '1234'; // Universal developer test code
+    const cleanNum = number.replace(/\D/g, '');
+    if (!cleanNum) {
+      return { success: false, requestId: '', formattedNumber: '', whatsappSent: false, expiresInSeconds: 0, error: 'رقم غير صالح' };
+    }
     const requestId = `req_hassty_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-    
-    // Save in session for instant validation
-    sessionStorage.setItem(`otp_${requestId}`, JSON.stringify({ code: simulatedCode, expiresAt: Date.now() + 10 * 60 * 1000 }));
-    sessionStorage.setItem('hassty_last_otp', simulatedCode);
 
     try {
       const fingerprint = await getBrowserFingerprint();
@@ -248,32 +224,35 @@ export const whatsappService = {
       if (res.ok && contentType.includes('application/json')) {
         const json = await res.json();
         if (json.success) {
-          json.debugCode = json.debugCode || simulatedCode;
+          delete json.debugCode; // SECURITY: never expose codes to the client
           return json;
         }
+        return { success: false, requestId, formattedNumber: cleanNum, whatsappSent: false, expiresInSeconds: 0, error: json.error || 'تعذر إرسال رمز الواتساب' };
       }
+      return { success: false, requestId, formattedNumber: cleanNum, whatsappSent: false, expiresInSeconds: 0, error: `خدمة الواتساب غير مهيأة على الخادم (${res.status})` };
     } catch (e: any) {
-      console.info('Using simulated WhatsApp OTP verification mode:', e);
+      return { success: false, requestId, formattedNumber: cleanNum, whatsappSent: false, expiresInSeconds: 0, error: e?.message || 'فشل الاتصال بخدمة الواتساب' };
     }
-
-    // Always succeed in simulation mode so users never get blocked
-    return {
-      success: true,
-      requestId,
-      formattedNumber: cleanNum,
-      whatsappSent: true,
-      expiresInSeconds: 300,
-      debugCode: simulatedCode,
-    };
   },
 
   /**
-   * 12. Verify WhatsApp OTP (Simulated & Live Hybrid Validation)
+   * 12. Verify WhatsApp OTP (verification happens server-side only)
    */
   async verifyOtp(requestId: string, code: string): Promise<OtpVerifyResult> {
-    const cleanCode = code.trim();
-
-    return { success: false, verified: false, error: 'كود التحقق غير صحيح، يرجى إدخال 1234 للاختبار الفوري' };
+    try {
+      const res = await fetch('/api/otp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, code: code.trim() }),
+      });
+      const contentType = res.headers.get('content-type') || '';
+      if (res.ok && contentType.includes('application/json')) {
+        return await res.json();
+      }
+      return { success: false, verified: false, error: `خدمة التحقق غير مهيأة على الخادم (${res.status})` };
+    } catch (e: any) {
+      return { success: false, verified: false, error: e?.message || 'فشل الاتصال بخدمة التحقق' };
+    }
   },
 
   /**

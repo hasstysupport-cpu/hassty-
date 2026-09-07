@@ -225,7 +225,7 @@ export const WhatsAppStudioPage: React.FC = () => {
                 )}
               </div>
               <span className="text-[10px] font-mono text-gray-400 mt-0.5">
-                Target: http://54.85.197.100:3000
+                Gateway: /api/v1 (server-side proxy)
               </span>
             </div>
 
@@ -733,7 +733,7 @@ export const WhatsAppStudioPage: React.FC = () => {
                 <span>دليل التوثيق والتكامل:</span>
               </div>
               <p className="text-[11px] leading-relaxed text-blue-800">
-                يتم إرسال الطلبات إلى السيرفر الخلفي محلياً (`/api/v1/*`) والذي بدوره يضيف تلقائياً مفتاح `X-API-Key: CHANGE_THIS_SECRET_KEY` إلى خادم Baileys الخارجي، لحماية المفتاح السري ومنع ظهوره في المتصفح.
+                يتم إرسال الطلبات عبر وسيط خادمي آمن (`/api/v1/*`) يُضيف مفتاح الواتساب السري على الخادم فقط — لا يظهر أي مفتاح أو عنوان داخلي في المتصفح، ويُنصح بتفعيل TLS وقيود IP على الخادم نفسه.
               </p>
             </div>
           </div>
