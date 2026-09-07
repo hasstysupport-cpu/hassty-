@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSEO } from '../lib/useSEO';
-import { Star, ShieldCheck, MapPin, BookOpen, Award, Users, MessageSquare, Flag, Calendar, CheckCircle2, Loader2, AlertCircle, Send, ArrowLeft } from 'lucide-react';
+import { Star, ShieldCheck, MapPin, BookOpen, Award, Users, MessageSquare, Flag, Calendar, CheckCircle2, Loader2, AlertCircle, Send, ArrowLeft, GraduationCap, Sparkles } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { ScrollReveal } from '../components/common/ScrollReveal';
 import { TutorProfile } from '../types';
 
 interface TeacherProfilePageProps {
@@ -260,77 +261,327 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({ tutorId,
   };
 
   if (loading) {
-    return <div className="min-h-screen bg-[#F8FAFF] flex items-center justify-center"><div className="flex items-center gap-2 font-bold text-[#1E3A8A]"><Loader2 className="w-5 h-5 animate-spin" />جاري تحميل بيانات المدرس...</div></div>;
+    return (
+      <div dir="rtl" className="flex min-h-screen items-center justify-center bg-[#F6F9FF]">
+        <div className="flex flex-col items-center gap-4">
+          <div className="flex h-14 w-14 items-center justify-center rounded-[18px] bg-gradient-to-br from-[#2563EB] to-[#7C3AED] shadow-lg shadow-blue-600/25">
+            <Loader2 className="h-6 w-6 animate-spin text-white" />
+          </div>
+          <div className="text-sm font-bold text-[#1E3A8A]">جاري تحميل بيانات المدرس...</div>
+        </div>
+      </div>
+    );
   }
 
   if (!tutor || loadError) {
-    return <div className="min-h-screen bg-[#F8FAFF] px-4 py-16"><div className="max-w-xl mx-auto bg-white border border-red-100 rounded-3xl p-8 text-center"><AlertCircle className="w-12 h-12 mx-auto text-red-500 mb-4" /><h1 className="text-xl font-black text-gray-900">تعذر فتح ملف المدرس</h1><p className="text-sm text-gray-500 mt-2">{loadError || 'هذا المدرس غير موجود أو غير موثق.'}</p><button onClick={() => onNavigate('/search')} className="mt-6 inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-[#2563EB] text-white font-bold"><ArrowLeft className="w-4 h-4" />العودة للبحث</button></div></div>;
+    return (
+      <div dir="rtl" className="min-h-screen bg-[#F6F9FF] px-4 py-16">
+        <div className="mx-auto max-w-xl overflow-hidden rounded-[28px] border border-red-100 bg-white p-8 text-center shadow-[0_24px_70px_-30px_rgba(30,58,138,0.2)]">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-[18px] bg-gradient-to-br from-red-500 to-rose-600 shadow-lg shadow-red-600/25">
+            <AlertCircle className="h-7 w-7 text-white" />
+          </div>
+          <h1 className="text-xl font-black text-slate-900">تعذر فتح ملف المدرس</h1>
+          <p className="mt-2 text-sm leading-7 text-slate-500">{loadError || 'هذا المدرس غير موجود أو غير موثق.'}</p>
+          <button onClick={() => onNavigate('/search')} className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-gradient-to-l from-[#2563EB] to-[#7C3AED] px-6 py-3 text-sm font-black text-white shadow-lg shadow-blue-600/25 transition-transform active:scale-[0.97]">
+            <ArrowLeft className="w-4 h-4" />العودة للبحث
+          </button>
+        </div>
+      </div>
+    );
   }
 
+  const breakdownItems: [string, number][] = [
+    ['جودة الشرح', averageBreakdown.teaching],
+    ['الالتزام بالمواعيد', averageBreakdown.punctuality],
+    ['أسلوب التعامل', averageBreakdown.behavior],
+    ['القيمة مقابل السعر', averageBreakdown.value],
+  ];
+  const hasBreakdown = breakdownItems.some(([, v]) => v > 0);
+
   return (
-    <div className="min-h-screen bg-[#F8FAFF] pb-16 text-right">
-      <div className="bg-white border-b border-[#E5E7EB] py-3"><div className="max-w-7xl mx-auto px-4 flex items-center gap-2 text-xs text-gray-500"><button onClick={() => onNavigate('/')} className="hover:text-blue-600">الرئيسية</button><span>/</span><button onClick={() => onNavigate('/search')} className="hover:text-blue-600">البحث عن مدرسين</button><span>/</span><span className="text-[#1E3A8A] font-bold">{tutor.name}</span></div></div>
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
-        {notice && <div className={`rounded-2xl px-4 py-3 text-sm font-bold ${notice.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>{notice.text}</div>}
-        <section className="bg-white border border-gray-200 rounded-3xl p-6 sm:p-8">
-          <div className="flex flex-col sm:flex-row gap-6 items-start">
-            <div className="relative shrink-0 w-28 h-28 rounded-2xl overflow-hidden border border-gray-200 bg-gray-50 flex items-center justify-center">
-              {tutor.avatarUrl ? <img src={tutor.avatarUrl} alt={tutor.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : <span className="text-3xl font-black text-blue-200">{tutor.name.slice(0,1)}</span>}
-              <div className="absolute bottom-2 left-2 bg-[#2563EB] text-white p-1.5 rounded-xl"><ShieldCheck className="w-5 h-5" /></div>
-            </div>
-            <div className="flex-1">
-              <div className="flex flex-wrap items-center gap-2"><h1 className="text-3xl font-black text-[#1E3A8A]">{tutor.name}</h1><span className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 text-xs font-black">{tutor.subject || 'تخصص غير محدد'}</span></div>
-              {tutor.title && <p className="mt-2 text-sm font-bold text-gray-600">{tutor.title}</p>}
-              <div className="flex flex-wrap gap-3 mt-4 text-xs text-gray-600">
-                <span className="inline-flex items-center gap-1.5"><Star className="w-4 h-4 text-amber-500 fill-amber-400" />{tutor.rating.toFixed(1)} ({tutor.reviewsCount} تقييم)</span>
-                {tutor.governorate && <span className="inline-flex items-center gap-1.5"><MapPin className="w-4 h-4" />{tutor.governorate}{tutor.area ? ` — ${tutor.area}` : ''}</span>}
-                {tutor.experienceYears > 0 && <span className="inline-flex items-center gap-1.5"><Award className="w-4 h-4" />{tutor.experienceYears} سنة خبرة</span>}
+    <div dir="rtl" className="relative min-h-screen overflow-hidden bg-[#F6F9FF] pb-16 text-right">
+      {/* هالات ضوئية محيطة */}
+      <div className="pointer-events-none absolute inset-0 -z-10">
+        <div className="absolute -top-24 right-1/4 h-96 w-96 rounded-full bg-gradient-to-br from-blue-400/12 via-indigo-300/8 to-transparent blur-3xl" />
+        <div className="absolute bottom-0 -left-24 h-80 w-80 rounded-full bg-gradient-to-tr from-violet-300/10 via-purple-200/8 to-transparent blur-3xl" />
+      </div>
+
+      <div className="border-b border-blue-100/60 bg-white/70 py-3 backdrop-blur-sm">
+        <div className="mx-auto flex max-w-7xl items-center gap-2 px-4 text-xs text-slate-500">
+          <button onClick={() => onNavigate('/')} className="transition-colors hover:text-[#2563EB]">الرئيسية</button>
+          <span>/</span>
+          <button onClick={() => onNavigate('/search')} className="transition-colors hover:text-[#2563EB]">البحث عن مدرسين</button>
+          <span>/</span>
+          <span className="font-bold text-[#1E3A8A]">{tutor.name}</span>
+        </div>
+      </div>
+
+      <main className="relative mx-auto max-w-7xl space-y-6 px-4 pt-6 sm:px-6 lg:px-8">
+        {notice && (
+          <div className={`anim-up rounded-2xl border px-4 py-3 text-sm font-bold ${notice.type === 'success' ? 'border-emerald-200 bg-gradient-to-l from-emerald-50 to-white text-emerald-800' : 'border-red-200 bg-gradient-to-l from-red-50 to-white text-red-800'}`}>{notice.text}</div>
+        )}
+
+        {/* ===== بطاقة الملف مع الغلاف المتدرّج ===== */}
+        <ScrollReveal direction="up">
+          <section className="relative overflow-hidden rounded-[28px] border border-blue-100/80 bg-white shadow-[0_24px_70px_-30px_rgba(30,58,138,0.3)]">
+            <div className="relative h-32 bg-gradient-to-l from-[#2563EB] via-[#4F46E5] to-[#7C3AED] sm:h-40">
+              <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(rgba(255,255,255,0.16) 1px, transparent 1px)', backgroundSize: '22px 22px' }} />
+              <div className="absolute -right-10 -top-10 h-44 w-44 rounded-full bg-white/10 blur-2xl" />
+              <div className="absolute left-1/4 top-6 h-24 w-24 rounded-full bg-white/10 blur-xl" />
+              <div className="absolute bottom-3 right-6 hidden items-center gap-2 rounded-full bg-white/15 px-3.5 py-1.5 text-xs font-bold text-white backdrop-blur-sm sm:flex">
+                <ShieldCheck className="h-4 w-4" /> مدرس موثّق من إدارة حِصّتي
               </div>
-              {tutor.levels.length > 0 && <div className="flex flex-wrap gap-2 mt-4">{tutor.levels.map((level, i) => <span key={i} className="px-3 py-1 rounded-xl bg-gray-50 border border-gray-200 text-xs font-bold text-gray-700">{level}</span>)}</div>}
             </div>
+
+            <div className="relative px-5 pb-6 sm:px-8 sm:pb-7">
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-end">
+                <div className="relative -mt-14 shrink-0 sm:-mt-16">
+                  <div className="rounded-[26px] bg-gradient-to-br from-[#2563EB] to-[#7C3AED] p-[3px] shadow-xl shadow-blue-600/25">
+                    <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-[23px] bg-white sm:h-32 sm:w-32">
+                      {tutor.avatarUrl ? (
+                        <img src={tutor.avatarUrl} alt={tutor.name} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                      ) : (
+                        <span className="text-4xl font-black text-blue-300">{tutor.name.slice(0, 1)}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="absolute -bottom-2 -left-2 flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[#2563EB] to-[#7C3AED] text-white shadow-lg shadow-blue-600/30 ring-4 ring-white">
+                    <ShieldCheck className="h-5 w-5" />
+                  </div>
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <h1 className="text-2xl font-black text-slate-900 sm:text-3xl">{tutor.name}</h1>
+                    <span className="rounded-full border border-blue-100 bg-gradient-to-l from-[#EFF6FF] to-[#F5F3FF] px-3 py-1 text-xs font-black text-[#1E3A8A]">
+                      {tutor.subject || 'تخصص غير محدد'}
+                    </span>
+                  </div>
+                  {tutor.title && <p className="mt-2 text-sm font-bold text-slate-500">{tutor.title}</p>}
+                  <div className="mt-3.5 flex flex-wrap gap-2.5">
+                    <span className="inline-flex items-center gap-1.5 rounded-2xl border border-amber-100 bg-gradient-to-l from-amber-50 to-orange-50 px-3 py-2 text-xs font-bold text-amber-700">
+                      <Star className="h-4 w-4 fill-amber-400 text-amber-500" />{tutor.rating.toFixed(1)} · {tutor.reviewsCount} تقييم
+                    </span>
+                    {tutor.governorate && (
+                      <span className="inline-flex items-center gap-1.5 rounded-2xl border border-blue-100 bg-gradient-to-l from-blue-50 to-indigo-50 px-3 py-2 text-xs font-bold text-slate-600">
+                        <MapPin className="h-4 w-4 text-[#2563EB]" />{tutor.governorate}{tutor.area ? ` — ${tutor.area}` : ''}
+                      </span>
+                    )}
+                    {tutor.experienceYears > 0 && (
+                      <span className="inline-flex items-center gap-1.5 rounded-2xl border border-violet-100 bg-gradient-to-l from-violet-50 to-purple-50 px-3 py-2 text-xs font-bold text-violet-700">
+                        <Award className="h-4 w-4" />{tutor.experienceYears} سنة خبرة
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {onOpenBooking && (
+                  <div className="shrink-0 sm:pb-1">
+                    <button onClick={() => onOpenBooking(tutor)} className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-l from-[#2563EB] to-[#7C3AED] px-7 py-3.5 text-sm font-black text-white shadow-lg shadow-blue-600/25 transition-all hover:shadow-xl hover:shadow-blue-600/30 active:scale-[0.97] sm:w-auto">
+                      <Calendar className="w-4 h-4" />احجز مع المدرس
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {tutor.levels.length > 0 && (
+                <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-5">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-400"><GraduationCap className="h-4 w-4" />المراحل:</span>
+                  {tutor.levels.map((level, i) => (
+                    <span key={i} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-600">{level}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        </ScrollReveal>
+
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          {/* ===== المحتوى الرئيسي ===== */}
+          <div className="space-y-6 lg:col-span-2">
+            <ScrollReveal direction="up" delay={60}>
+              <section className="card-lux rounded-3xl border border-slate-200/90 bg-white p-6 sm:p-7">
+                <div className="mb-4 flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[#2563EB] to-[#7C3AED] text-white shadow-lg shadow-blue-600/25">
+                    <BookOpen className="h-5 w-5" />
+                  </span>
+                  <h2 className="text-lg font-black text-[#1E3A8A]">نبذة وخبرات</h2>
+                </div>
+                <p className="text-sm leading-8 text-slate-600">{tutor.bio || 'لم يضف المدرس نبذة تعريفية بعد.'}</p>
+                {tutor.centers.length > 0 && (
+                  <div className="mt-5 border-t border-slate-100 pt-5">
+                    <h3 className="mb-2.5 inline-flex items-center gap-1.5 text-sm font-black text-slate-700"><MapPin className="h-4 w-4 text-[#2563EB]" />أماكن التدريس</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {tutor.centers.map((c, i) => (
+                        <span key={i} className="rounded-xl border border-blue-100/80 bg-gradient-to-l from-[#EFF6FF] to-[#F5F3FF] px-3.5 py-2 text-xs font-bold text-[#1E3A8A]">{c}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {hasBreakdown && (
+                  <div className="mt-5 grid grid-cols-1 gap-4 border-t border-slate-100 pt-5 sm:grid-cols-2">
+                    {breakdownItems.map(([label, val]) => (
+                      <div key={label}>
+                        <div className="mb-1.5 flex items-center justify-between text-xs font-bold">
+                          <span className="text-slate-500">{label}</span>
+                          <span className="text-[#1E3A8A]">{val.toFixed(1)} / 5</span>
+                        </div>
+                        <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
+                          <div className="h-full rounded-full bg-gradient-to-l from-[#2563EB] to-[#7C3AED] shadow-sm" style={{ width: `${Math.min((val / 5) * 100, 100)}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </ScrollReveal>
+
+            <ScrollReveal direction="up" delay={100}>
+              <section className="card-lux rounded-3xl border border-slate-200/90 bg-white p-6 sm:p-7">
+                <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[#2563EB] to-[#7C3AED] text-white shadow-lg shadow-blue-600/25">
+                      <MessageSquare className="h-5 w-5" />
+                    </span>
+                    <h2 className="text-lg font-black text-[#1E3A8A]">آراء الطلاب</h2>
+                  </div>
+                  <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-[11px] font-bold text-emerald-700">تقييمات بعد حصص مكتملة فقط</span>
+                </div>
+                {reviews.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 p-6 text-center text-sm text-slate-500">لا توجد تقييمات حقيقية منشورة حتى الآن — كن أول من يقيّم بعد أول حصة.</div>
+                ) : (
+                  <div className="space-y-4">
+                    {reviews.map(r => (
+                      <article key={r.id} className="rounded-2xl border border-slate-100 bg-gradient-to-l from-slate-50/60 to-white p-4 transition-colors hover:border-blue-100">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-1">{[1,2,3,4,5].map(s => <Star key={s} className={`h-4 w-4 ${s <= r.rating ? 'fill-amber-400 text-amber-500' : 'text-slate-200'}`} />)}</div>
+                          <span className="text-[11px] font-bold text-slate-400">{new Date(r.created_at).toLocaleDateString('ar-EG')}</span>
+                        </div>
+                        <p className="mt-3 text-sm leading-7 text-slate-700">{r.comment || 'بدون تعليق.'}</p>
+                        {r.verified_session && (
+                          <div className="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
+                            <CheckCircle2 className="h-4 w-4" />حصة موثّقة
+                          </div>
+                        )}
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </ScrollReveal>
+
+            <ScrollReveal direction="up" delay={140}>
+              <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+                <form onSubmit={submitReview} className="card-lux space-y-4 rounded-3xl border border-slate-200/90 bg-white p-6">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[#2563EB] to-[#7C3AED] text-white shadow-lg shadow-blue-600/25">
+                      <Star className="h-5 w-5" />
+                    </span>
+                    <h2 className="text-base font-black text-[#1E3A8A]">اكتب تقييمك</h2>
+                  </div>
+                  {eligibleBookings.length === 0 ? (
+                    <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 p-4 text-sm leading-7 text-slate-500">التقييم متاح فقط بعد إتمام حصة مع هذا المدرس — نظامنا يمنع التقييمات الوهمية لحماية الطلاب.</p>
+                  ) : (
+                    <>
+                      <label className="block text-xs font-bold text-slate-600">الحصة المكتملة
+                        <select value={selectedBookingId} onChange={e => setSelectedBookingId(e.target.value)} className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium outline-none transition-all focus:border-[#2563EB] focus:ring-2 focus:ring-blue-100">
+                          <option value="">اختر الحصة</option>
+                          {eligibleBookings.map(b => <option key={b.id} value={b.id}>{b.id.slice(0, 8)}</option>)}
+                        </select>
+                      </label>
+                      <div>
+                        <span className="text-xs font-bold text-slate-600">التقييم العام</span>
+                        <div className="mt-2 flex gap-1.5">
+                          {[1,2,3,4,5].map(s => (
+                            <button type="button" key={s} onClick={() => setRating(s)} className="rounded-xl p-1.5 transition-transform hover:scale-110 active:scale-95" aria-label={`${s} نجوم`}>
+                              <Star className={`h-7 w-7 transition-colors ${s <= rating ? 'fill-amber-400 text-amber-500' : 'text-slate-200'}`} />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        {[["الشرح",teachingQuality,setTeachingQuality],["الالتزام",punctuality,setPunctuality],["التعامل",behavior,setBehavior],["القيمة",valueForMoney,setValueForMoney]].map(([label,val,setter]) => (
+                          <label key={label as string} className="block rounded-2xl border border-slate-200 bg-slate-50/60 p-3 text-xs font-bold text-slate-600">
+                            {label as string}
+                            <select value={val as number} onChange={e => (setter as any)(Number(e.target.value))} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#2563EB]">
+                              {[1,2,3,4,5].map(n => <option key={n} value={n}>{n}</option>)}
+                            </select>
+                          </label>
+                        ))}
+                      </div>
+                      <textarea value={reviewComment} onChange={e => setReviewComment(e.target.value)} placeholder="اكتب رأيك باختصار..." rows={4} className="w-full rounded-2xl border border-slate-200 bg-slate-50/60 px-4 py-3 text-sm outline-none transition-all placeholder:text-slate-400 focus:border-[#2563EB] focus:bg-white focus:ring-2 focus:ring-blue-100" />
+                      <button disabled={savingReview} className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-l from-[#2563EB] to-[#7C3AED] py-3.5 text-sm font-black text-white shadow-lg shadow-blue-600/25 transition-all hover:shadow-xl hover:shadow-blue-600/30 active:scale-[0.97] disabled:opacity-60">
+                        {savingReview ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}إرسال التقييم
+                      </button>
+                    </>
+                  )}
+                </form>
+
+                <form onSubmit={submitReport} className="card-lux space-y-4 rounded-3xl border border-red-100/90 bg-white p-6">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-lg shadow-red-600/25">
+                      <Flag className="h-5 w-5" />
+                    </span>
+                    <h2 className="text-base font-black text-red-700">الإبلاغ عن المدرس</h2>
+                  </div>
+                  <p className="rounded-2xl border border-red-100 bg-red-50/60 p-3.5 text-xs leading-6 text-red-600">استخدم البلاغ عند وجود مشكلة حقيقية فقط — البلاغ يذهب مباشرة للإدارة ويتمتع بسرية تامة.</p>
+                  <label className="block text-xs font-bold text-slate-600">سبب البلاغ
+                    <select value={reportCategory} onChange={e => setReportCategory(e.target.value)} className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium outline-none transition-all focus:border-red-400 focus:ring-2 focus:ring-red-100">
+                      <option value="inappropriate_conduct">سلوك غير مناسب</option>
+                      <option value="external_payment_demand">طلب دفع خارج المنصة</option>
+                      <option value="absence_no_notice">غياب بدون إخطار</option>
+                      <option value="verbal_abuse">إساءة لفظية</option>
+                      <option value="fraud">احتيال</option>
+                      <option value="other">سبب آخر</option>
+                    </select>
+                  </label>
+                  <textarea value={reportDetails} onChange={e => setReportDetails(e.target.value)} placeholder="اشرح المشكلة بالتفصيل..." rows={6} className="w-full rounded-2xl border border-slate-200 bg-slate-50/60 px-4 py-3 text-sm outline-none transition-all placeholder:text-slate-400 focus:border-red-400 focus:bg-white focus:ring-2 focus:ring-red-100" />
+                  <button disabled={sendingReport} className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-l from-red-600 to-rose-600 py-3.5 text-sm font-black text-white shadow-lg shadow-red-600/25 transition-all hover:shadow-xl hover:shadow-red-600/30 active:scale-[0.97] disabled:opacity-60">
+                    {sendingReport ? <Loader2 className="w-4 h-4 animate-spin" /> : <Flag className="w-4 h-4" />}إرسال البلاغ
+                  </button>
+                </form>
+              </div>
+            </ScrollReveal>
           </div>
-          {onOpenBooking && <button onClick={() => onOpenBooking(tutor)} className="mt-6 w-full sm:w-auto px-6 py-3 rounded-2xl bg-[#2563EB] text-white font-black inline-flex items-center justify-center gap-2"><Calendar className="w-4 h-4" />احجز مع المدرس</button>}
-        </section>
 
-        <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-white border border-gray-200 rounded-3xl p-6 space-y-5">
-            <div className="flex items-center gap-2"><BookOpen className="w-5 h-5 text-blue-600" /><h2 className="text-lg font-black text-[#1E3A8A]">نبذة وخبرات</h2></div>
-            <p className="text-sm leading-8 text-gray-600">{tutor.bio || 'لم يضف المدرس نبذة تعريفية بعد.'}</p>
-            {tutor.centers.length > 0 && <div><h3 className="font-black text-sm mb-2">الأماكن</h3><div className="flex flex-wrap gap-2">{tutor.centers.map((c, i) => <span key={i} className="px-3 py-2 bg-gray-50 border rounded-xl text-xs font-bold">{c}</span>)}</div></div>}
-            {(averageBreakdown.teaching || averageBreakdown.punctuality || averageBreakdown.behavior || averageBreakdown.value) > 0 && <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t border-gray-100">{[['الشرح',averageBreakdown.teaching],['الالتزام',averageBreakdown.punctuality],['التعامل',averageBreakdown.behavior],['القيمة',averageBreakdown.value]].map(([label,val]) => <div key={label as string} className="bg-gray-50 rounded-2xl p-3 text-center"><div className="text-xs text-gray-500">{label}</div><div className="mt-1 font-black text-[#1E3A8A]">{Number(val).toFixed(1)}/5</div></div>)}</div>}
-          </div>
-          <div className="bg-white border border-gray-200 rounded-3xl p-6 space-y-4">
-            <div className="flex items-center gap-2"><Users className="w-5 h-5 text-emerald-600" /><h2 className="font-black text-[#1E3A8A]">التقييمات</h2></div>
-            <div className="text-4xl font-black text-[#1E3A8A]">{tutor.rating.toFixed(1)}</div><div className="text-xs text-gray-500">من 5 · {tutor.reviewsCount} تقييم</div>
-            {tutor.pricePerSession > 0 && <div className="pt-3 border-t border-gray-100 text-sm font-black">{tutor.pricePerSession} ج.م / حصة</div>}
-          </div>
-        </section>
+          {/* ===== الشريط الجانبي ===== */}
+          <ScrollReveal direction="up" delay={80}>
+            <aside className="space-y-6 lg:sticky lg:top-6 lg:self-start">
+              <section className="card-lux relative overflow-hidden rounded-3xl border border-slate-200/90 bg-white p-6">
+                <div className="pointer-events-none absolute -left-14 -top-14 h-40 w-40 rounded-full bg-gradient-to-br from-blue-100/70 to-violet-100/60 blur-2xl" />
+                <div className="relative">
+                  <div className="mb-1 inline-flex items-center gap-1.5 text-xs font-bold text-slate-400"><Sparkles className="h-4 w-4 text-violet-500" />التقييم العام</div>
+                  <div className="flex items-end gap-2">
+                    <span className="bg-gradient-to-l from-[#2563EB] to-[#7C3AED] bg-clip-text text-5xl font-black leading-none text-transparent">{tutor.rating.toFixed(1)}</span>
+                    <span className="pb-1 text-sm font-bold text-slate-400">/ 5</span>
+                  </div>
+                  <div className="mt-3 flex items-center gap-1">{[1,2,3,4,5].map(s => <Star key={s} className={`h-5 w-5 ${s <= Math.round(tutor.rating) ? 'fill-amber-400 text-amber-500' : 'text-slate-200'}`} />)}</div>
+                  <div className="mt-2 text-xs font-bold text-slate-400">{tutor.reviewsCount} تقييم موثّق من طلاب حضروا حصصًا فعلية</div>
+                </div>
 
-        <section className="bg-white border border-gray-200 rounded-3xl p-6 space-y-5">
-          <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><MessageSquare className="w-5 h-5 text-blue-600" /><h2 className="text-lg font-black text-[#1E3A8A]">آراء الطلاب</h2></div><span className="text-xs font-bold text-gray-500">تقييمات مسجلة بعد حصة مكتملة</span></div>
-          {reviews.length === 0 ? <p className="text-sm text-gray-500">لا توجد تقييمات حقيقية منشورة حتى الآن.</p> : <div className="space-y-4">{reviews.map(r => <article key={r.id} className="border border-gray-100 rounded-2xl p-4"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-1">{[1,2,3,4,5].map(s => <Star key={s} className={`w-4 h-4 ${s <= r.rating ? 'text-amber-500 fill-amber-400' : 'text-gray-200'}`} />)}</div><span className="text-[11px] text-gray-400">{new Date(r.created_at).toLocaleDateString('ar-EG')}</span></div><p className="mt-3 text-sm leading-7 text-gray-700">{r.comment || 'بدون تعليق.'}</p>{r.verified_session && <div className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-2 py-1"><CheckCircle2 className="w-4 h-4" />حصة موثقة</div>}</article>)}</div>}
-        </section>
+                {tutor.pricePerSession > 0 && (
+                  <div className="relative mt-5 rounded-2xl border border-blue-100/80 bg-gradient-to-l from-[#EFF6FF] to-[#F5F3FF] p-4">
+                    <div className="text-xs font-bold text-slate-500">سعر الحصة</div>
+                    <div className="mt-1 flex items-baseline gap-1.5">
+                      <span className="text-3xl font-black text-[#1E3A8A]">{tutor.pricePerSession}</span>
+                      <span className="text-xs font-bold text-slate-400">ج.م / حصة</span>
+                    </div>
+                    <div className="mt-1.5 flex items-center gap-1.5 text-[11px] font-bold text-emerald-600"><ShieldCheck className="h-3.5 w-3.5" />الدفع محمي عبر المنصة</div>
+                  </div>
+                )}
 
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <form onSubmit={submitReview} className="bg-white border border-gray-200 rounded-3xl p-6 space-y-4">
-            <div className="flex items-center gap-2"><MessageSquare className="w-5 h-5 text-blue-600" /><h2 className="font-black text-[#1E3A8A]">اكتب تقييمك</h2></div>
-            {eligibleBookings.length === 0 ? <p className="text-sm text-gray-500 bg-gray-50 rounded-2xl p-4">التقييم متاح فقط بعد إتمام حصة مع هذا المدرس.</p> : <>
-              <label className="block text-xs font-bold text-gray-600">الحصة المكتملة<select value={selectedBookingId} onChange={e => setSelectedBookingId(e.target.value)} className="mt-2 w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm"><option value="">اختر الحصة</option>{eligibleBookings.map(b => <option key={b.id} value={b.id}>{b.id.slice(0,8)}</option>)}</select></label>
-              <label className="block text-xs font-bold text-gray-600">التقييم العام<div className="flex gap-1 mt-2">{[1,2,3,4,5].map(s => <button type="button" key={s} onClick={() => setRating(s)} className="p-1" aria-label={`${s} نجوم`}><Star className={`w-7 h-7 ${s <= rating ? 'text-amber-500 fill-amber-400' : 'text-gray-200'}`} /></button>)}</div></label>
-              <div className="grid grid-cols-2 gap-3">{[["الشرح",teachingQuality,setTeachingQuality],["الالتزام",punctuality,setPunctuality],["التعامل",behavior,setBehavior],["القيمة",valueForMoney,setValueForMoney]].map(([label,val,setter]) => <label key={label as string} className="text-xs font-bold text-gray-600">{label as string}<select value={val as number} onChange={e => (setter as any)(Number(e.target.value))} className="mt-2 w-full rounded-2xl border px-3 py-2">{[1,2,3,4,5].map(n => <option key={n} value={n}>{n}</option>)}</select></label>)}</div>
-              <textarea value={reviewComment} onChange={e => setReviewComment(e.target.value)} placeholder="اكتب رأيك باختصار..." rows={4} className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm" />
-              <button disabled={savingReview} className="w-full rounded-2xl bg-[#2563EB] text-white py-3 font-black inline-flex items-center justify-center gap-2">{savingReview ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}إرسال التقييم</button>
-            </>}
-          </form>
-
-          <form onSubmit={submitReport} className="bg-white border border-red-100 rounded-3xl p-6 space-y-4">
-            <div className="flex items-center gap-2"><Flag className="w-5 h-5 text-red-500" /><h2 className="font-black text-red-700">الإبلاغ عن المدرس</h2></div>
-            <p className="text-xs text-gray-500">استخدم البلاغ عند وجود مشكلة حقيقية. البلاغ يذهب مباشرة للإدارة.</p>
-            <label className="block text-xs font-bold text-gray-600">سبب البلاغ<select value={reportCategory} onChange={e => setReportCategory(e.target.value)} className="mt-2 w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm"><option value="inappropriate_conduct">سلوك غير مناسب</option><option value="external_payment_demand">طلب دفع خارج المنصة</option><option value="absence_no_notice">غياب بدون إخطار</option><option value="verbal_abuse">إساءة لفظية</option><option value="fraud">احتيال</option><option value="other">سبب آخر</option></select></label>
-            <textarea value={reportDetails} onChange={e => setReportDetails(e.target.value)} placeholder="اشرح المشكلة بالتفصيل..." rows={6} className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm" />
-            <button disabled={sendingReport} className="w-full rounded-2xl bg-red-600 text-white py-3 font-black inline-flex items-center justify-center gap-2">{sendingReport ? <Loader2 className="w-4 h-4 animate-spin" /> : <Flag className="w-4 h-4" />}إرسال البلاغ</button>
-          </form>
-        </section>
+                {onOpenBooking && (
+                  <button onClick={() => onOpenBooking(tutor)} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-l from-[#2563EB] to-[#7C3AED] py-3.5 text-sm font-black text-white shadow-lg shadow-blue-600/25 transition-all hover:shadow-xl hover:shadow-blue-600/30 active:scale-[0.97]">
+                    <Calendar className="w-4 h-4" />احجز مع المدرس
+                  </button>
+                )}
+                <button onClick={() => onNavigate('/search')} className="mt-2.5 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 py-3 text-sm font-bold text-slate-600 transition-all hover:border-slate-900 hover:bg-slate-900 hover:text-white active:scale-[0.97]">
+                  <Users className="w-4 h-4" />مدرسين آخرين
+                </button>
+              </section>
+            </aside>
+          </ScrollReveal>
+        </div>
       </main>
     </div>
   );
