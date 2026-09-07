@@ -98,9 +98,11 @@ export default function App(){
  const {user,logout}=useAuth();
  const [currentPath,setCurrentPath]=useState<string>(()=>typeof window!=='undefined'?window.location.pathname||'/':'/');
  const isLoggedIn=!!user; const currentRole:AccountRole=user?.role||'student';
- const [selectedTutorId,setSelectedTutorId]=useState(''); const [searchSubject,setSearchSubject]=useState(''); const [searchGovernorate,setSearchGovernorate]=useState(''); const [searchCity,setSearchCity]=useState('');
+ /* معرّف المدرس يُهيّأ من الـ URL عند الدخول المباشر (محركات البحث/مشاركة الروابط)
+    لأن التنقل الداخلي عبر handleSelectTutor هو المسار الوحيد الذي كان يضبطه */
+ const [selectedTutorId,setSelectedTutorId]=useState<string>(()=>{if(typeof window==='undefined')return '';const m=window.location.pathname.match(/^\/tutor\/([^/?#]+)/);return m?decodeURIComponent(m[1]):''}); const [searchSubject,setSearchSubject]=useState(''); const [searchGovernorate,setSearchGovernorate]=useState(''); const [searchCity,setSearchCity]=useState('');
  const [needsProfileSetup,setNeedsProfileSetup]=useState(false); const [isCheckingProfile,setIsCheckingProfile]=useState(false); const [signupLegalAccepted,setSignupLegalAccepted]=useState(()=>hasRecentSignupConsent());
- useEffect(()=>{const h=()=>setCurrentPath(window.location.pathname||'/');window.addEventListener('popstate',h);return()=>window.removeEventListener('popstate',h)},[]);
+ useEffect(()=>{const h=()=>{const p=window.location.pathname||'/';const m=p.match(/^\/tutor\/([^/?#]+)/);if(m)setSelectedTutorId(decodeURIComponent(m[1]));setCurrentPath(p)};window.addEventListener('popstate',h);return()=>window.removeEventListener('popstate',h)},[]);
  useEffect(()=>{window.scrollTo({top:0,behavior:'instant' as ScrollBehavior});if(typeof window!=='undefined'&&window.location.pathname!==currentPath)window.history.pushState({},'',currentPath)},[currentPath]);
  const handleNavigate=(path:string)=>{if(path.startsWith('/tutor/'))setSelectedTutorId(path.replace('/tutor/',''));setCurrentPath(path)};
  const handleSearchWithParams=(subject:string,governorate:string,city='')=>{setSearchSubject(subject);setSearchGovernorate(governorate);setSearchCity(city);setCurrentPath('/search')};

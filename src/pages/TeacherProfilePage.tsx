@@ -171,6 +171,7 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({ tutorId,
     description: tutor?.bio || 'ملف مدرس موثق على حِصّتي',
     canonicalPath: `/tutor/${tutorId}`,
     ogType: 'profile',
+    robots: tutor ? undefined : 'noindex, follow',
     jsonLd: tutor ? {
       '@context': 'https://schema.org',
       '@type': 'ProfilePage',
