@@ -23,7 +23,13 @@ interface HomePageProps {
 }
 
 export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onOpenQRSimulator, onOpenAuth, onSearchWithParams }) => {
-  useSEO({ title: 'الرئيسية - حِصّتي | ابحث عن مدرسين موثقين', description: 'منصة حِصّتي تساعد الطلاب وأولياء الأمور على الوصول إلى مدرسين موثقين، حجز الحصص، ومتابعة الحضور والبيانات التعليمية في مكان واحد.', canonicalPath: '/' });
+  useSEO({
+    title: 'ابحث عن مدرسين خصوصيين موثقين في مصر',
+    description: 'منصة حِصّتي تساعد الطلاب وأولياء الأمور على الوصول إلى مدرسين موثقين، حجز الحصص، ومتابعة الحضور والبيانات التعليمية في مكان واحد.',
+    canonicalPath: '/',
+    keywords: 'مدرسين خصوصيين, حجز مدرس خصوصي, مدرسين معتمدين مصر, دروس خصوصية, حضور QR, منصة حصتي',
+    ogImage: 'https://hassty.vercel.app/og-image.png',
+  });
 
   const handleSearch = (subject: string, governorate: string, city: string = '') => onSearchWithParams ? onSearchWithParams(subject, governorate, city) : onNavigate('/search');
   const handleQRSimulator = () => onOpenQRSimulator ? onOpenQRSimulator() : onNavigate('/student/qr-card');

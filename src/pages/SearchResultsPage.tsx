@@ -52,7 +52,7 @@ export const SearchResultsPage: React.FC<SearchResultsPageProps> = ({
   const [error, setError] = useState('');
 
   useSEO({
-    title: subject ? `مدرسين ${subject} المعتمدين في مصر` : 'المدرسين المعتمدين | حِصّتي',
+    title: subject ? `مدرسين ${subject} المعتمدين في مصر` : 'المدرسين المعتمدين للدروس الخصوصية في مصر',
     description: 'ابحث عن المدرسين المعتمدين على منصة حِصّتي حسب المادة والمحافظة والمرحلة.',
     canonicalPath: '/search',
     keywords: `مدرس ${subject || 'خصوصي'}, مدرسين معتمدين, حِصّتي`,
