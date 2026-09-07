@@ -3,9 +3,29 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
 
+/** بصمة إصدار فريدة لكل عملية build — تُدمج في الكود وتُنشر في /version.json
+ *  ليكتشف المتصفح (chunkRecovery.ts) أنه يشغّل نسخة قديمة ويحدّث نفسه تلقائيًا */
+const BUILD_ID = Date.now().toString(36);
+
 export default defineConfig(() => {
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      {
+        name: 'hassty-version-stamp',
+        generateBundle() {
+          this.emitFile({
+            type: 'asset',
+            fileName: 'version.json',
+            source: JSON.stringify({ buildId: BUILD_ID, builtAt: new Date().toISOString() }, null, 2),
+          });
+        },
+      },
+    ],
+    define: {
+      __BUILD_ID__: JSON.stringify(BUILD_ID),
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
@@ -31,7 +51,11 @@ export default defineConfig(() => {
             // ===== Lazy app feature groups (only fetched on demand) =====
             if (id.includes('/src/pages/admin/')) return 'app-admin';
             if (id.includes('/src/pages/teacher/')) return 'app-teacher';
-            if (id.includes('/src/pages/student/') || id.includes('/src/pages/parent/') || id.includes('/src/pages/assistant/')) return 'app-roles';
+            // أدوار منفصلة: ولي الأمر لا يحمّل كود الطلاب/المساعدين والعكس — حزم أصغر
+            // أقل عرضة لفشل التحميل على شبكات ضعيفة (كانت حزمة واحدة app-roles سابقًا)
+            if (id.includes('/src/pages/student/')) return 'app-student';
+            if (id.includes('/src/pages/parent/')) return 'app-parent';
+            if (id.includes('/src/pages/assistant/')) return 'app-assistant';
             if (id.includes('/src/pages/')) return 'app-public';
             // role-only components follow their role chunks
             if (id.includes('/src/components/teacher/')) return 'app-teacher';

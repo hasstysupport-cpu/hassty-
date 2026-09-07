@@ -1,21 +1,30 @@
 import React from 'react';
+import { isImportFailure, smartChunkReload, type RecoveryOutcome } from '../../lib/chunkRecovery';
 
 /**
  * GlobalErrorBoundary — شبكة الأمان الأخيرة ضد «الشاشة البيضاء».
  * أي استثناء غير معالَج أثناء الرندر يُلتقط هنا ويُعرض رسالة عربية ودّية
- * مع تفاصيل الخطأ (لقطّع لقطة شاشة للدعم) وأزرار استرداد — بدل صفحة بيضاء فارغة.
+ * مع تفاصيل الخطأ (لنسخ لقطة شاشة للدعم) وأزرار استرداد — بدل صفحة بيضاء فارغة.
+ *
+ * فشل تحميل الحزم (dynamic import / React.lazy) له مسار خاص:
+ * React يبتلع رفض الوعد ويسلّمه هنا — ولا يصل أبدًا إلى window.onerror —
+ * لذلك الاسترداد الذكي (smartChunkReload) يُطلَق من هذه النقطة:
+ * يفحص الاتصال وبصمة الإصدار ثم يحدّث الصفحة تلقائيًا مرة واحدة،
+ * ولو الإنترنت مقطوع ينتظر عودته ويحدّث تلقائيًا حينها.
  */
 interface State {
   error: Error | null;
   info: string;
   errorId: number; // يزيد مع كل خطأ — يُستخدم لإعادة محاولة الرندر
+  /** حالة الاسترداد الخاص بفشل تحميل الحزم: null = ليس خطأ حزم */
+  importRecovery: null | 'checking' | 'offline' | 'cooldown';
 }
 
 export class GlobalErrorBoundary extends React.Component<{ children: React.ReactNode }, State> {
-  state: State = { error: null, info: '', errorId: 0 };
+  state: State = { error: null, info: '', errorId: 0, importRecovery: null };
 
   static getDerivedStateFromError(error: Error): Partial<State> {
-    return { error };
+    return { error, importRecovery: isImportFailure(error) ? 'checking' : null };
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
@@ -30,9 +39,33 @@ export class GlobalErrorBoundary extends React.Component<{ children: React.React
       };
     } catch { /* ignore */ }
     console.error('[Hassty] خطأ غير معالَج:', error, info?.componentStack);
+
+    // ⚡ المسار الحقيقي لفشل تحميل الحزم: React.lazy رفض الوعد وسلّمه لنا هنا.
+    // ننتظر 600ms حتى تُرسم بطاقة الخطأ أولًا (المستخدم يرى شيئًا بدل وميض أبيض)
+    // ثم نطلق الاسترداد الذكي: فحص الاتصال/الإصدار ← تحديث تلقائي واحد محروس.
+    if (isImportFailure(error)) {
+      window.setTimeout(() => { void this.runImportRecovery(); }, 600);
+    }
   }
 
-  private retry = () => this.setState((s) => ({ error: null, errorId: s.errorId + 1 }));
+  private runImportRecovery = async () => {
+    try {
+      const outcome: RecoveryOutcome = await smartChunkReload();
+      if (outcome === 'offline') this.setState({ importRecovery: 'offline' });
+      else if (outcome === 'cooldown') this.setState({ importRecovery: 'cooldown' });
+      // outcome === 'reload' → الصفحة ستُعاد تحميلها بالفعل من داخل smartChunkReload
+    } catch { /* ignore */ }
+  };
+
+  private retry = () => {
+    // React.lazy يخزّن الوعد المرفوض نهائيًا — إعادة الرندر وحدها لن تعيد تحميل الحزمة.
+    // لفشل الحزم: «إعادة المحاولة» = استرداد ذكي (يتخطى فترة التهدئة لأن المستخدم هو من طلب).
+    if (this.state.error && isImportFailure(this.state.error)) {
+      void smartChunkReload({ force: true });
+      return;
+    }
+    this.setState((s) => ({ error: null, errorId: s.errorId + 1, importRecovery: null }));
+  };
 
   private goHome = () => {
     try { sessionStorage.removeItem('hassty_loop_detected'); } catch { /* ignore */ }
@@ -50,10 +83,11 @@ export class GlobalErrorBoundary extends React.Component<{ children: React.React
   };
 
   render() {
-    const { error } = this.state;
+    const { error, importRecovery } = this.state;
     if (!error) return this.props.children;
 
     const isLoop = /Maximum update depth|update depth exceeded/i.test(String(error.message || ''));
+    const isImport = isImportFailure(error);
     return (
       <div dir="rtl" className="min-h-screen bg-[#F6F9FF] flex items-center justify-center px-4 py-10 font-sans">
         <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl shadow-[0_24px_70px_-30px_rgba(30,58,138,0.35)] overflow-hidden">
@@ -69,10 +103,35 @@ export class GlobalErrorBoundary extends React.Component<{ children: React.React
             </div>
           </div>
           <div className="p-6 space-y-4">
-            <p className="text-sm text-[#374151] leading-relaxed">
-              جرّب زر <span className="font-bold">«إعادة المحاولة»</span> — لو استمرت المشكلة اضغط
-              <span className="font-bold"> «تحديث الصفحة»</span>. لو تكررت كثيرًا انسخ تفاصيل الخطأ وابعتهالا لدعم واتساب.
-            </p>
+            {isImport ? (
+              <p className="text-sm text-[#374151] leading-relaxed">
+                فشل تحميل أحد ملفات الموقع من الإنترنت — أشيع سبب هو ضعف الاتصال لحظة فتح الصفحة.
+                جرّب <span className="font-bold">«إعادة المحاولة»</span>، ولو استمرت المشكلة اتأكد إن الشبكة شغالة واضغط
+                <span className="font-bold"> «تحديث الصفحة»</span>.
+              </p>
+            ) : (
+              <p className="text-sm text-[#374151] leading-relaxed">
+                جرّب زر <span className="font-bold">«إعادة المحاولة»</span> — لو استمرت المشكلة اضغط
+                <span className="font-bold"> «تحديث الصفحة»</span>. لو تكررت كثيرًا انسخ تفاصيل الخطأ وابعتهالا لدعم واتساب.
+              </p>
+            )}
+
+            {isImport && importRecovery === 'checking' && (
+              <p className="text-xs bg-blue-50 border border-blue-200 text-blue-800 rounded-xl px-3 py-2.5 leading-relaxed">
+                بنحاول نصلّح المشكلة تلقائيًا... الصفحة هتتحدّث لحظة لو لزم الأمر.
+              </p>
+            )}
+            {isImport && importRecovery === 'offline' && (
+              <p className="text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-3 py-2.5 leading-relaxed">
+                مفيش اتصال بالإنترنت حاليًا. أول ما الاتصال يرجع، الصفحة هتتحدّث تلقائيًا من غير ما تعمل حاجة.
+              </p>
+            )}
+            {isImport && importRecovery === 'cooldown' && (
+              <p className="text-xs bg-slate-50 border border-slate-200 text-slate-700 rounded-xl px-3 py-2.5 leading-relaxed">
+                حاولنا الإصلاح التلقائي قبل قليل. اضغط «تحديث الصفحة»، ولو المشكلة استمرت جرّب إغلاق التبويب وفتحه من جديد.
+              </p>
+            )}
+
             {isLoop && (
               <p className="text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-3 py-2 leading-relaxed">
                 سبب الخطأ: تكرار تحويلات داخلي سريع (غالبًا بسبب حالة جلسة قديمة في المتصفح). زر «تحديث الصفحة» يعالجها فورًا.
