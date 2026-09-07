@@ -12,6 +12,8 @@ interface SeoProps {
   jsonLd?: Record<string, any> | null;
   /** صورة Open Graph الخاصة بالصفحة (اختياري — الافتراضية في index.html) */
   ogImage?: string;
+  /** مسار تنقل الصفحة (الرئيسية ضمنية) — يبني BreadcrumbList تلقائياً */
+  breadcrumbs?: string[];
 }
 
 export const DEFAULT_TITLE = 'منصة حصتي | أفضل منصة لحجز المدرسين الخصوصيين وحضور الـ QR في مصر';
@@ -39,12 +41,39 @@ const setLink = (selector: string, rel: string, href: string) => {
   el.setAttribute('href', href);
 };
 
+/** يجمع JSON-LD الخاص بالصفحة + BreadcrumbList في كيان واحد @graph */
+const buildCombinedJsonLd = (
+  jsonLd: Record<string, any> | null | undefined,
+  breadcrumbs: string[] | undefined,
+  canonicalUrl: string,
+): Record<string, any> | null => {
+  const graph: Record<string, any>[] = [];
+  if (jsonLd) graph.push(jsonLd);
+  if (breadcrumbs && breadcrumbs.length) {
+    graph.push({
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'الرئيسية', item: `${BASE_URL}/` },
+        ...breadcrumbs.map((name, i) => ({
+          '@type': 'ListItem',
+          // آخر عنصر = الصفحة الحالية بلا item URL (توصية Google)
+          ...(i < breadcrumbs.length - 1
+            ? { position: i + 2, name, item: canonicalUrl }
+            : { position: i + 2, name }),
+        })),
+      ],
+    });
+  }
+  if (!graph.length) return null;
+  return graph.length === 1 ? graph[0] : { '@context': 'https://schema.org', '@graph': graph };
+};
+
 /**
  * Custom React Hook to manage dynamic SEO title, description, OpenGraph,
  * Twitter, canonical, robots and JSON-LD structured data per page —
  * with automatic restore to site defaults on unmount (SPA navigation safety).
  */
-export function useSEO({ title, description, keywords, canonicalPath, ogType = 'website', robots, jsonLd, ogImage }: SeoProps) {
+export function useSEO({ title, description, keywords, canonicalPath, ogType = 'website', robots, jsonLd, ogImage, breadcrumbs }: SeoProps) {
   const jsonLdKey = jsonLd ? JSON.stringify(jsonLd) : '';
   const jsonLdId = 'page-specific-jsonld';
 
@@ -79,7 +108,11 @@ export function useSEO({ title, description, keywords, canonicalPath, ogType = '
     setLink('link[rel="canonical"]', 'canonical', fullCanonical);
 
     // 7. Page-specific JSON-LD structured data
-    if (jsonLd) {
+    // لو دخلت عبر SPA على صفحة ثابتة prerendered، احذف JSON-LD المسار الثابت
+    // حتى لا يتعارض مسار التنقل مع meta الصفحة الحالية (المستخدم نفسه يرى الصحيح عبر JS)
+    document.querySelectorAll('script[data-route="prerendered"]').forEach((s) => s.remove());
+    const combinedJsonLd = buildCombinedJsonLd(jsonLd, breadcrumbs, fullCanonical);
+    if (combinedJsonLd) {
       let script = document.getElementById(jsonLdId) as HTMLScriptElement | null;
       if (!script) {
         script = document.createElement('script');
@@ -87,7 +120,7 @@ export function useSEO({ title, description, keywords, canonicalPath, ogType = '
         script.type = 'application/ld+json';
         document.head.appendChild(script);
       }
-      script.textContent = JSON.stringify(jsonLd);
+      script.textContent = JSON.stringify(combinedJsonLd);
     }
 
     // Cleanup: استرجاع الإعدادات الافتراضية للموقع عند مغادرة الصفحة
@@ -107,5 +140,5 @@ export function useSEO({ title, description, keywords, canonicalPath, ogType = '
       if (script) script.remove();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, description, keywords, canonicalPath, ogType, robots, jsonLdKey, ogImage]);
+  }, [title, description, keywords, canonicalPath, ogType, robots, jsonLdKey, ogImage, breadcrumbs?.join('/')]);
 }

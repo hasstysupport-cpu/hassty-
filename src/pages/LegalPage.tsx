@@ -46,10 +46,21 @@ const LegalLayout = ({ active, setActive, onNavigate, children }: { active: Lega
 
 export const LegalPage: React.FC<LegalPageProps> = ({ section = 'terms', onNavigate }) => {
   const [active, setActive] = useState<LegalSection>(section);
+  const LEGAL_TITLES: Record<string, string> = {
+    privacy: 'سياسة الخصوصية',
+    terms: 'شروط الاستخدام',
+    teacher: 'توثيق المعلمين وشروط الخدمة',
+    cookies: 'سياسة الكوكيز',
+    acceptable: 'سياسة الاستخدام المقبول',
+    refund: 'سياسة الدفع والاسترداد',
+    rights: 'حقوق البيانات',
+  };
   useSEO({
-    title: active === 'privacy' ? 'سياسة الخصوصية - حِصّتي' : active === 'terms' ? 'شروط الاستخدام - حِصّتي' : 'المركز القانوني - حِصّتي',
+    title: LEGAL_TITLES[active] || 'المركز القانوني',
     description: 'المركز القانوني لمنصة حِصّتي: شروط الاستخدام، الخصوصية، توثيق المعلمين، الدفع والاسترداد وحقوق البيانات.',
     canonicalPath: `/legal/${active}`,
+    breadcrumbs: [LEGAL_TITLES[active] || 'المركز القانوني'],
+    keywords: `${LEGAL_TITLES[active] || 'المركز القانوني'}, حصتي, Hassty legal`,
   });
 
   const common = <>

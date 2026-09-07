@@ -27,6 +27,7 @@ export const ForTeachersPage: React.FC<ForTeachersPageProps> = ({ onNavigate }) 
     title: 'انضم كمدرس معتمد - نمِّ دخلك وطلّابك',
     description: 'انضم إلى منصة حصتي كمعلم معتمد واستفد من نظام إدارة المجموعات والـ QR كود لمتابعة الطلاب، أقل نسبة عمولة في مصر، وإعلانات موجهة لمنطقتك.',
     canonicalPath: '/for-teachers',
+    breadcrumbs: ['انضم كمدرس'],
     keywords: 'انضم كمدرس, تدريس خصوصي مصر, زيادة طلاب الدروس, نظام حضور الطلاب للمدرسين, سناتر تعليمية',
   });
 

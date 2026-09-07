@@ -15,6 +15,7 @@ export const AssistantSignupPage: React.FC<{ onNavigate: (path: string) => void 
     title: 'التسجيل كمساعد مدرس',
     description: 'انضم كمساعد مدرس على منصة حصتي: ساعد المدرسين في الحضور والمدفوعات واربح دخلًا إضافيًا من خلال اعتماد المدرسين لك ضمن مجموعاتهم.',
     canonicalPath: '/assistant/signup',
+    breadcrumbs: ['التسجيل كمساعد'],
     keywords: 'مساعد مدرس, وظيفة مساعد تدريس, مساعد مدرس خصوصي, Hassty assistant',
   });
 

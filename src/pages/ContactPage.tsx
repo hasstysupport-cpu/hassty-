@@ -51,6 +51,7 @@ export const ContactPage: React.FC<ContactPageProps> = ({ onNavigate }) => {
     title: 'اتصل بنا والدعم الفني',
     description: 'تواصل مع فريق الدعم الفني لمنصة حصتي للاستفسارات العامة، دعم المدرسين والطلاب، أو عبر الواتساب والبريد الإلكتروني المباشر.',
     canonicalPath: '/contact',
+    breadcrumbs: ['اتصل بنا'],
     keywords: 'اتصل بنا حصتي, دعم منصة حصتي, خدمة العملاء, مساعدة أولياء الأمور والطلاب',
   });
 

@@ -55,6 +55,7 @@ export const SearchResultsPage: React.FC<SearchResultsPageProps> = ({
     title: subject ? `مدرسين ${subject} المعتمدين في مصر` : 'المدرسين المعتمدين للدروس الخصوصية في مصر',
     description: 'ابحث عن المدرسين المعتمدين على منصة حِصّتي حسب المادة والمحافظة والمرحلة.',
     canonicalPath: '/search',
+    breadcrumbs: ['المدرسين المعتمدين'],
     keywords: `مدرس ${subject || 'خصوصي'}, مدرسين معتمدين, حِصّتي`,
   });
 

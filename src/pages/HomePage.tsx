@@ -10,6 +10,7 @@ import { AccountTypesSection } from '../components/AccountTypesSection';
 import { FeaturesSection } from '../components/FeaturesSection';
 import { TeacherCTASection } from '../components/TeacherCTASection';
 import { PlatformProofSection } from '../components/PlatformProofSection';
+import { FAQSection } from '../components/FAQSection';
 import { ScrollReveal } from '../components/common/ScrollReveal';
 import { AccountRole } from '../types';
 import '../landing.css';
@@ -50,6 +51,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onOpenQRSimulato
       <ScrollReveal direction="up" delay={90}><AccountTypesSection onSelectRole={(role) => handleAuth('register', role)} /></ScrollReveal>
       <ScrollReveal direction="up" delay={90}><FeaturesSection /></ScrollReveal>
       <ScrollReveal direction="up" delay={90}><PlatformProofSection /></ScrollReveal>
+      <ScrollReveal direction="up" delay={90}><FAQSection /></ScrollReveal>
       <ScrollReveal direction="up" delay={100}><TeacherCTASection onJoinAsTeacher={() => onNavigate('/for-teachers')} /></ScrollReveal>
     </div>
   );

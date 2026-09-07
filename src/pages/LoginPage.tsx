@@ -33,6 +33,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigate, onLoginSuccess
     title: 'تسجيل الدخول — طالب، ولي أمر، أو مدرس',
     description: 'سجّل الدخول إلى حسابك في منصة حصتي لمتابعة الحصص، الحضور بالـ QR، الدرجات، والمدفوعات. دخول آمن بكلمة المرور أو بحساب جوجل.',
     canonicalPath: '/login',
+    breadcrumbs: ['تسجيل الدخول'],
     keywords: 'تسجيل دخول حصتي, دخول الطالب, دخول ولي الأمر, دخول المدرس, Hassty login',
   });
 

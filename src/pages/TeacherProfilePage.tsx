@@ -172,6 +172,7 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({ tutorId,
     canonicalPath: `/tutor/${tutorId}`,
     ogType: 'profile',
     robots: tutor ? undefined : 'noindex, follow',
+    breadcrumbs: tutor ? ['المدرسين المعتمدين', tutor.name] : ['المدرسين المعتمدين'],
     jsonLd: tutor ? {
       '@context': 'https://schema.org',
       '@type': 'ProfilePage',

@@ -52,6 +52,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onNavigate, onSignupSucc
     title: 'إنشاء حساب جديد — طالب، ولي أمر، أو مدرس',
     description: 'أنشئ حسابك المجاني على منصة حصتي في دقيقة: حساب طالب لمتابعة الحصص والدرجات، حساب ولي أمر لمتابعة أبنائك، أو حساب مدرس لإدارة مجموعاتك وأرباحك.',
     canonicalPath: '/signup',
+    breadcrumbs: ['إنشاء حساب'],
     keywords: 'إنشاء حساب حصتي, تسجيل طالب جديد, تسجيل ولي أمر, حساب مدرس, Hassty signup',
   });
 
