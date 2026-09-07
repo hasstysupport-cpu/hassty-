@@ -28,7 +28,7 @@ export const ForTeachersPage: React.FC<ForTeachersPageProps> = ({ onNavigate }) 
     description: 'انضم إلى منصة حصتي كمعلم معتمد واستفد من نظام إدارة المجموعات والـ QR كود لمتابعة الطلاب، أقل نسبة عمولة في مصر، وإعلانات موجهة لمنطقتك.',
     canonicalPath: '/for-teachers',
     breadcrumbs: ['انضم كمدرس'],
-    keywords: 'انضم كمدرس, تدريس خصوصي مصر, زيادة طلاب الدروس, نظام حضور الطلاب للمدرسين, سناتر تعليمية',
+    keywords: 'انضم كمدرس, سجل كمدرس خصوصي, تدريس خصوصي مصر, زيادة طلاب الدروس, نظام حضور الطلاب للمدرسين, ماسح QR للمدرسين, سناتر تعليمية, Hassty for teachers, tutor Egypt',
   });
 
   return (
