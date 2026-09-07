@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useSEO } from '../lib/useSEO';
 import { BriefcaseBusiness, CheckCircle2, FileBadge, MapPin, ShieldCheck, User, Eye, EyeOff, Loader2, RefreshCw, Mail } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { authApi } from '../lib/authApi';
@@ -9,6 +10,14 @@ import { SIGNUP_CONSENT_KEY } from '../lib/legal';
 
 export const AssistantSignupPage: React.FC<{ onNavigate: (path: string) => void }> = ({ onNavigate }) => {
   const { finishPasswordLogin } = useAuth();
+
+  useSEO({
+    title: 'التسجيل كمساعد مدرس',
+    description: 'انضم كمساعد مدرس على منصة حصتي: ساعد المدرسين في الحضور والمدفوعات واربح دخلًا إضافيًا من خلال اعتماد المدرسين لك ضمن مجموعاتهم.',
+    canonicalPath: '/assistant/signup',
+    keywords: 'مساعد مدرس, وظيفة مساعد تدريس, مساعد مدرس خصوصي, Hassty assistant',
+  });
+
   const [name, setName] = useState(''); const [email, setEmail] = useState(''); const [password, setPassword] = useState(''); const [showPassword, setShowPassword] = useState(false);
   const [phone, setPhone] = useState(''); const [whatsappPhone, setWhatsappPhone] = useState(''); const [governorate, setGovernorate] = useState('القاهرة'); const [city, setCity] = useState('مدينة نصر');
   const [experienceYears, setExperienceYears] = useState(''); const [experienceSummary, setExperienceSummary] = useState(''); const [education, setEducation] = useState(''); const [certificateSummary, setCertificateSummary] = useState('');

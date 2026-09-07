@@ -54,29 +54,31 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({ currentPath, isLogge
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-[#E5E7EB] transition-all">
+      {/* خط الهوية المتدرج — مطابق لبار لوحات التحكم */}
+      <div className="h-[2px] bg-grad opacity-70 w-full" aria-hidden="true" />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20">
-          <button onClick={() => handleLinkClick('/')} className="flex items-center gap-3 group text-right cursor-pointer"><BrandLogo size="md" /></button>
+        <div className="flex items-center justify-between h-14 gap-2">
+          <button onClick={() => handleLinkClick('/')} className="flex items-center group text-right cursor-pointer shrink-0"><BrandLogo size="sm" /></button>
 
           <nav className="hidden lg:flex items-center gap-1 xl:gap-2">
             {navLinks.map((link) => {
               const isActive = currentPath === link.path || (link.path !== '/' && currentPath.startsWith(link.path));
-              return <button key={link.path} onClick={() => handleLinkClick(link.path)} className={`px-3.5 py-2 text-sm font-bold rounded-xl transition-all cursor-pointer ${isActive ? 'text-[#2563EB] bg-[#EFF6FF]' : 'text-[#1F2937] hover:text-[#2563EB] hover:bg-gray-50'}`}>{link.name}</button>;
+              return <button key={link.path} onClick={() => handleLinkClick(link.path)} className={`px-3 py-1.5 text-[13px] font-bold rounded-xl transition-all cursor-pointer ${isActive ? 'text-[#2563EB] bg-[#EFF6FF]' : 'text-[#1F2937] hover:text-[#2563EB] hover:bg-gray-50'}`}>{link.name}</button>;
             })}
           </nav>
 
-          <div className="hidden md:flex items-center gap-2.5">
+          <div className="hidden md:flex items-center gap-2">
             {isLoggedIn ? (
-              <div className="flex items-center gap-3">
-                <button onClick={() => handleLinkClick(getDashboardPath())} className="px-4 py-2.5 text-xs font-bold text-white bg-[#2563EB] hover:bg-[#1D4ED8] rounded-xl transition-all shadow-sm flex items-center gap-2 cursor-pointer"><LayoutDashboard className="w-4 h-4" /><span>الذهاب إلى {getRoleTitle()}</span></button>
-                <div onClick={() => handleLinkClick(getDashboardPath())} className="flex items-center gap-2 p-1.5 pr-2.5 bg-gray-50 border border-gray-200 rounded-xl cursor-pointer hover:border-blue-300 transition-colors"><img src={userAvatar} alt={userName} className="w-7 h-7 rounded-lg object-cover border border-gray-200" referrerPolicy="no-referrer"/><span className="text-xs font-bold text-gray-800 max-w-[100px] truncate">{userName}</span></div>
-                {onLogout && <button onClick={onLogout} title="تسجيل الخروج" className="p-2.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-red-200"><LogOut className="w-4 h-4" /></button>}
+              <div className="flex items-center gap-2.5">
+                <button onClick={() => handleLinkClick(getDashboardPath())} className="px-3.5 py-2 text-xs font-bold text-white bg-[#2563EB] hover:bg-[#1D4ED8] rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"><LayoutDashboard className="w-4 h-4" /><span className="hidden xl:inline">الذهاب إلى {getRoleTitle()}</span><span className="xl:hidden">{getRoleTitle()}</span></button>
+                <div onClick={() => handleLinkClick(getDashboardPath())} className="hidden sm:flex items-center gap-2 p-1.5 pr-2.5 bg-gray-50 border border-gray-200 rounded-xl cursor-pointer hover:border-blue-300 transition-colors"><img src={userAvatar} alt={userName} className="w-6 h-6 rounded-lg object-cover border border-gray-200" referrerPolicy="no-referrer"/><span className="text-xs font-bold text-gray-800 max-w-[90px] truncate">{userName}</span></div>
+                {onLogout && <button onClick={onLogout} title="تسجيل الخروج" className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-red-200"><LogOut className="w-4 h-4" /></button>}
               </div>
             ) : (
               <>
-                <button onClick={handleAssistantSignupClick} className="px-3.5 py-2.5 text-xs font-bold text-indigo-700 hover:text-indigo-800 hover:bg-indigo-50 border border-indigo-100 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"><UsersRound className="w-3.5 h-3.5" /><span>انضم كمساعد</span></button>
-                <button onClick={handleLoginClick} className="px-4 py-2.5 text-xs font-bold text-[#1E3A8A] hover:text-[#2563EB] hover:bg-gray-50 border border-[#E5E7EB] rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"><LogIn className="w-3.5 h-3.5" /><span>تسجيل الدخول</span></button>
-                <button onClick={handleSignupClick} className="px-4 py-2.5 text-xs font-bold text-white bg-[#2563EB] hover:bg-[#1D4ED8] rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"><UserPlus className="w-3.5 h-3.5" /><span>إنشاء حساب جديد</span></button>
+                <button onClick={handleAssistantSignupClick} className="hidden xl:flex items-center gap-1.5 px-3 py-2 text-[11px] font-bold text-indigo-700 hover:text-indigo-800 hover:bg-indigo-50 border border-indigo-100 rounded-xl transition-all cursor-pointer"><UsersRound className="w-3.5 h-3.5" /><span>انضم كمساعد</span></button>
+                <button onClick={handleLoginClick} className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-[#1E3A8A] hover:text-[#2563EB] hover:bg-gray-50 border border-[#E5E7EB] rounded-xl transition-all cursor-pointer"><LogIn className="w-3.5 h-3.5" /><span>تسجيل الدخول</span></button>
+                <button onClick={handleSignupClick} className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-[#2563EB] hover:bg-[#1D4ED8] rounded-xl transition-all shadow-xs cursor-pointer"><UserPlus className="w-3.5 h-3.5" /><span>إنشاء حساب</span></button>
               </>
             )}
           </div>

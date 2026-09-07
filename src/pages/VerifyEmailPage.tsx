@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useSEO } from '../lib/useSEO';
 import {
   Mail, CheckCircle2, AlertCircle, Loader2, RefreshCw, ArrowRight, KeyRound, ShieldCheck,
 } from 'lucide-react';
@@ -18,6 +19,13 @@ type Stage = 'input' | 'code' | 'verifying' | 'success' | 'failed';
 
 export const VerifyEmailPage: React.FC<VerifyEmailPageProps> = ({ onNavigate, onVerificationSuccess }) => {
   const { user, finishPasswordLogin } = useAuth();
+
+  useSEO({
+    title: 'تأكيد البريد الإلكتروني',
+    description: 'أكّد بريدك الإلكتروني لتفعيل حسابك على منصة حصتي والوصول إلى لوحة التحكم الخاصة بك.',
+    canonicalPath: '/verify-email',
+    robots: 'noindex, follow',
+  });
 
   const [stage, setStage] = useState<Stage>('input');
   const [email, setEmail] = useState('');

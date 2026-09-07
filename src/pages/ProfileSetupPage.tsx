@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useSEO } from '../lib/useSEO';
 import {
   GraduationCap, Users, Briefcase, CheckCircle2, AlertCircle, Loader2, UserCheck, Phone, MapPin,
   BookOpen, Award, Heart, ShieldCheck, Sparkles, ArrowRight,
@@ -30,6 +31,13 @@ const ROLE_CARDS: { role: AccountRole; icon: any; title: string; desc: string }[
 
 export const ProfileSetupPage: React.FC<ProfileSetupPageProps> = ({ onComplete, onLogout }) => {
   const { user, refreshUser } = useAuth();
+
+  useSEO({
+    title: 'استكمال بيانات الحساب',
+    description: 'أكمل بيانات حسابك على منصة حصتي لبدء استخدام لوحة التحكم.',
+    robots: 'noindex, follow',
+  });
+
   const googleFirstLogin = typeof window !== 'undefined' && Boolean(localStorage.getItem('hassty_google_login_started_at'));
 
   const [role, setRole] = useState<AccountRole>('student');

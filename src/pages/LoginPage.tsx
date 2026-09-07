@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useSEO } from '../lib/useSEO';
 import {
   Mail, Lock, Eye, EyeOff, AlertCircle, CheckCircle2, ShieldCheck, RefreshCw,
   ArrowRight, KeyRound, Smartphone, GraduationCap, Send, Loader2,
@@ -27,6 +28,13 @@ const GoogleIcon: React.FC = () => (
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onNavigate, onLoginSuccess }) => {
   const { beginPasswordLogin, finishPasswordLogin, loginWithGoogle } = useAuth();
+
+  useSEO({
+    title: 'تسجيل الدخول — طالب، ولي أمر، أو مدرس',
+    description: 'سجّل الدخول إلى حسابك في منصة حصتي لمتابعة الحصص، الحضور بالـ QR، الدرجات، والمدفوعات. دخول آمن بكلمة المرور أو بحساب جوجل.',
+    canonicalPath: '/login',
+    keywords: 'تسجيل دخول حصتي, دخول الطالب, دخول ولي الأمر, دخول المدرس, Hassty login',
+  });
 
   const [stage, setStage] = useState<Stage>('credentials');
   const [email, setEmail] = useState('');

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSEO } from '../../lib/useSEO';
 import {
   MessageSquare,
   Send,
@@ -25,6 +26,11 @@ import {
 import { whatsappService, InteractiveButton, InteractiveListSection, WhatsAppGatewayStatus } from '../../lib/whatsappService';
 
 export const WhatsAppStudioPage: React.FC = () => {
+  useSEO({
+    title: 'استوديو الواتساب — إدارة',
+    description: 'أداة إدارية داخلية لإرسال رسائل الواتساب.',
+    robots: 'noindex, nofollow',
+  });
   const [activeTab, setActiveTab] = useState<'text' | 'interactive' | 'list' | 'media' | 'location' | 'reaction'>('interactive');
   const [status, setStatus] = useState<WhatsAppGatewayStatus | null>(null);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);

@@ -1,22 +1,28 @@
 # https://www.robotstxt.org/robotstxt.html
+# robots.txt — منصة حصتي (Hassty)
 User-agent: *
 Allow: /
 Allow: /about
 Allow: /contact
 Allow: /for-teachers
-Allow: /teachers
 Allow: /search
 Allow: /login
 Allow: /signup
+Allow: /assistant/signup
 Allow: /tutor/
+Allow: /legal/
 
-# Disallow private user portals and backend APIs from search indexing
+# منع فهرسة مساحات العمل الخاصة وواجهات الـ API
 Disallow: /admin
 Disallow: /api/
 Disallow: /student/
 Disallow: /teacher/
 Disallow: /parent/
+Disallow: /assistant/
+Disallow: /whatsapp-studio
+Disallow: /setup-profile
+Disallow: /verify-email
 
-# Sitemap location for Google Search Console and Bing
+# Sitemap لـ Google Search Console و Bing
 Sitemap: https://hassty.vercel.app/sitemap.xml
 Host: https://hassty.vercel.app

@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
+import { useSEO } from '../lib/useSEO';
 import {
   GraduationCap, Users, Briefcase, CheckCircle2, AlertCircle, Loader2, Mail, Lock, Eye, EyeOff,
   RefreshCw, ArrowRight, Phone, MapPin, BookOpen, Sparkles, ShieldCheck, UserCheck, Award, KeyRound, Heart, ChevronDown,
@@ -46,6 +47,13 @@ const GoogleIcon: React.FC = () => (
 
 export const SignupPage: React.FC<SignupPageProps> = ({ onNavigate, onSignupSuccess }) => {
   const { signupUser, finishPasswordLogin, loginWithGoogle } = useAuth();
+
+  useSEO({
+    title: 'إنشاء حساب جديد — طالب، ولي أمر، أو مدرس',
+    description: 'أنشئ حسابك المجاني على منصة حصتي في دقيقة: حساب طالب لمتابعة الحصص والدرجات، حساب ولي أمر لمتابعة أبنائك، أو حساب مدرس لإدارة مجموعاتك وأرباحك.',
+    canonicalPath: '/signup',
+    keywords: 'إنشاء حساب حصتي, تسجيل طالب جديد, تسجيل ولي أمر, حساب مدرس, Hassty signup',
+  });
 
   const [step, setStep] = useState<Step>(1);
   const [isLoading, setIsLoading] = useState(false);
