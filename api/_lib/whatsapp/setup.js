@@ -1,5 +1,5 @@
-import { jsonErr, jsonOk, readJsonBody } from '../_lib/config.js';
-import { configureWebhook, internalOrUser } from './_green.js';
+import { jsonErr, jsonOk, readJsonBody } from '../config.js';
+import { configureWebhook, internalOrUser } from '../green.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return jsonErr(res, 'طريقة الطلب غير مسموحة.', 405);

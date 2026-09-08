@@ -13,7 +13,7 @@ import {
 import { issueCode } from '../_lib/codes.js';
 import { sendAuthEmail } from '../_lib/mailer.js';
 import { isPhoneTaken, resetProfileForRole } from '../_lib/profile.js';
-import { sendText } from '../whatsapp/_green.js';
+import { sendText } from '../_lib/green.js';
 
 const isGoogleAccount = (user) =>
   user?.app_metadata?.provider === 'google' ||

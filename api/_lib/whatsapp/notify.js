@@ -1,6 +1,6 @@
-import { jsonErr, jsonOk, readJsonBody } from '../_lib/config.js';
-import { dbSelect } from '../_lib/supabase.js';
-import { findProfile, internalOrUser, sendFile, sendText } from './_green.js';
+import { jsonErr, jsonOk, readJsonBody } from '../config.js';
+import { dbSelect } from '../supabase.js';
+import { findProfile, internalOrUser, sendFile, sendText } from '../green.js';
 
 const templates = {
   welcome: (role, name) => `*منصة حِصّتي — أهلاً بك* 👋\n\nمرحباً *${name || 'بك'}*! تم إنشاء حسابك في منصة حِصّتي بنجاح.\nنوع الحساب: *${role === 'parent' ? 'ولي أمر' : role === 'teacher' ? 'مدرس' : role === 'assistant' ? 'مساعد' : 'طالب'}* 🎓\n\nنحن معك لتسهيل إدارة التعليم والحصص والمتابعة.`,

@@ -1,5 +1,5 @@
-import { SITE_URL, SUPABASE_URL, SERVICE_KEY } from '../_lib/config.js';
-import { getCallerUser, dbSelect } from '../_lib/supabase.js';
+import { SITE_URL, SUPABASE_URL, SERVICE_KEY } from './config.js';
+import { getCallerUser, dbSelect } from './supabase.js';
 
 const GREEN_API_URL = String(process.env.GREEN_API_URL || '').replace(/\/$/, '');
 const GREEN_API_INSTANCE_ID = String(process.env.GREEN_API_INSTANCE_ID || '');

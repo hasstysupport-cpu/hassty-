@@ -1,5 +1,5 @@
-import { readJsonBody, jsonOk, jsonErr } from '../_lib/config.js';
-import { internalOrUser, sendText, sendFile, sendLocation, sendInteractive, chatId } from './_green.js';
+import { readJsonBody, jsonOk, jsonErr } from '../config.js';
+import { internalOrUser, sendText, sendFile, sendLocation, sendInteractive, chatId } from '../green.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return jsonErr(res, 'طريقة الطلب غير مسموحة.', 405);

@@ -1,5 +1,5 @@
-import { jsonOk, jsonErr, readJsonBody } from '../_lib/config.js';
-import { validWebhookToken, findProfileByPhone, sendText } from './_green.js';
+import { jsonOk, jsonErr, readJsonBody } from '../config.js';
+import { validWebhookToken, findProfileByPhone, sendText } from '../green.js';
 
 function extractText(body) {
   return String(

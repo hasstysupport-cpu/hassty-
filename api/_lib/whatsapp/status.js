@@ -1,5 +1,5 @@
-import { jsonErr, jsonOk } from '../_lib/config.js';
-import { internalOrUser, getGreenState } from './_green.js';
+import { jsonErr, jsonOk } from '../config.js';
+import { internalOrUser, getGreenState } from '../green.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return jsonErr(res, 'طريقة الطلب غير مسموحة.', 405);

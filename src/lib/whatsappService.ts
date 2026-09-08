@@ -2,6 +2,7 @@
  * Hassty WhatsApp client.
  * GREEN API credentials stay server-side in Vercel API functions.
  */
+import { supabase } from './supabase';
 export interface WhatsAppSendResult { success: boolean; messageId?: string; formattedNumber?: string; data?: any; error?: string; }
 export interface WhatsAppGatewayStatus { success: boolean; connected: boolean; state?: string; data?: any; error?: string; }
 export type InteractiveButton =
@@ -13,7 +14,17 @@ export interface InteractiveListSection { title: string; rows: Array<{ header?: 
 
 async function post(path: string, body?: any, method = 'POST') {
   try {
-    const res = await fetch(path, { method, headers: { 'Content-Type': 'application/json' }, body: method === 'GET' ? undefined : JSON.stringify(body || {}) });
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    /* Best-effort auth: attach the Supabase access token when a session exists,
+       so /api/whatsapp/* serverless functions can verify the caller. */
+    try {
+      if (supabase) {
+        const { data } = await supabase.auth.getSession();
+        const token = data?.session?.access_token;
+        if (token) headers.Authorization = `Bearer ${token}`;
+      }
+    } catch { /* anonymous calls stay allowed for the webhook side */ }
+    const res = await fetch(path, { method, headers, body: method === 'GET' ? undefined : JSON.stringify(body || {}) });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) return { success: false, error: json?.error || `WhatsApp API ${res.status}`, data: json };
     return json;
