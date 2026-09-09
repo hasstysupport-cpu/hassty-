@@ -17,9 +17,52 @@ const PlatformProofSection = lazy(() => import('../components/PlatformProofSecti
 const FAQSection = lazy(() => import('../components/FAQSection').then(m => ({ default: m.FAQSection })));
 const TeacherCTASection = lazy(() => import('../components/TeacherCTASection').then(m => ({ default: m.TeacherCTASection })));
 
-const LazySection = ({ children }: { children: React.ReactNode }) => (
-  <Suspense fallback={<div aria-hidden="true" className="min-h-[30vh]" />}>{children}</Suspense>
-);
+/* ===== تأجيل متدرّج لأقسام أسفل الشاشة (Performance) =====
+   المشكلة: lazy() وحدها لا تكفي — React يجلب وينفّذ كل الأقسام فور التركيب أثناء
+   نافذة التحميل الحرجة، فيرتفع TBT ويتأخر TTI على الشبكات الضعيفة.
+   الحل: كل قسم يُركَّب فقط عند (أ) اقترابه من الشاشة (IntersectionObserver) أو
+   (ب) بعد مؤقّت أمان متدرّج يضمن اكتمال DOM بالكامل لزواحف البحث والوكلاء
+   حتى لو لم يلمس المستخدم الصفحة. أولًا نُحمّل chunk الأقسام عند خمول المتصفح
+   (requestIdleCallback) ليكون جاهزًا فور الحاجة بدون منافسة على الشبكة. */
+const warmLandingChunk = () => { void import('../components/ProblemSolutionSection'); };
+
+const DeferredSection: React.FC<{ children: React.ReactNode; delay?: number; minHeight?: string }> = ({ children, delay = 0, minHeight = '30vh' }) => {
+  const [mounted, setMounted] = React.useState(false);
+  const holderRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    let alive = true;
+    const mount = () => { if (alive) setMounted(true); };
+
+    // (أ) المستخدم قارب على رؤية القسم — ركّبه فورًا
+    const io = typeof IntersectionObserver !== 'undefined'
+      ? new IntersectionObserver((entries) => {
+          if (entries.some(e => e.isIntersecting)) { io.disconnect(); mount(); }
+        }, { rootMargin: '480px 0px' })
+      : null;
+    if (holderRef.current && io) io.observe(holderRef.current);
+
+    // (ب) شبكة الأمان: اكتمال الشجرة كاملة خلال ~4 ثوانٍ، متدرّج لتقسيم المهام الطويلة
+    const timer = window.setTimeout(mount, 4000 + delay);
+
+    return () => { alive = false; io?.disconnect(); window.clearTimeout(timer); };
+  }, [delay]);
+
+  return (
+    <div ref={holderRef}>
+      {mounted
+        ? <Suspense fallback={<div aria-hidden="true" style={{ minHeight }} />}>{children}</Suspense>
+        : <div aria-hidden="true" style={{ minHeight }} />}
+    </div>
+  );
+};
+
+/* جلب chunk الأقسام عند أول خمول — خارج النافذة الحرجة تمامًا */
+if (typeof window !== 'undefined') {
+  const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => void }).requestIdleCallback;
+  if (ric) ric(warmLandingChunk, { timeout: 3000 });
+  else window.setTimeout(warmLandingChunk, 2500);
+}
 
 interface HomePageProps {
   onNavigate: (path: string) => void;
@@ -50,15 +93,15 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onOpenQRSimulato
     <div className="hs-home-shell flex flex-col bg-white overflow-hidden">
       <ScrollReveal direction="up" delay={0} className="contents"><HeroSection onSearch={handleSearch} onOpenQRSimulator={handleQRSimulator} /></ScrollReveal>
       <StatsBand />
-      <ScrollReveal direction="up" delay={40}><LazySection><ProblemSolutionSection /></LazySection></ScrollReveal>
-      <ScrollReveal direction="up" delay={70}><LazySection><HowItWorksSection onOpenAuth={handleAuth} onOpenTutorSearch={() => onNavigate('/search')} onOpenQRSimulator={handleQRSimulator} /></LazySection></ScrollReveal>
-      <ScrollReveal direction="up" delay={80}><LazySection><FindTutorStepsSection onOpenTutorSearch={() => onNavigate('/search')} /></LazySection></ScrollReveal>
-      <ScrollReveal direction="up" delay={90}><LazySection><SubjectsSection onSelectSubject={(subjectName) => handleSearch(subjectName, '')} /></LazySection></ScrollReveal>
-      <ScrollReveal direction="up" delay={90}><LazySection><AccountTypesSection onSelectRole={(role) => handleAuth('register', role)} /></LazySection></ScrollReveal>
-      <ScrollReveal direction="up" delay={90}><LazySection><FeaturesSection /></LazySection></ScrollReveal>
-      <ScrollReveal direction="up" delay={90}><LazySection><PlatformProofSection /></LazySection></ScrollReveal>
-      <ScrollReveal direction="up" delay={90}><LazySection><FAQSection /></LazySection></ScrollReveal>
-      <ScrollReveal direction="up" delay={100}><LazySection><TeacherCTASection onJoinAsTeacher={() => onNavigate('/for-teachers')} /></LazySection></ScrollReveal>
+      <ScrollReveal direction="up" delay={40}><DeferredSection delay={0}><ProblemSolutionSection /></DeferredSection></ScrollReveal>
+      <ScrollReveal direction="up" delay={70}><DeferredSection delay={250}><HowItWorksSection onOpenAuth={handleAuth} onOpenTutorSearch={() => onNavigate('/search')} onOpenQRSimulator={handleQRSimulator} /></DeferredSection></ScrollReveal>
+      <ScrollReveal direction="up" delay={80}><DeferredSection delay={500}><FindTutorStepsSection onOpenTutorSearch={() => onNavigate('/search')} /></DeferredSection></ScrollReveal>
+      <ScrollReveal direction="up" delay={90}><DeferredSection delay={750}><SubjectsSection onSelectSubject={(subjectName) => handleSearch(subjectName, '')} /></DeferredSection></ScrollReveal>
+      <ScrollReveal direction="up" delay={90}><DeferredSection delay={1000}><AccountTypesSection onSelectRole={(role) => handleAuth('register', role)} /></DeferredSection></ScrollReveal>
+      <ScrollReveal direction="up" delay={90}><DeferredSection delay={1250}><FeaturesSection /></DeferredSection></ScrollReveal>
+      <ScrollReveal direction="up" delay={90}><DeferredSection delay={1500}><PlatformProofSection /></DeferredSection></ScrollReveal>
+      <ScrollReveal direction="up" delay={90}><DeferredSection delay={1750}><FAQSection /></DeferredSection></ScrollReveal>
+      <ScrollReveal direction="up" delay={100}><DeferredSection delay={2000}><TeacherCTASection onJoinAsTeacher={() => onNavigate('/for-teachers')} /></DeferredSection></ScrollReveal>
     </div>
   );
 };

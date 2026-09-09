@@ -200,6 +200,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onSearch, onOpenQRSimu
                     alt="صورة مدرس موثق"
                     width={32}
                     height={32}
+                    loading="lazy"
                     decoding="async"
                     fetchPriority="low"
                     className="w-8 h-8 rounded-full border-2 border-white object-cover shadow-xs"

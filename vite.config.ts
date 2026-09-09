@@ -38,8 +38,11 @@ export default defineConfig(() => {
             // ===== Vendors: stable libs, cached separately from app code =====
             if (id.includes('node_modules')) {
               if (id.includes('react-dom') || id.includes('scheduler')) return 'vendor-react';
-              if (id.includes('@supabase')) return 'vendor-supabase';
-              if (id.includes('recharts') || id.includes('d3-') || id.includes('victory-vendor')) return 'vendor-charts';
+              if (id.includes('@supabase') || id.includes('iceberg-js')) return 'vendor-supabase';
+              // recharts وعائلته الكاملة (redux/immer/es-toolkit...) في حزمة واحدة — تُحمَّل فقط مع لوحات الأدمن/المدرس
+              // (بدون هذا كان redux يُسحب eager داخل vendor-misc على الصفحة الرئيسية ~80KB بلا استخدام)
+              // ملاحظة: iceberg-js تبعية لـ @supabase/storage-js وليست لـ recharts — يجب ألا تدخل هذه الحزمة
+              if (id.includes('recharts') || id.includes('d3-') || id.includes('victory-vendor') || id.includes('@reduxjs') || id.includes('redux') || id.includes('react-redux') || id.includes('reselect') || id.includes('immer') || id.includes('es-toolkit')) return 'vendor-charts';
               if (id.includes('lucide-react')) return 'vendor-icons';
               if (id.includes('motion') || id.includes('framer')) return 'vendor-motion';
               if (id.includes('qrcode') || id.includes('jsbarcode') || id.includes('jsqr') || id.includes('html-to-image')) return 'vendor-qr';
