@@ -6,7 +6,7 @@
   "trailingSlash": false,
   "headers": [
     {
-      "source": "/fonts/(.*)\.(woff2|woff)",
+      "source": "/fonts/(.*)\\.(woff2|woff)",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" },
         { "key": "Access-Control-Allow-Origin", "value": "*" }
