@@ -12,23 +12,30 @@ import { DevDisclaimerFloatingPill } from './components/common/DevDisclaimerFloa
 import { ToastProvider } from './components/common/ui';
 import { hasRecentSignupConsent } from './lib/legal';
 import { HomePage } from './pages/HomePage';
-import { SearchResultsPage } from './pages/SearchResultsPage';
-import { TeacherProfilePage } from './pages/TeacherProfilePage';
-import { AboutPage } from './pages/AboutPage';
-import { ContactPage } from './pages/ContactPage';
-import { ForTeachersPage } from './pages/ForTeachersPage';
-import { LoginPage } from './pages/LoginPage';
-import { SignupPage } from './pages/SignupPage';
-import { AssistantSignupPage } from './pages/AssistantSignupPage';
-import { VerifyEmailPage } from './pages/VerifyEmailPage';
-import { ProfileSetupPage } from './pages/ProfileSetupPage';
+import type { LegalSection } from './pages/LegalPage';
 import { SECRET_ADMIN_ROUTE } from './lib/securityConfig';
-import { LegalPage,LegalSection } from './pages/LegalPage';
-import { NotificationsPage,CalendarPage,MessagesPage,AssignmentsPage,GradesPage,AttendanceOverviewPage } from './pages/PlatformFeaturesPages';
-import { NotFoundPage } from './pages/NotFoundPage';
 
 /* ===== Route-level lazy loading: role workspaces load on demand (Phase 19) ===== */
 const HasstyAdminApp = lazy(() => import('./pages/admin/HasstyAdminApp').then(m => ({ default: m.HasstyAdminApp })));
+/* ===== الصفحات العامة غير الرئيسية تُحمَّل عند الطلب — تقليل الحزمة الأولية (Perf) ===== */
+const SearchResultsPage = lazy(() => import('./pages/SearchResultsPage').then(m => ({ default: m.SearchResultsPage })));
+const TeacherProfilePage = lazy(() => import('./pages/TeacherProfilePage').then(m => ({ default: m.TeacherProfilePage })));
+const AboutPage = lazy(() => import('./pages/AboutPage').then(m => ({ default: m.AboutPage })));
+const ContactPage = lazy(() => import('./pages/ContactPage').then(m => ({ default: m.ContactPage })));
+const ForTeachersPage = lazy(() => import('./pages/ForTeachersPage').then(m => ({ default: m.ForTeachersPage })));
+const LoginPage = lazy(() => import('./pages/LoginPage').then(m => ({ default: m.LoginPage })));
+const SignupPage = lazy(() => import('./pages/SignupPage').then(m => ({ default: m.SignupPage })));
+const AssistantSignupPage = lazy(() => import('./pages/AssistantSignupPage').then(m => ({ default: m.AssistantSignupPage })));
+const VerifyEmailPage = lazy(() => import('./pages/VerifyEmailPage').then(m => ({ default: m.VerifyEmailPage })));
+const ProfileSetupPage = lazy(() => import('./pages/ProfileSetupPage').then(m => ({ default: m.ProfileSetupPage })));
+const LegalPage = lazy(() => import('./pages/LegalPage').then(m => ({ default: m.LegalPage })));
+const NotificationsPage = lazy(() => import('./pages/PlatformFeaturesPages').then(m => ({ default: m.NotificationsPage })));
+const CalendarPage = lazy(() => import('./pages/PlatformFeaturesPages').then(m => ({ default: m.CalendarPage })));
+const MessagesPage = lazy(() => import('./pages/PlatformFeaturesPages').then(m => ({ default: m.MessagesPage })));
+const AssignmentsPage = lazy(() => import('./pages/PlatformFeaturesPages').then(m => ({ default: m.AssignmentsPage })));
+const GradesPage = lazy(() => import('./pages/PlatformFeaturesPages').then(m => ({ default: m.GradesPage })));
+const AttendanceOverviewPage = lazy(() => import('./pages/PlatformFeaturesPages').then(m => ({ default: m.AttendanceOverviewPage })));
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage').then(m => ({ default: m.NotFoundPage })));
 const WhatsAppStudioPage = lazy(() => import('./pages/admin/WhatsAppStudioPage').then(m => ({ default: m.WhatsAppStudioPage })));
 const StudentDashboardPage = lazy(() => import('./pages/student/StudentDashboardPage').then(m => ({ default: m.StudentDashboardPage })));
 const StudentQRCardPage = lazy(() => import('./pages/student/StudentQRCardPage').then(m => ({ default: m.StudentQRCardPage })));
@@ -153,10 +160,10 @@ export default function App(){
    </div></div>}
  const [initialAdminToken]=useState<string|null>(()=>typeof window!=='undefined'?new URLSearchParams(window.location.search).get('authKey'):null);
  if(isAdminAppRoute)return <ToastProvider><Suspense fallback={<PageLoader/>}><HasstyAdminApp onSwitchToPublicApp={()=>setCurrentPath('/')} initialToken={initialAdminToken}/></Suspense></ToastProvider>;
- if(isAssistantSignupRoute&&!isLoggedIn)return <AssistantSignupPage onNavigate={handleNavigate}/>;
- if(isSignupRoute&&!isLoggedIn)return <div className="min-h-screen w-full bg-[#F8FAFF] text-[#1F2937] font-['IBM_Plex_Sans_Arabic',sans-serif] antialiased"><SignupPage onNavigate={handleNavigate} onSignupSuccess={handleLogin}/></div>;
- if(isLoggedIn&&needsProfileSetup&&!isUnverified&&currentPath==='/setup-profile')return <div className="min-h-screen bg-[#F7FAFF] text-[#1F2937] font-['IBM_Plex_Sans_Arabic',sans-serif] antialiased"><ProfileSetupPage onComplete={handleProfileSetupComplete} onLogout={handleLogout}/><DevDisclaimerFloatingPill/></div>;
- const legalMatch=currentPath.match(/^\/legal\/(terms|privacy|teacher|cookies|acceptable|refund|rights)$/); if(legalMatch)return <LegalPage section={legalMatch[1] as LegalSection} onNavigate={handleNavigate}/>;
+ if(isAssistantSignupRoute&&!isLoggedIn)return <Suspense fallback={<PageLoader/>}><AssistantSignupPage onNavigate={handleNavigate}/></Suspense>;
+ if(isSignupRoute&&!isLoggedIn)return <div className="min-h-screen w-full bg-[#F8FAFF] text-[#1F2937] font-['IBM_Plex_Sans_Arabic',sans-serif] antialiased"><Suspense fallback={<PageLoader/>}><SignupPage onNavigate={handleNavigate} onSignupSuccess={handleLogin}/></Suspense></div>;
+ if(isLoggedIn&&needsProfileSetup&&!isUnverified&&currentPath==='/setup-profile')return <div className="min-h-screen bg-[#F7FAFF] text-[#1F2937] font-['IBM_Plex_Sans_Arabic',sans-serif] antialiased"><Suspense fallback={<PageLoader/>}><ProfileSetupPage onComplete={handleProfileSetupComplete} onLogout={handleLogout}/></Suspense><DevDisclaimerFloatingPill/></div>;
+ const legalMatch=currentPath.match(/^\/legal\/(terms|privacy|teacher|cookies|acceptable|refund|rights)$/); if(legalMatch)return <Suspense fallback={<PageLoader/>}><LegalPage section={legalMatch[1] as LegalSection} onNavigate={handleNavigate}/></Suspense>;
  return <ToastProvider><div data-role={currentRole} className="min-h-screen bg-[#F8FAFF] text-[#1F2937] flex flex-col antialiased">
   {isLoggedIn&&isDashboardRoute&&!isUnverified&&!needsProfileSetup?<LoggedInNavbar currentRole={currentRole} currentPath={currentPath} userName={user?.name} userAvatar={user?.avatarUrl||user?.profileData?.avatarUrl} onNavigate={handleNavigate} onRoleChange={(r)=>setCurrentPath(`/${r}/dashboard`)} onLogout={handleLogout}/>:<PublicNavbar currentPath={currentPath} isLoggedIn={isLoggedIn&&!isUnverified&&!needsProfileSetup} user={user} currentRole={currentRole} onNavigate={handleNavigate} onOpenLogin={()=>handleNavigate('/login')} onOpenSignup={()=>handleNavigate('/signup')} onLogout={handleLogout}/>}
   {isDashboardRoute&&isLoggedIn&&!isUnverified&&!needsProfileSetup?<div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5 pb-24 sm:pb-24 lg:pb-6 flex flex-col md:flex-row gap-5 lg:gap-6 items-start"><DashboardSidebar currentRole={currentRole} currentPath={currentPath} onNavigate={handleNavigate} onLogout={handleLogout}/><main key={currentPath} className="flex-1 w-full min-w-0 page-transition"><Suspense fallback={<PageLoader/>}>
@@ -187,7 +194,7 @@ export default function App(){
      '/teacher/dashboard','/teacher/assistants','/teacher/assistants/search','/teacher/students','/teacher/groups','/teacher/scan','/teacher/attendance','/teacher/attendance/disputes','/teacher/payments','/teacher/availability','/teacher/profile','/teacher/reviews','/teacher/notifications','/teacher/calendar','/teacher/messages','/teacher/assignments','/teacher/assignment-submissions','/teacher/sessions','/teacher/enrollment-requests','/teacher/transfers','/teacher/makeup','/teacher/student-notes','/teacher/exams','/teacher/gradebook',
      '/assistant/dashboard','/assistant/groups','/assistant/students','/assistant/attendance','/assistant/payments','/assistant/invitations','/assistant/notifications','/assistant/calendar','/assistant/messages','/assistant/profile','/assistant/verification',
    ].includes(currentPath)&&!/\/teacher\/(students|exams)\/[^/]+$/.test(currentPath)&&<NotFoundPage variant="dashboard" onNavigate={handleNavigate} dashboardPath={`/${currentRole}/dashboard`}/>}
-  </Suspense></main></div>:<main key={currentPath} className="flex-1 page-transition">{isCheckingProfile&&isLoggedIn&&!isUnverified&&isKnownPublicPath&&currentPath!=='/setup-profile'&&<div className="max-w-3xl mx-auto px-4 py-8 text-center text-xs text-slate-500">جاري تجهيز بيانات حسابك...</div>} {currentPath==='/'&&<HomePage onNavigate={handleNavigate} onSelectTutor={handleSelectTutor} onSearchWithParams={handleSearchWithParams}/>} {currentPath==='/search'&&<SearchResultsPage onNavigate={handleNavigate} onSelectTutor={handleSelectTutor} initialSubject={searchSubject} initialGovernorate={searchGovernorate} initialCity={searchCity}/>} {currentPath.startsWith('/tutor')&&<TeacherProfilePage tutorId={selectedTutorId} onNavigate={handleNavigate} onSelectTutor={handleSelectTutor}/>} {currentPath==='/about'&&<AboutPage onNavigate={handleNavigate}/>} {currentPath==='/contact'&&<ContactPage onNavigate={handleNavigate}/>} {currentPath==='/for-teachers'&&<ForTeachersPage onNavigate={handleNavigate}/>} {currentPath==='/login'&&<LoginPage onNavigate={handleNavigate} onLoginSuccess={handleLogin}/>} {(currentPath==='/verify-email'||isUnverified)&&<VerifyEmailPage onNavigate={handleNavigate} onVerificationSuccess={handleLogin}/>} {currentPath==='/whatsapp-studio'&&<Suspense fallback={<PageLoader/>}><WhatsAppStudioPage/></Suspense>}{!isKnownPublicPath&&!isUnverified&&<NotFoundPage onNavigate={handleNavigate}/>}</main>}
+  </Suspense></main></div>:<main key={currentPath} className="flex-1 page-transition"><Suspense fallback={<PageLoader/>}>{isCheckingProfile&&isLoggedIn&&!isUnverified&&isKnownPublicPath&&currentPath!=='/setup-profile'&&<div className="max-w-3xl mx-auto px-4 py-8 text-center text-xs text-slate-500">جاري تجهيز بيانات حسابك...</div>} {currentPath==='/'&&<HomePage onNavigate={handleNavigate} onSelectTutor={handleSelectTutor} onSearchWithParams={handleSearchWithParams}/>} {currentPath==='/search'&&<SearchResultsPage onNavigate={handleNavigate} onSelectTutor={handleSelectTutor} initialSubject={searchSubject} initialGovernorate={searchGovernorate} initialCity={searchCity}/>} {currentPath.startsWith('/tutor')&&<TeacherProfilePage tutorId={selectedTutorId} onNavigate={handleNavigate} onSelectTutor={handleSelectTutor}/>} {currentPath==='/about'&&<AboutPage onNavigate={handleNavigate}/>} {currentPath==='/contact'&&<ContactPage onNavigate={handleNavigate}/>} {currentPath==='/for-teachers'&&<ForTeachersPage onNavigate={handleNavigate}/>} {currentPath==='/login'&&<LoginPage onNavigate={handleNavigate} onLoginSuccess={handleLogin}/>} {(currentPath==='/verify-email'||isUnverified)&&<VerifyEmailPage onNavigate={handleNavigate} onVerificationSuccess={handleLogin}/>} {currentPath==='/whatsapp-studio'&&<Suspense fallback={<PageLoader/>}><WhatsAppStudioPage/></Suspense>}{!isKnownPublicPath&&!isUnverified&&<NotFoundPage onNavigate={handleNavigate}/>}</Suspense></main>}
   {!isDashboardRoute&&!isLoggedIn&&<Footer onNavigate={handleNavigate}/>}<DevDisclaimerFloatingPill/>
  </div></ToastProvider>;
 }

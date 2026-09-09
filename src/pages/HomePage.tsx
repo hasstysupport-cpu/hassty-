@@ -1,19 +1,25 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { useSEO } from '../lib/useSEO';
 import { HeroSection } from '../components/HeroSection';
 import { StatsBand } from '../components/StatsBand';
-import { ProblemSolutionSection } from '../components/ProblemSolutionSection';
-import { HowItWorksSection } from '../components/HowItWorksSection';
-import { FindTutorStepsSection } from '../components/FindTutorStepsSection';
-import { SubjectsSection } from '../components/SubjectsSection';
-import { AccountTypesSection } from '../components/AccountTypesSection';
-import { FeaturesSection } from '../components/FeaturesSection';
-import { TeacherCTASection } from '../components/TeacherCTASection';
-import { PlatformProofSection } from '../components/PlatformProofSection';
-import { FAQSection } from '../components/FAQSection';
 import { ScrollReveal } from '../components/common/ScrollReveal';
 import { AccountRole } from '../types';
 import '../landing.css';
+
+/* أقسام أسفل الشاشة الأولى تُحمَّل عند الطلب — تقليل الحزمة الأولية وتحسين FCP/LCP */
+const ProblemSolutionSection = lazy(() => import('../components/ProblemSolutionSection').then(m => ({ default: m.ProblemSolutionSection })));
+const HowItWorksSection = lazy(() => import('../components/HowItWorksSection').then(m => ({ default: m.HowItWorksSection })));
+const FindTutorStepsSection = lazy(() => import('../components/FindTutorStepsSection').then(m => ({ default: m.FindTutorStepsSection })));
+const SubjectsSection = lazy(() => import('../components/SubjectsSection').then(m => ({ default: m.SubjectsSection })));
+const AccountTypesSection = lazy(() => import('../components/AccountTypesSection').then(m => ({ default: m.AccountTypesSection })));
+const FeaturesSection = lazy(() => import('../components/FeaturesSection').then(m => ({ default: m.FeaturesSection })));
+const PlatformProofSection = lazy(() => import('../components/PlatformProofSection').then(m => ({ default: m.PlatformProofSection })));
+const FAQSection = lazy(() => import('../components/FAQSection').then(m => ({ default: m.FAQSection })));
+const TeacherCTASection = lazy(() => import('../components/TeacherCTASection').then(m => ({ default: m.TeacherCTASection })));
+
+const LazySection = ({ children }: { children: React.ReactNode }) => (
+  <Suspense fallback={<div aria-hidden="true" className="min-h-[30vh]" />}>{children}</Suspense>
+);
 
 interface HomePageProps {
   onNavigate: (path: string) => void;
@@ -44,15 +50,15 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onOpenQRSimulato
     <div className="hs-home-shell flex flex-col bg-white overflow-hidden">
       <ScrollReveal direction="up" delay={0} className="contents"><HeroSection onSearch={handleSearch} onOpenQRSimulator={handleQRSimulator} /></ScrollReveal>
       <StatsBand />
-      <ScrollReveal direction="up" delay={40}><ProblemSolutionSection /></ScrollReveal>
-      <ScrollReveal direction="up" delay={70}><HowItWorksSection onOpenAuth={handleAuth} onOpenTutorSearch={() => onNavigate('/search')} onOpenQRSimulator={handleQRSimulator} /></ScrollReveal>
-      <ScrollReveal direction="up" delay={80}><FindTutorStepsSection onOpenTutorSearch={() => onNavigate('/search')} /></ScrollReveal>
-      <ScrollReveal direction="up" delay={90}><SubjectsSection onSelectSubject={(subjectName) => handleSearch(subjectName, '')} /></ScrollReveal>
-      <ScrollReveal direction="up" delay={90}><AccountTypesSection onSelectRole={(role) => handleAuth('register', role)} /></ScrollReveal>
-      <ScrollReveal direction="up" delay={90}><FeaturesSection /></ScrollReveal>
-      <ScrollReveal direction="up" delay={90}><PlatformProofSection /></ScrollReveal>
-      <ScrollReveal direction="up" delay={90}><FAQSection /></ScrollReveal>
-      <ScrollReveal direction="up" delay={100}><TeacherCTASection onJoinAsTeacher={() => onNavigate('/for-teachers')} /></ScrollReveal>
+      <ScrollReveal direction="up" delay={40}><LazySection><ProblemSolutionSection /></LazySection></ScrollReveal>
+      <ScrollReveal direction="up" delay={70}><LazySection><HowItWorksSection onOpenAuth={handleAuth} onOpenTutorSearch={() => onNavigate('/search')} onOpenQRSimulator={handleQRSimulator} /></LazySection></ScrollReveal>
+      <ScrollReveal direction="up" delay={80}><LazySection><FindTutorStepsSection onOpenTutorSearch={() => onNavigate('/search')} /></LazySection></ScrollReveal>
+      <ScrollReveal direction="up" delay={90}><LazySection><SubjectsSection onSelectSubject={(subjectName) => handleSearch(subjectName, '')} /></LazySection></ScrollReveal>
+      <ScrollReveal direction="up" delay={90}><LazySection><AccountTypesSection onSelectRole={(role) => handleAuth('register', role)} /></LazySection></ScrollReveal>
+      <ScrollReveal direction="up" delay={90}><LazySection><FeaturesSection /></LazySection></ScrollReveal>
+      <ScrollReveal direction="up" delay={90}><LazySection><PlatformProofSection /></LazySection></ScrollReveal>
+      <ScrollReveal direction="up" delay={90}><LazySection><FAQSection /></LazySection></ScrollReveal>
+      <ScrollReveal direction="up" delay={100}><LazySection><TeacherCTASection onJoinAsTeacher={() => onNavigate('/for-teachers')} /></LazySection></ScrollReveal>
     </div>
   );
 };

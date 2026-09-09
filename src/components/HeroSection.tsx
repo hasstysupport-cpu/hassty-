@@ -31,10 +31,10 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onSearch, onOpenQRSimu
   };
 
   const sampleAvatars = [
-    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=96&h=96&fit=crop&q=75&auto=format',
+    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=96&h=96&fit=crop&q=75&auto=format',
+    'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=96&h=96&fit=crop&q=75&auto=format',
+    'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=96&h=96&fit=crop&q=75&auto=format',
   ];
 
   return (
@@ -114,11 +114,11 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onSearch, onOpenQRSimu
               منصة متكاملة تربطك بأفضل المدرسين المعتمدين في منطقتك، مع نظام تتبع عادل للحضور والواجبات لضمان التزام وتفوق الأبناء.
             </p>
 
-            {/* Search Card */}
+            {/* Search Card — بدون تأخير دخول: التأخير كان يؤخر أول رسم للزر (LCP) ~240ms */}
             <form
               onSubmit={handleSubmit}
               className="hs-hero-card w-full p-4 sm:p-6 relative z-10 anim-up"
-              style={{ animationDelay: '240ms' }}
+              style={{ animationDelay: '0ms', animationDuration: '0.45s' }}
               id="hero-search-card"
             >
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mb-3.5">
@@ -198,6 +198,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onSearch, onOpenQRSimu
                     key={idx}
                     src={src}
                     alt="صورة مدرس موثق"
+                    width={32}
+                    height={32}
+                    decoding="async"
                     className="w-8 h-8 rounded-full border-2 border-white object-cover shadow-xs"
                     referrerPolicy="no-referrer"
                   />

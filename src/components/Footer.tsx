@@ -21,7 +21,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
           </div>
 
           <div>
-            <h4 className="text-sm font-bold text-[#1E3A8A] mb-4">المنصة</h4>
+            <h3 className="text-sm font-bold text-[#1E3A8A] mb-4">المنصة</h3>
             <ul className="space-y-2.5 text-sm text-[#6B7280]">
               <li><button onClick={() => onNavigate('/')} className="hover:text-[#2563EB] transition-colors">الرئيسية</button></li>
               <li><button onClick={() => onNavigate('/search')} className="hover:text-[#2563EB] transition-colors">البحث عن مدرسين</button></li>
@@ -32,7 +32,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
           </div>
 
           <div>
-            <h4 className="text-sm font-bold text-[#1E3A8A] mb-4">للطلاب وأولياء الأمور</h4>
+            <h3 className="text-sm font-bold text-[#1E3A8A] mb-4">للطلاب وأولياء الأمور</h3>
             <ul className="space-y-2.5 text-sm text-[#6B7280]">
               <li><button onClick={() => onNavigate('/search')} className="hover:text-[#2563EB] transition-colors">البحث بالمادة والمحافظة</button></li>
               <li><button onClick={() => onNavigate('/signup')} className="hover:text-[#2563EB] transition-colors">إنشاء حساب</button></li>
@@ -42,7 +42,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
           </div>
 
           <div>
-            <h4 className="text-sm font-bold text-[#1E3A8A] mb-4">للمدرسين والدعم</h4>
+            <h3 className="text-sm font-bold text-[#1E3A8A] mb-4">للمدرسين والدعم</h3>
             <ul className="space-y-2.5 text-sm text-[#6B7280]">
               <li><button onClick={() => onNavigate('/for-teachers')} className="hover:text-[#2563EB] transition-colors">العمولات والمزايا</button></li>
               <li><button onClick={() => onNavigate('/legal/teacher')} className="hover:text-[#2563EB] transition-colors">لماذا نطلب مستندات التوثيق؟</button></li>

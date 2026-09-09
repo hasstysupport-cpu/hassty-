@@ -1,13 +1,16 @@
-import React, { StrictMode } from 'react';
+import React, { StrictMode, lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import { AuthProvider } from './lib/AuthContext.tsx';
 import { ProfileCompletionGate } from './components/common/ProfileCompletionGate';
 import { GlobalErrorBoundary } from './components/common/GlobalErrorBoundary';
-import { LegalPage, type LegalSection } from './pages/LegalPage';
+import type { LegalSection } from './pages/LegalPage';
 import { isImportFailure, smartChunkReload } from './lib/chunkRecovery';
 import './index.css';
 import './profile-setup-responsive.css';
+
+/* صفحة Legal تُحمَّل عند الطلب — لا تُثقل الحزمة الأولية */
+const LegalPage = lazy(() => import('./pages/LegalPage').then(m => ({ default: m.LegalPage })));
 
 /* ===== شبكة الأمان 1: فشل تحميل حزم JS (الاسترداد الذكي) =====
    بعد كل deploy جديد تُحذف ملفات الحزم القديمة، وقد يفشل تحميل حزمة أيضًا
@@ -47,7 +50,7 @@ const Root = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  if (legalSection) return <LegalPage section={legalSection} onNavigate={navigate} />;
+  if (legalSection) return <Suspense fallback={<div style={{ minHeight: '60vh' }} />}><LegalPage section={legalSection} onNavigate={navigate} /></Suspense>;
   return <App />;
 };
 

@@ -48,6 +48,10 @@ export default defineConfig(() => {
             }
             // App entry stays in the index chunk (avoids shell<->public circular chunk)
             if (id.endsWith('/src/App.tsx') || id.endsWith('/src/main.tsx')) return;
+            // HomePage bundle منفصلة عن باقي الصفحات العامة — باقي الصفحات تُحمَّل عند الطلب فقط
+            if (id.endsWith('/src/pages/HomePage.tsx')) return 'app-home';
+            // أقسام صفحة الهبوط السفلية — تُحمَّل عند الطلب (lazy) ولا تُثقل التحميل الأولي
+            if (id.includes('/src/components/ProblemSolutionSection') || id.includes('/src/components/HowItWorksSection') || id.includes('/src/components/FindTutorStepsSection') || id.includes('/src/components/SubjectsSection') || id.includes('/src/components/AccountTypesSection') || id.includes('/src/components/FeaturesSection') || id.includes('/src/components/TeacherCTASection') || id.includes('/src/components/PlatformProofSection') || id.includes('/src/components/FAQSection')) return 'app-landing';
             // ===== Lazy app feature groups (only fetched on demand) =====
             if (id.includes('/src/pages/admin/')) return 'app-admin';
             if (id.includes('/src/pages/teacher/')) return 'app-teacher';
