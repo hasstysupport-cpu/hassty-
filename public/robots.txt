@@ -1,5 +1,7 @@
 # https://www.robotstxt.org/robotstxt.html
 # robots.txt — منصة حصتي (Hassty)
+
+# ── القاعدة العامة لجميع الزواحف ──
 User-agent: *
 Allow: /
 Allow: /about
@@ -13,6 +15,32 @@ Allow: /tutor/
 Allow: /legal/
 
 # منع فهرسة مساحات العمل الخاصة وواجهات الـ API
+Disallow: /admin
+Disallow: /api/
+Disallow: /student/
+Disallow: /teacher/
+Disallow: /parent/
+Disallow: /assistant/
+Disallow: /whatsapp-studio
+Disallow: /setup-profile
+Disallow: /verify-email
+
+# ── السماح الصريح لزواحف ومساعدي الذكاء الاصطناعي (Agentic Web) ──
+# نفس السياسة العامة: الصفحات العامة مسموحة، ومساحات العمل الخاصة ممنوعة
+# تلخيص المنصة للنماذج اللغوية متاح على /llms.txt
+User-agent: GPTBot
+User-agent: OAI-SearchBot
+User-agent: ChatGPT-User
+User-agent: ClaudeBot
+User-agent: Claude-User
+User-agent: Claude-SearchBot
+User-agent: PerplexityBot
+User-agent: Perplexity-User
+User-agent: Google-Extended
+User-agent: Applebot-Extended
+User-agent: meta-externalagent
+User-agent: Amazonbot
+Allow: /
 Disallow: /admin
 Disallow: /api/
 Disallow: /student/
