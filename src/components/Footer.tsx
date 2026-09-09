@@ -4,6 +4,13 @@ import { BrandLogo } from './common/BrandLogo';
 
 interface FooterProps { onNavigate: (path: string) => void; }
 
+// روابط حقيقية <a href> لتمكين الزواحف وأدوات فحص الأمان من رصد صفحات القوانين،
+// مع الحفاظ على التنقل السريع داخل الـ SPA عبر onNavigate.
+const navLink = (e: React.MouseEvent<HTMLAnchorElement>, path: string, onNavigate: (path: string) => void) => {
+  if (!path.startsWith('http')) e.preventDefault();
+  onNavigate(path);
+};
+
 const WHATSAPP_SUPPORT = [
   { label: 'واتساب 1', number: '+201212281360', href: 'https://wa.me/201212281360' },
   { label: 'واتساب 2', number: '+201080158828', href: 'https://wa.me/201080158828' },
@@ -36,8 +43,8 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             <ul className="space-y-2.5 text-sm text-[#6B7280]">
               <li><button onClick={() => onNavigate('/search')} className="hover:text-[#2563EB] transition-colors">البحث بالمادة والمحافظة</button></li>
               <li><button onClick={() => onNavigate('/signup')} className="hover:text-[#2563EB] transition-colors">إنشاء حساب</button></li>
-              <li><button onClick={() => onNavigate('/legal/privacy')} className="hover:text-[#2563EB] transition-colors">كيف نحمي بياناتك؟</button></li>
-              <li><button onClick={() => onNavigate('/legal/rights')} className="hover:text-[#2563EB] transition-colors">حقوق البيانات وطلبات المحو</button></li>
+              <li><a href="/legal/privacy" aria-label="Privacy Policy" title="Privacy Policy" onClick={(e) => navLink(e, '/legal/privacy', onNavigate)} className="hover:text-[#2563EB] transition-colors">كيف نحمي بياناتك؟</a></li>
+              <li><a href="/legal/rights" aria-label="Data Rights and Erasure Requests" title="Data Rights and Erasure Requests" onClick={(e) => navLink(e, '/legal/rights', onNavigate)} className="hover:text-[#2563EB] transition-colors">حقوق البيانات وطلبات المحو</a></li>
             </ul>
           </div>
 
@@ -73,17 +80,17 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
 
         <div className="pt-8 flex flex-col gap-4 text-xs text-[#6B7280]">
           <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
-            <button onClick={() => onNavigate('/legal/terms')} className="hover:text-[#2563EB]">شروط الاستخدام</button>
+            <a href="/legal/terms" aria-label="Terms of Service" title="Terms of Service" onClick={(e) => navLink(e, '/legal/terms', onNavigate)} className="hover:text-[#2563EB]">شروط الاستخدام</a>
             <span>•</span>
-            <button onClick={() => onNavigate('/legal/privacy')} className="hover:text-[#2563EB]">سياسة الخصوصية</button>
+            <a href="/legal/privacy" aria-label="Privacy Policy" title="Privacy Policy" onClick={(e) => navLink(e, '/legal/privacy', onNavigate)} className="hover:text-[#2563EB]">سياسة الخصوصية</a>
             <span>•</span>
-            <button onClick={() => onNavigate('/legal/acceptable')} className="hover:text-[#2563EB]">الاستخدام المقبول</button>
+            <a href="/legal/acceptable" aria-label="Acceptable Use Policy" title="Acceptable Use Policy" onClick={(e) => navLink(e, '/legal/acceptable', onNavigate)} className="hover:text-[#2563EB]">الاستخدام المقبول</a>
             <span>•</span>
-            <button onClick={() => onNavigate('/legal/refund')} className="hover:text-[#2563EB]">الدفع والاسترداد</button>
+            <a href="/legal/refund" aria-label="Payment and Refund Policy" title="Payment and Refund Policy" onClick={(e) => navLink(e, '/legal/refund', onNavigate)} className="hover:text-[#2563EB]">الدفع والاسترداد</a>
             <span>•</span>
-            <button onClick={() => onNavigate('/legal/cookies')} className="hover:text-[#2563EB]">ملفات الارتباط</button>
+            <a href="/legal/cookies" aria-label="Cookies Policy" title="Cookies Policy" onClick={(e) => navLink(e, '/legal/cookies', onNavigate)} className="hover:text-[#2563EB]">ملفات الارتباط</a>
             <span>•</span>
-            <button onClick={() => onNavigate('/legal/rights')} className="hover:text-[#2563EB]">حقوق البيانات</button>
+            <a href="/legal/rights" aria-label="Data Rights" title="Data Rights" onClick={(e) => navLink(e, '/legal/rights', onNavigate)} className="hover:text-[#2563EB]">حقوق البيانات</a>
           </div>
           <p className="text-center">© 2026 حِصّتي. جميع الحقوق محفوظة.</p>
         </div>

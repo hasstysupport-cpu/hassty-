@@ -1,33 +1,18 @@
 # https://www.robotstxt.org/robotstxt.html
 # robots.txt — منصة حصتي (Hassty)
 
+# ملاحظة أمنية (Best Practice): مسارات لوحات التحكم الخاصة وواجهات الـ API
+# محمية بالمصادقة والتشفير، ولا يُذكر مسارها هنا حتى لا تُعلن لجهات حاولت
+# الاستطلاع — فحص الأمان يُغني عن ذكرها، والمصادقة هي خط الحماية الفعلي.
+# ملخص المنصة للنماذج اللغوية والوكلاء الذكيين متاح على /llms.txt
+
 # ── القاعدة العامة لجميع الزواحف ──
 User-agent: *
 Allow: /
-Allow: /about
-Allow: /contact
-Allow: /for-teachers
-Allow: /search
-Allow: /login
-Allow: /signup
-Allow: /assistant/signup
-Allow: /tutor/
-Allow: /legal/
-
-# منع فهرسة مساحات العمل الخاصة وواجهات الـ API
-Disallow: /admin
-Disallow: /api/
-Disallow: /student/
-Disallow: /teacher/
-Disallow: /parent/
-Disallow: /assistant/
-Disallow: /whatsapp-studio
-Disallow: /setup-profile
-Disallow: /verify-email
+Disallow:
 
 # ── السماح الصريح لزواحف ومساعدي الذكاء الاصطناعي (Agentic Web) ──
-# نفس السياسة العامة: الصفحات العامة مسموحة، ومساحات العمل الخاصة ممنوعة
-# تلخيص المنصة للنماذج اللغوية متاح على /llms.txt
+# الصفحات العامة مسموحة تمامًا كالقاعدة العامة
 User-agent: GPTBot
 User-agent: OAI-SearchBot
 User-agent: ChatGPT-User
@@ -41,15 +26,7 @@ User-agent: Applebot-Extended
 User-agent: meta-externalagent
 User-agent: Amazonbot
 Allow: /
-Disallow: /admin
-Disallow: /api/
-Disallow: /student/
-Disallow: /teacher/
-Disallow: /parent/
-Disallow: /assistant/
-Disallow: /whatsapp-studio
-Disallow: /setup-profile
-Disallow: /verify-email
+Disallow:
 
 # Sitemap لـ Google Search Console و Bing
 Sitemap: https://hassty.vercel.app/sitemap.xml
