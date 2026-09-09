@@ -76,7 +76,8 @@ export default async function handler(req, res) {
         (u) =>
           `  <url>\n    <loc>${esc(u.loc)}</loc>\n    <lastmod>${u.lastmod}</lastmod>\n` +
           `    <changefreq>${u.freq}</changefreq>\n    <priority>${u.priority}</priority>\n` +
-          `    <xhtml:link rel="alternate" hreflang="ar" href="${esc(u.loc)}" />\n  </url>`
+          `    <xhtml:link rel="alternate" hreflang="ar" href="${esc(u.loc)}" />\n` +
+          `    <xhtml:link rel="alternate" hreflang="x-default" href="${esc(u.loc)}" />\n  </url>`
       )
       .join('\n') +
     '\n</urlset>\n';

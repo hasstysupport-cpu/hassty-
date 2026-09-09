@@ -8,6 +8,31 @@
   "theme_color": "#2563EB",
   "lang": "ar",
   "dir": "rtl",
+  "categories": ["education"],
+  "prefer_related_applications": false,
+  "shortcuts": [
+    {
+      "name": "ابحث عن مدرس خصوصي",
+      "short_name": "بحث مدرس",
+      "description": "دوّر على مدرس معتمد قريب منك واحجز حصتك فورًا",
+      "url": "/search",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "انضم كمدرس معتمد",
+      "short_name": "انضم كمدرس",
+      "description": "أنشئ بروفايلك كمدرس وابدأ استقبال الطلاب بعمولة تنازلية",
+      "url": "/for-teachers",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "حجز حصة جديدة",
+      "short_name": "حجز حصة",
+      "description": "احجز حصة تقوية جديدة مع مدرسك",
+      "url": "/signup",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ],
   "icons": [
     {
       "src": "/icon-192.png",

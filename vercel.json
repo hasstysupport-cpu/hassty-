@@ -13,6 +13,13 @@
       ]
     },
     {
+      "source": "/sw.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" },
+        { "key": "Service-Worker-Allowed", "value": "/" }
+      ]
+    },
+    {
       "source": "/(.*)",
       "headers": [
         { "key": "X-Content-Type-Options", "value": "nosniff" },
@@ -25,6 +32,7 @@
   ],
   "rewrites": [
     { "source": "/sitemap.xml", "destination": "/api/sitemap" },
+    { "source": "/tutor/:id", "destination": "/api/tutor-meta?id=:id" },
     { "source": "/api/auth/register", "destination": "/api/auth/register" },
     { "source": "/api/auth/verify-code", "destination": "/api/auth/verify-code" },
     { "source": "/api/auth/send-code", "destination": "/api/auth/send-code" },

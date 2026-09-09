@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { showLocalNotification } from './pushService';
 
 export type NotificationType = 'system' | 'booking' | 'attendance' | 'payment' | 'support' | 'verification' | 'announcement';
 
@@ -32,7 +33,17 @@ export function subscribeToNotifications(userId: string, onChange: (items: AppNo
   // "cannot add postgres_changes callbacks after subscribe()".
   const channel = supabase
     .channel(`notifications:nav:${userId}:${Date.now().toString(36)}`)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` }, () => void load())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` }, (payload: any) => {
+      /* إشعار متصفح محلي: عند وصول إشعار داخلي جديد والموقع مفتوح في تاب خلفي
+         (لو التاب ظاهر أمام المستخدم، الجرس والشارة داخل الموقع كافيان) */
+      try {
+        const row = payload?.new;
+        if (payload?.eventType === 'INSERT' && row?.title && typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+          void showLocalNotification(String(row.title), String(row.message || ''), row.link || null, row.id ? `hassty-${row.id}` : undefined);
+        }
+      } catch { /* best-effort */ }
+      void load();
+    })
     .subscribe((status) => {
       if ((status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') && !disposed) onError?.(new Error(`Notifications realtime: ${status}`));
     });
