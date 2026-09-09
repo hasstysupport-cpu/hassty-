@@ -99,8 +99,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onSearch, onOpenQRSimu
               </div>
             </div>
 
-            {/* Bold Headline */}
-            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black text-[#1E3A8A] leading-[1.3] tracking-tight mb-3 anim-up" style={{ animationDelay: '80ms' }}>
+            {/* Bold Headline — بدون تأخير دخول (كان يؤخر أول رسم للنص = LCP) */}
+            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black text-[#1E3A8A] leading-[1.3] tracking-tight mb-3 anim-up" style={{ animationDelay: '0ms', animationDuration: '0.45s' }}>
               اعثر على أفضل{' '}
               <span className="hs-grad relative inline-block font-black">
                 المدرسين الخصوصيين
@@ -109,8 +109,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onSearch, onOpenQRSimu
               القريبين منك
             </h1>
 
-            {/* Subheadline */}
-            <p className="text-sm sm:text-base text-[#4B5563] leading-relaxed max-w-2xl mb-6 font-normal anim-up" style={{ animationDelay: '160ms' }}>
+            {/* Subheadline — بدون تأخير دخول (كان أطول عنصر نصي مؤجل = عنصر LCP) */}
+            <p className="text-sm sm:text-base text-[#4B5563] leading-relaxed max-w-2xl mb-6 font-normal anim-up" style={{ animationDelay: '0ms', animationDuration: '0.45s' }}>
               منصة متكاملة تربطك بأفضل المدرسين المعتمدين في منطقتك، مع نظام تتبع عادل للحضور والواجبات لضمان التزام وتفوق الأبناء.
             </p>
 
@@ -201,6 +201,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onSearch, onOpenQRSimu
                     width={32}
                     height={32}
                     decoding="async"
+                    fetchPriority="low"
                     className="w-8 h-8 rounded-full border-2 border-white object-cover shadow-xs"
                     referrerPolicy="no-referrer"
                   />
