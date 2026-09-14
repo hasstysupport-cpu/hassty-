@@ -12,7 +12,7 @@
    ============================================================ */
 import { SUPABASE_URL, SERVICE_KEY } from './_lib/config.js';
 
-const FALLBACK_ORIGIN = 'https://hassty.vercel.app';
+const FALLBACK_ORIGIN = 'https://hassty.site';
 
 function originFrom(req) {
   const dep = String(req.headers['x-vercel-deployment-url'] || '');
@@ -123,7 +123,7 @@ export default async function handler(req, res) {
       // مدرس غير موجود → الصفحة الأساسية مع منع الفهرسة (الـ SPA سيعرض حالته الخاصة)
       const html = baseHtml
         .replace(/<meta name="robots" content="[^"]*"\s*\/?>/, '<meta name="robots" content="noindex, follow" />')
-        .replace(/<link rel="canonical" href="[^"]*"\s*\/?>/, '<link rel="canonical" href="https://hassty.vercel.app/search" />');
+        .replace(/<link rel="canonical" href="[^"]*"\s*\/?>/, '<link rel="canonical" href="https://hassty.site/search" />');
       res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300');
       return res.status(200).send(html);
     }

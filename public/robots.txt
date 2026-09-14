@@ -29,5 +29,5 @@ Allow: /
 Disallow:
 
 # Sitemap لـ Google Search Console و Bing
-Sitemap: https://hassty.vercel.app/sitemap.xml
-Host: https://hassty.vercel.app
+Sitemap: https://hassty.site/sitemap.xml
+Host: https://hassty.site

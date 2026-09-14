@@ -40,7 +40,7 @@ export default async function handler(req, res) {
     } else if (/(مساعدة|help|menu|القائمة)/.test(text)) {
       reply = '*حِصّتي — المساعد* 🤖\n\n• اكتب *الدعم* لمعلومات الدعم.\n• اكتب *الموقع* لرابط المنصة.\n• اكتب *حالة الحساب* للتواصل مع الدعم حول حسابك.\n\nالإشعارات المهمة مثل الحجز والحضور والدفع والفواتير تُرسل تلقائيًا على هذا الرقم.';
     } else if (/(الموقع|الرابط|site|website)/.test(text)) {
-      reply = '🌐 منصة حِصّتي:\nhttps://hassty.vercel.app';
+      reply = '🌐 منصة حِصّتي:\nhttps://hassty.site';
     } else if (/(الدعم|support)/.test(text)) {
       reply = '🎧 الدعم الفني عبر واتساب: تواصل مع فريق حِصّتي من صفحة اتصل بنا داخل المنصة.';
     } else {

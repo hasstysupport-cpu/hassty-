@@ -6,27 +6,27 @@
 
 ## الصفحات الرئيسية (Main pages)
 
-- [الصفحة الرئيسية](https://hassty.vercel.app/): نظرة عامة على خدمات المنصة والمميزات والإحصائيات
-- [من نحن](https://hassty.vercel.app/about): تعريف بمنصة حصتي ورؤيتها وكيف تعمل
-- [ابحث عن مدرّس](https://hassty.vercel.app/search): البحث عن المدرسين الخصوصيين حسب المادة والصف والمحافظة
-- [للمدرّسين](https://hassty.vercel.app/for-teachers): كيف ينضم المدرّسون إلى المنصة ومزاياهم
-- [تواصل معنا](https://hassty.vercel.app/contact): قنوات التواصل والدعم الفني والأسئلة الشائعة
+- [الصفحة الرئيسية](https://hassty.site/): نظرة عامة على خدمات المنصة والمميزات والإحصائيات
+- [من نحن](https://hassty.site/about): تعريف بمنصة حصتي ورؤيتها وكيف تعمل
+- [ابحث عن مدرّس](https://hassty.site/search): البحث عن المدرسين الخصوصيين حسب المادة والصف والمحافظة
+- [للمدرّسين](https://hassty.site/for-teachers): كيف ينضم المدرّسون إلى المنصة ومزاياهم
+- [تواصل معنا](https://hassty.site/contact): قنوات التواصل والدعم الفني والأسئلة الشائعة
 
 ## الحسابات (Accounts)
 
-- [إنشاء حساب جديد](https://hassty.vercel.app/signup): تسجيل الطلاب والمدرّسين على المنصة
-- [تسجيل الدخول](https://hassty.vercel.app/login): الوصول إلى حسابك في حصتي
-- [ملفات المدرّسين](https://hassty.vercel.app/tutor/): الصفحات العمومية للمدرّسين — أضف معرّف المدرّس بعد المسار، مثل /tutor/123
+- [إنشاء حساب جديد](https://hassty.site/signup): تسجيل الطلاب والمدرّسين على المنصة
+- [تسجيل الدخول](https://hassty.site/login): الوصول إلى حسابك في حصتي
+- [ملفات المدرّسين](https://hassty.site/tutor/): الصفحات العمومية للمدرّسين — أضف معرّف المدرّس بعد المسار، مثل /tutor/123
 
 ## السياسات (Legal)
 
-- [شروط الاستخدام](https://hassty.vercel.app/legal/terms): شروط وأحكام استخدام المنصة
-- [سياسة الخصوصية](https://hassty.vercel.app/legal/privacy): كيف نجمع بياناتك ونحميها
-- [توثيق المدرّسين](https://hassty.vercel.app/legal/teacher): سياسة التحقق من هوية ومؤهلات المدرّسين
-- [الاستخدام المقبول](https://hassty.vercel.app/legal/acceptable): قواعد السلوك المقبول على المنصة
+- [شروط الاستخدام](https://hassty.site/legal/terms): شروط وأحكام استخدام المنصة
+- [سياسة الخصوصية](https://hassty.site/legal/privacy): كيف نجمع بياناتك ونحميها
+- [توثيق المدرّسين](https://hassty.site/legal/teacher): سياسة التحقق من هوية ومؤهلات المدرّسين
+- [الاستخدام المقبول](https://hassty.site/legal/acceptable): قواعد السلوك المقبول على المنصة
 
 ## ملاحظات للوكلاء الذكيين (Agent notes)
 
 - مساحات العمل الخاصة (/student، /teacher، /parent، /assistant، /admin) محمية وتتطلب تسجيل دخول، وهي غير متاحة للزحف الآلي.
-- خريطة الموقع الكاملة متاحة على [sitemap.xml](https://hassty.vercel.app/sitemap.xml)
-- بيانات الاتصال الرسمية والاستفسارات متاحة في صفحة [تواصل معنا](https://hassty.vercel.app/contact)
+- خريطة الموقع الكاملة متاحة على [sitemap.xml](https://hassty.site/sitemap.xml)
+- بيانات الاتصال الرسمية والاستفسارات متاحة في صفحة [تواصل معنا](https://hassty.site/contact)

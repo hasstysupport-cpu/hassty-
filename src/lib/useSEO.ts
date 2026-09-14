@@ -18,7 +18,7 @@ interface SeoProps {
 
 export const DEFAULT_TITLE = 'منصة حصتي | أفضل منصة لحجز المدرسين الخصوصيين وحضور الـ QR في مصر';
 export const DEFAULT_DESC = 'منصة حصتي (Hassty) هي المنصة التعليمية الأولى في مصر لحجز أفضل المدرسين الخصوصيين المعتمدين لمختلف المراحل الدراسية واللغات مع نظام متابعة الحضور التلقائي بكود QR وإشعارات فورية عبر الواتساب.';
-export const BASE_URL = 'https://hassty.vercel.app';
+export const BASE_URL = 'https://hassty.site';
 const DEFAULT_ROBOTS = 'index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1';
 
 const setMeta = (selector: string, attr: 'name' | 'property', key: string, content: string) => {

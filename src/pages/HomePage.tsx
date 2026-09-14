@@ -78,7 +78,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onOpenQRSimulato
     description: 'منصة حِصّتي (Hassty) تساعد الطلاب وأولياء الأمور على الوصول لمدرسين موثقين قريبين منهم: دوّر على مدرسك، احجز الحصة أونلاين، وتابع تسجيل حضور الطلاب بكود QR والدرجات — كل ده في مكان واحد.',
     canonicalPath: '/',
     keywords: 'مدرسين خصوصيين, مدرس قريب مني, احسن مدرس خصوصي, دكتور رياضيات, تقوية, دروس خصوصية, حجز مدرس خصوصي, مدرسين معتمدين مصر, حضور QR, منصة حصتي, Hassty, QR attendance, private tutor Egypt',
-    ogImage: 'https://hassty.vercel.app/og-image.png',
+    ogImage: 'https://hassty.site/og-image.png',
   });
 
   const handleSearch = (subject: string, governorate: string, city: string = '') => onSearchWithParams ? onSearchWithParams(subject, governorate, city) : onNavigate('/search');

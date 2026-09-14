@@ -12,9 +12,7 @@ export const PEPPER = process.env.AUTH_CODE_PEPPER || 'hassty-dev-pepper';
 export const GMAIL_USER = process.env.GMAIL_USER || process.env.SMTP_USER || 'hasstysupport@gmail.com';
 export const GMAIL_PASS = (process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS || '').replace(/\s+/g, '');
 
-// Canonical production origin for OAuth/email/webhook links.
-// APP_URL in Vercel should also be set to https://hassty.site
-export const SITE_URL = (process.env.APP_URL || 'https://hassty.site').replace(/\/+$/, '');
+export const SITE_URL = process.env.APP_URL || 'https://hassty.site';
 export const SUPPORT_EMAIL = 'hasstysupport@gmail.com';
 
 /* ---- Verification code policy ---- */
