@@ -25,30 +25,22 @@ export const TeacherDashboardPageV2: React.FC<Props> = ({ onNavigate }) => {
     if (!teacherId || !supabase) { setLoading(false); return; }
     setRefreshing(true);
     try {
-      const [liveGroups, liveStudents] = await Promise.all([
+      // الموجة 1 (متوازية): المجموعات + الطلاب + الحجوزات المعلقة — لا اعتماد بينها
+      const [liveGroups, liveStudents, pendingBookings] = await Promise.all([
         loadTeacherGroups(teacherId),
         loadTeacherStudents(teacherId),
-      ]);
-      setGroups(liveGroups);
-      setStudents(liveStudents);
-
-      const groupIds = liveGroups.map(g => g.id);
-
-      // Fetch bookings safely
-      let bookingData: any[] = [];
-      try {
-        const { data: bData } = await supabase
-          .from('booking_requests')
+        supabase.from('booking_requests')
           .select('id,student_id,student_name,subject,day,time,location,price,status,created_at')
           .eq('tutor_id', teacherId)
           .eq('status', 'pending')
           .order('created_at', { ascending: false })
-          .limit(20);
-        bookingData = bData || [];
-      } catch (err) {
-        console.warn('Booking fetch warning:', err);
-      }
-      setBookings(bookingData.map((r: any) => ({
+          .limit(20)
+          .then((r: any) => r.data || [])
+          .catch((err: any) => { console.warn('Booking fetch warning:', err); return []; }),
+      ]);
+      setGroups(liveGroups);
+      setStudents(liveStudents);
+      setBookings(pendingBookings.map((r: any) => ({
         id: r.id,
         studentId: r.student_id,
         studentName: r.student_name || 'طالب',
@@ -61,7 +53,9 @@ export const TeacherDashboardPageV2: React.FC<Props> = ({ onNavigate }) => {
         createdAt: r.created_at,
       })));
 
-      // Fetch attendance records safely
+      const groupIds = liveGroups.map(g => g.id);
+
+      // الموجة 2: سجلات الحضور (تعتمد على groupIds من الموجة 1)
       let attData: any[] = [];
       try {
         if (groupIds.length > 0) {

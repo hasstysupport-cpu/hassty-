@@ -128,31 +128,38 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ currentRole,
     let active = true;
     const loadCounters = async () => {
       try {
-        const { data: notif } = await supabase.from('notifications').select('id').eq('user_id', user.uid).is('read_at', null);
+        // موجة 1 (متوازية): الإشعارات + مجموعاتي + واجباتي — لا تعتمد على بعضها
+        const [notifRes, groupsRes, assignmentsRes] = await Promise.all([
+          supabase.from('notifications').select('id', { count: 'exact', head: true }).eq('user_id', user.uid).is('read_at', null),
+          currentRole === 'teacher' ? supabase.from('student_groups').select('id').eq('tutor_id', user.uid) : Promise.resolve({ data: [] } as any),
+          currentRole === 'teacher' ? supabase.from('assignments').select('id').eq('teacher_id', user.uid) : Promise.resolve({ data: [] } as any),
+        ]);
         if (!active) return;
-        const n = (notif || []).length;
+        const n = notifRes.count ?? 0;
         setUnread(n);
         setCounters((p) => ({ ...p, notifications: n }));
         if (currentRole === 'teacher') {
-          const { data: myGroups } = await supabase.from('student_groups').select('id').eq('tutor_id', user.uid);
-          const groupIds = (myGroups || []).map((g: any) => g.id);
-          const { data: myAssignments } = await supabase.from('assignments').select('id').eq('teacher_id', user.uid);
-          const assignmentIds = (myAssignments || []).map((a: any) => a.id);
-          const { data: myStudents } = groupIds.length ? await supabase.from('group_enrollments').select('student_id').in('group_id', groupIds) : { data: [] };
-          const studentIds = (myStudents || []).map((s: any) => s.student_id).filter(Boolean);
+          const groupIds = ((groupsRes as any).data || []).map((g: any) => g.id);
+          const assignmentIds = ((assignmentsRes as any).data || []).map((a: any) => a.id);
+          // موجة 2 (متوازية): كلها تعتمد فقط على نتائج الموجة 1
           const [book, trans, makeup, disputes, subs] = await Promise.all([
-            supabase.from('booking_requests').select('id').eq('tutor_id', user.uid).eq('status', 'pending'),
-            groupIds.length ? supabase.from('group_transfer_requests').select('id').eq('status', 'pending').in('to_group_id', groupIds) : Promise.resolve({ data: [] }),
-            studentIds.length ? supabase.from('makeup_requests').select('id').eq('status', 'pending').in('student_id', studentIds) : Promise.resolve({ data: [] }),
-            supabase.from('attendance_disputes').select('id').eq('status', 'pending'),
-            assignmentIds.length ? supabase.from('assignment_submissions').select('id').in('status', ['submitted', 'late']).in('assignment_id', assignmentIds) : Promise.resolve({ data: [] }),
+            supabase.from('booking_requests').select('id', { count: 'exact', head: true }).eq('tutor_id', user.uid).eq('status', 'pending'),
+            groupIds.length ? supabase.from('group_transfer_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending').in('to_group_id', groupIds) : Promise.resolve({ count: 0 } as any),
+            groupIds.length ? supabase.from('group_enrollments').select('student_id').in('group_id', groupIds).then(async ({ data }: any) => {
+              const studentIds = (data || []).map((s: any) => s.student_id).filter(Boolean);
+              return studentIds.length
+                ? supabase.from('makeup_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending').in('student_id', studentIds)
+                : { count: 0 };
+            }) : Promise.resolve({ count: 0 } as any),
+            supabase.from('attendance_disputes').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+            assignmentIds.length ? supabase.from('assignment_submissions').select('id', { count: 'exact', head: true }).in('status', ['submitted', 'late']).in('assignment_id', assignmentIds) : Promise.resolve({ count: 0 } as any),
           ]);
           if (!active) return;
-          setCounters((p) => ({ ...p, enrollment: book.data?.length || 0, transfers: trans.data?.length || 0, makeup: makeup.data?.length || 0, disputes: disputes.data?.length || 0, submissions: subs.data?.length || 0 }));
+          setCounters((p) => ({ ...p, enrollment: (book as any).count ?? 0, transfers: (trans as any).count ?? 0, makeup: (makeup as any).count ?? 0, disputes: (disputes as any).count ?? 0, submissions: (subs as any).count ?? 0 }));
         }
         if (currentRole === 'assistant') {
-          const { data: inv } = await supabase.from('assistant_invitations').select('id').eq('assistant_id', user.uid).eq('status', 'pending');
-          if (active) setCounters((p) => ({ ...p, invitations: inv?.length || 0 }));
+          const { count: inv } = await supabase.from('assistant_invitations').select('id', { count: 'exact', head: true }).eq('assistant_id', user.uid).eq('status', 'pending');
+          if (active) setCounters((p) => ({ ...p, invitations: inv ?? 0 }));
         }
       } catch { /* silent — counters are best-effort */ }
     };

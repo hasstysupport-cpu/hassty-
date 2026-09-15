@@ -130,31 +130,6 @@ function subscribeTables<T>(channelName: string, tables: string[], loader: () =>
   };
 }
 
-export async function seedAdminDatabaseIfEmpty() {
-  const client = requireSupabase();
-  const { data: teachers, error } = await client.from('profiles').select('id,role,full_name,phone,email,governorate,city,grade,metadata').eq('role', 'teacher');
-  if (error) throw error;
-  for (const teacher of teachers || []) {
-    const { data: existing, error: requestError } = await client.from('teacher_verification_requests').select('id').eq('teacher_id', teacher.id).limit(1).maybeSingle();
-    if (requestError) throw requestError;
-    if (existing) continue;
-    await client.from('teacher_verification_requests').insert({
-      teacher_id: teacher.id,
-      teacher_name: teacher.full_name || 'مدرس حِصّتي',
-      phone: teacher.phone || '',
-      stage: teacher.grade || '',
-      governorate: teacher.governorate || 'القاهرة',
-      area: teacher.city || '',
-      subject: '',
-      bio: '',
-      experience_years: '',
-      id_card_image_url: String((teacher.metadata as any)?.idCardImageUrl || ''),
-      certificate_image_url: String((teacher.metadata as any)?.certificateImageUrl || ''),
-      status: 'pending',
-    });
-  }
-}
-
 export function subscribeToUsers(callback: (users: AdminUserAccount[]) => void, onError?: (error: any) => void) {
   return subscribeTables('admin:users', ['profiles', 'tutor_profiles', 'student_groups', 'group_enrollments'], loadAccountRows, callback, onError);
 }
@@ -240,12 +215,22 @@ function getCommissionRate(students: number) {
   return 2.0;
 }
 
+/* حماية من لوب realtime: كل كتابة في commission_tracking تولّد حدثًا يعيد
+   تشغيل الـ sync — لذلك: (1) upsert مجمّع في طلب واحد بدل طلب لكل مدرس
+   (2) cooldown دقيقة كاملة بين عمليات الـ sync (3) قفل ضد التداخل. */
+const SYNC_COOLDOWN_MS = 60_000;
+let lastCommissionSyncAt = 0;
+let commissionSyncInFlight: Promise<void> | null = null;
+
 async function syncCurrentCommissionRows() {
+  if (Date.now() - lastCommissionSyncAt < SYNC_COOLDOWN_MS) return;
+  if (commissionSyncInFlight) return commissionSyncInFlight;
+  commissionSyncInFlight = (async () => {
   const client = requireSupabase();
   const billingCycle = getBillingCycle();
   const [{ data: teachers, error: teacherError }, { data: tutors, error: tutorError }, { data: groups, error: groupError }, { data: enrollments, error: enrollmentError }, { data: existing, error: existingError }] = await Promise.all([
     client.from('profiles').select('id,full_name,role').eq('role', 'teacher'),
-    client.from('tutor_profiles').select('user_id,subjects').in('user_id', (await client.from('profiles').select('id').eq('role', 'teacher')).data?.map((p: any) => p.id) || []),
+    client.from('tutor_profiles').select('user_id,subjects'),
     client.from('student_groups').select('id,tutor_id,monthly_fee,is_active'),
     client.from('group_enrollments').select('group_id,student_id,status').eq('status', 'active'),
     client.from('commission_tracking').select('id,teacher_id,billing_cycle,payment_status,last_payment_date').eq('billing_cycle', billingCycle),
@@ -266,15 +251,15 @@ async function syncCurrentCommissionRows() {
     if (enrollment.student_id) studentsByTeacher.get(group.tutor_id)!.add(enrollment.student_id);
     grossByTeacher.set(group.tutor_id, (grossByTeacher.get(group.tutor_id) || 0) + Number(group.monthly_fee || 0));
   }
-  const subjectByTeacher = new Map<string, string>((tutors || []).map((t: any) => [t.user_id, t.subjects?.[0] || '']));
   const existingByTeacher = new Map<string, any>((existing || []).map((r: any) => [r.teacher_id, r]));
-  for (const teacher of teachers || []) {
+
+  const rows = (teachers || []).map((teacher: any) => {
     const count = studentsByTeacher.get(teacher.id)?.size || 0;
     const gross = grossByTeacher.get(teacher.id) || 0;
     const old = existingByTeacher.get(teacher.id);
     const rate = getCommissionRate(count);
     const due = Number((gross * rate / 100).toFixed(2));
-    const { error } = await client.from('commission_tracking').upsert({
+    return {
       id: old?.id,
       teacher_id: teacher.id,
       billing_cycle: billingCycle,
@@ -285,9 +270,17 @@ async function syncCurrentCommissionRows() {
       payment_status: old?.payment_status || 'pending',
       last_payment_date: old?.last_payment_date || null,
       updated_at: new Date().toISOString(),
-    }, { onConflict: 'teacher_id,billing_cycle' });
+    };
+  });
+
+  // upsert مجمّع واحد بدل طلب لكل مدرس (كان يولّد N حدث realtime ويشعل لوبًا ذاتيًا)
+  if (rows.length) {
+    const { error } = await client.from('commission_tracking').upsert(rows, { onConflict: 'teacher_id,billing_cycle' });
     if (error) throw error;
   }
+  lastCommissionSyncAt = Date.now();
+  })().finally(() => { commissionSyncInFlight = null; });
+  return commissionSyncInFlight;
 }
 
 async function loadCommissionRows(): Promise<TeacherCommissionTrackingItem[]> {
@@ -319,7 +312,10 @@ async function loadCommissionRows(): Promise<TeacherCommissionTrackingItem[]> {
 }
 
 export function subscribeToCommissions(callback: (commissions: TeacherCommissionTrackingItem[]) => void, onError?: (error: any) => void) {
-  return subscribeTables('admin:commission-tracking', ['commission_tracking', 'student_groups', 'group_enrollments', 'profiles', 'tutor_profiles'], loadCommissionRows, callback, onError);
+  /* ملاحظة أداء: الاشتراك يسمع على بيانات المصدر (المجموعات/التسجيلات) فقط،
+     وليس commission_tracking نفسه — حتى لا يعيد كل تحديث للعمولات تشغيل
+     الـ sync في حلقة مغلقة. */
+  return subscribeTables('admin:commission-tracking', ['student_groups', 'group_enrollments', 'profiles', 'tutor_profiles'], loadCommissionRows, callback, onError);
 }
 
 export async function createTeacherVerificationRequest(payload: Partial<TeacherVerificationRequest> & { teacherId: string; teacherName: string }) {

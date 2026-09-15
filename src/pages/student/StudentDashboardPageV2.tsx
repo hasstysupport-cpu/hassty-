@@ -47,18 +47,18 @@ export const StudentDashboardPageV2: React.FC<Props> = ({ onNavigate, onSelectTu
 
       const rows = bookingsRes.data || [];
       const tutorIds = Array.from(new Set(rows.map((r:any)=>r.tutor_id).filter(Boolean).concat((enrollmentsRes.data||[]).map((r:any)=>r.group?.tutor_id).filter(Boolean))));
+      // موجة 2 (متوازية): بيانات المدرسين + الأسماء — كلاهما يعتمد فقط على الموجة 1
       let tutorMap = new Map<string, any>();
-      if (tutorIds.length) {
-        const { data: tutorProfiles, error } = await supabase.from('tutor_profiles').select('user_id,title,headline,subjects,is_verified,verification_status,governorate,city').in('user_id', tutorIds);
-        if (error) throw error;
-        tutorMap = new Map((tutorProfiles||[]).map((p:any)=>[p.user_id,p]));
-      }
-      const profileIds = Array.from(new Set([...tutorIds]));
       let names = new Map<string,string>();
-      if (profileIds.length) {
-        const { data: people, error } = await supabase.from('profiles').select('id,full_name,avatar_url').in('id', profileIds);
-        if (error) throw error;
-        names = new Map((people||[]).map((p:any)=>[p.id,p.full_name||'المدرس']));
+      if (tutorIds.length) {
+        const [tpRes, peopleRes] = await Promise.all([
+          supabase.from('tutor_profiles').select('user_id,title,headline,subjects,is_verified,verification_status,governorate,city').in('user_id', tutorIds),
+          supabase.from('profiles').select('id,full_name,avatar_url').in('id', tutorIds),
+        ]);
+        if (tpRes.error) throw tpRes.error;
+        if (peopleRes.error) throw peopleRes.error;
+        tutorMap = new Map((tpRes.data||[]).map((p:any)=>[p.user_id,p]));
+        names = new Map((peopleRes.data||[]).map((p:any)=>[p.id,p.full_name||'المدرس']));
       }
 
       const enrollmentLessons: Lesson[] = (enrollmentsRes.data||[]).map((r:any)=>({
