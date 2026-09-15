@@ -2,8 +2,6 @@ import React, { useState } from 'react';
 import { useSEO } from '../lib/useSEO';
 import {
   Mail,
-  Phone,
-  MessageCircle,
   MapPin,
   Send,
   CheckCircle2,
@@ -21,11 +19,6 @@ import { createSupportTicket } from '../lib/supportTicketsService';
 interface ContactPageProps {
   onNavigate: (path: string) => void;
 }
-
-const WHATSAPP_SUPPORT = [
-  { label: 'واتساب 1', number: '+201212281360', href: 'https://wa.me/201212281360' },
-  { label: 'واتساب 2', number: '+201080158828', href: 'https://wa.me/201080158828' },
-];
 
 const TELEGRAM_SUPPORT = [
   { label: 'تليجرام 1', username: '@MCV_M', href: 'https://t.me/MCV_M' },
@@ -49,7 +42,7 @@ export const ContactPage: React.FC<ContactPageProps> = ({ onNavigate }) => {
 
   useSEO({
     title: 'اتصل بنا والدعم الفني',
-    description: 'تواصل مع فريق الدعم الفني لمنصة حصتي للاستفسارات العامة، دعم المدرسين والطلاب، أو عبر الواتساب والبريد الإلكتروني المباشر.',
+    description: 'تواصل مع فريق الدعم الفني لمنصة حصتي للاستفسارات العامة، دعم المدرسين والطلاب، أو عبر تليجرام والبريد الإلكتروني المباشر.',
     canonicalPath: '/contact',
     breadcrumbs: ['اتصل بنا'],
     keywords: 'اتصل بنا حصتي, دعم منصة حصتي, خدمة العملاء, مساعدة أولياء الأمور والطلاب',
@@ -102,16 +95,15 @@ export const ContactPage: React.FC<ContactPageProps> = ({ onNavigate }) => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 space-y-12">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="space-y-4">
-            <div className="bg-emerald-500 text-white rounded-3xl p-6 sm:p-7 shadow-xs space-y-4">
-              <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center"><MessageCircle className="w-7 h-7" /></div>
-              <div><span className="text-xs font-bold bg-white/20 px-2 py-0.5 rounded-md">أسرع وسيلة تواصل</span><h3 className="text-lg font-black mt-2 mb-1">دعم واتساب الفوري</h3><p className="text-xs text-emerald-100 leading-relaxed">تواصل معنا مباشرة عبر أي من أرقام الواتساب للدعم والاستفسارات.</p></div>
-              <div className="space-y-2">{WHATSAPP_SUPPORT.map((item) => <a key={item.number} href={item.href} target="_blank" rel="noreferrer" className="w-full py-3 bg-white hover:bg-emerald-50 text-emerald-800 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"><span>{item.label}: {item.number}</span><Send className="w-3.5 h-3.5 rotate-180" /></a>)}</div>
+            <div className="bg-sky-500 text-white rounded-3xl p-6 sm:p-7 shadow-xs space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center"><Send className="w-7 h-7" /></div>
+              <div><span className="text-xs font-bold bg-white/20 px-2 py-0.5 rounded-md">أسرع وسيلة تواصل</span><h3 className="text-lg font-black mt-2 mb-1">دعم تليجرام الفوري</h3><p className="text-xs text-sky-100 leading-relaxed">تواصل معنا مباشرة عبر حسابات تليجرام الرسمية للدعم والاستفسارات.</p></div>
+              <div className="space-y-2">{TELEGRAM_SUPPORT.map((item) => <a key={item.username} href={item.href} target="_blank" rel="noreferrer" className="w-full py-3 bg-white hover:bg-sky-50 text-sky-800 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"><span>{item.label}: {item.username}</span><Send className="w-3.5 h-3.5" /></a>)}</div>
             </div>
 
             <div className="bg-white border border-[#E5E7EB] rounded-3xl p-6 space-y-4">
-              <div className="flex items-start gap-3.5 pb-4 border-b border-gray-100"><div className="w-9 h-9 rounded-xl bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center shrink-0"><Phone className="w-4 h-4" /></div><div><h4 className="text-xs font-bold text-[#6B7280]">الهاتف المباشر</h4><div className="space-y-1 mt-0.5">{WHATSAPP_SUPPORT.map((item) => <a key={item.number} href={`tel:${item.number}`} className="block text-sm font-bold text-[#1E3A8A] font-mono hover:text-[#2563EB]">{item.number}</a>)}</div><p className="text-[11px] text-gray-400 mt-1">متاح يومياً من 9:00 ص إلى 10:00 م</p></div></div>
               <div className="flex items-start gap-3.5 pb-4 border-b border-gray-100"><div className="w-9 h-9 rounded-xl bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center shrink-0"><Mail className="w-4 h-4" /></div><div><h4 className="text-xs font-bold text-[#6B7280]">البريد الإلكتروني</h4><p className="text-xs font-bold text-[#1E3A8A] font-mono mt-0.5">hasstysupport@gmail.com</p><p className="text-[11px] text-gray-400">الرد خلال ساعتين بحد أقصى</p></div></div>
-              <div className="flex items-start gap-3.5"><div className="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0"><Send className="w-4 h-4" /></div><div className="min-w-0"><h4 className="text-xs font-bold text-[#6B7280]">تليجرام</h4><div className="space-y-1 mt-1">{TELEGRAM_SUPPORT.map((item) => <a key={item.username} href={item.href} target="_blank" rel="noreferrer" className="block text-xs font-bold text-[#1E3A8A] hover:text-sky-700">{item.label}: {item.username}</a>)}</div></div></div>
+              <div className="flex items-start gap-3.5"><div className="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0"><Send className="w-4 h-4" /></div><div><h4 className="text-xs font-bold text-[#6B7280]">تليجرام</h4><div className="space-y-1 mt-1">{TELEGRAM_SUPPORT.map((item) => <a key={item.username} href={item.href} target="_blank" rel="noreferrer" className="block text-xs font-bold text-[#1E3A8A] hover:text-sky-700">{item.label}: {item.username}</a>)}</div></div></div>
               <div className="flex items-start gap-3.5 pt-4 border-t border-gray-100"><div className="w-9 h-9 rounded-xl bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center shrink-0"><MapPin className="w-4 h-4" /></div><div><h4 className="text-xs font-bold text-[#6B7280]">المقر الرئيسي</h4><p className="text-xs font-bold text-[#1E3A8A] mt-0.5">القاهرة الجديدة — التجمع الخامس، مصر</p></div></div>
             </div>
           </div>

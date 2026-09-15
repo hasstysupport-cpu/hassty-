@@ -17,14 +17,13 @@ import {
   KeyRound
 } from 'lucide-react';
 import { signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider } from '../../lib/supabaseAuthCompat';
-import { doc, setDoc, getDoc } from '../../lib/supabaseCompat';
-import { db } from '../../lib/supabaseCompat';
 import { auth } from '../../lib/supabaseAuthCompat';
+import { supabase } from '../../lib/supabase';
 import {
-  OFFICIAL_ADMIN_EMAIL,
   SECRET_ADMIN_ROUTE,
   requestAdminMagicLink,
   verifyAdminMagicToken,
+  verifyGoogleAdminAccess,
   saveAdminSession,
   clearAdminSession,
 } from '../../lib/securityConfig';
@@ -41,7 +40,9 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
   initialToken,
 }) => {
   const [step, setStep] = useState<'request' | 'otp_verify' | 'verifying' | 'success'>('request');
-  const [targetEmail, setTargetEmail] = useState(OFFICIAL_ADMIN_EMAIL);
+  /* لا يوجد بريد مكتوب في الكود — يُدخل يدويًا ويُتحقق منه على السيرفر من القايمة البيضاء */
+  const [targetEmail, setTargetEmail] = useState('');
+  const [maskedEmail, setMaskedEmail] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [otpCodeInput, setOtpCodeInput] = useState('');
@@ -56,49 +57,30 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
     getRedirectResult(auth)
       .then(async (res) => {
         if (res && res.user) {
-          const user = res.user;
-          const userEmail = (user.email || '').toLowerCase().trim();
-          const adminName = user.displayName || 'مدير المنصة';
-          const adminPhoto = user.photoURL || '';
-
+          // التحقق من القايمة البيضاء على السيرفر (ولا يُفتح أي مفتاح بدونها)
           try {
-            await setDoc(doc(db, 'admin_users', user.uid), {
-              uid: user.uid,
-              email: userEmail,
-              name: adminName,
-              photoURL: adminPhoto,
-              role: 'super_admin',
-              lastLogin: new Date().toISOString(),
-              authProvider: 'google',
-              status: 'active'
-            }, { merge: true });
-
-            await setDoc(doc(db, 'users', user.uid), {
-              uid: user.uid,
-              email: userEmail,
-              name: adminName,
+            const check = await verifyGoogleAdminAccess();
+            if (!check.allowed) {
+              await supabase?.auth.signOut();
+              clearAdminSession();
+              setErrorMessage('هذا الحساب غير مصرح له بالدخول الإداري.');
+              return;
+            }
+            saveAdminSession({
+              token: `google_admin_${res.user.uid}_${Date.now()}`,
+              email: check.email || (res.user.email || '').toLowerCase(),
+              expiresAt: Date.now() + 24 * 60 * 60 * 1000,
               role: 'admin',
-              avatarUrl: adminPhoto,
-              accountStatus: 'active',
-              emailVerified: true,
-              lastLogin: new Date().toISOString(),
-            }, { merge: true });
-          } catch (dbErr) {
-            console.warn('Admin Supabase record save notice:', dbErr);
+            });
+            setStep('success');
+            setSuccessMessage('تم تسجيل الدخول الإداري بنجاح! جاري نقلك إلى لوحة التحكم...');
+            setTimeout(() => {
+              onLoginSuccess(check.email || (res.user.email || '').toLowerCase());
+            }, 500);
+          } catch (checkErr: any) {
+            console.warn('Admin access check notice:', checkErr);
+            setErrorMessage(checkErr?.message || 'تعذر التحقق من صلاحية الدخول الإداري.');
           }
-
-          saveAdminSession({
-            token: `google_admin_${user.uid}_${Date.now()}`,
-            email: userEmail,
-            expiresAt: Date.now() + 24 * 60 * 60 * 1000,
-            role: 'admin',
-          });
-
-          setStep('success');
-          setSuccessMessage(`تم تسجيل الدخول الإداري بنجاح (${userEmail})! جاري نقلك إلى لوحة التحكم...`);
-          setTimeout(() => {
-            onLoginSuccess(userEmail);
-          }, 500);
         }
       })
       .catch((err) => {
@@ -144,15 +126,21 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
     setErrorMessage('');
     setSuccessMessage('');
 
+    if (!targetEmail.trim()) {
+      setErrorMessage('يرجى إدخال البريد الإداري المعتمد أولًا.');
+      return;
+    }
+
     try {
-      const res = await requestAdminMagicLink(OFFICIAL_ADMIN_EMAIL);
+      const res = await requestAdminMagicLink(targetEmail);
 
       if (res.success) {
         setStep('otp_verify');
-        setSuccessMessage('تم إرسال كود التحقق المكون من 6 أرقام إلى البريد الإداري الرسمي (hasstysupport@gmail.com). صلاحية الكود 10 دقائق.');
+        setMaskedEmail(res.maskedEmail || 'البريد المعتمد');
+        setSuccessMessage(`تم إرسال كود التحقق المكون من 6 أرقام إلى (${res.maskedEmail || 'البريد المعتمد'}). صلاحية الكود 10 دقائق.`);
         setCooldown(60);
       } else {
-        setErrorMessage(res.error || 'تعذر إرسال الكود. يرجى التأكد من إعدادات البريد الإداري.');
+        setErrorMessage(res.error || 'تعذر إرسال الكود. تأكد من أن البريد مُضاف إلى قايمة الإدارة.');
       }
     } catch {
       setErrorMessage('حدث خطأ أثناء الاتصال بالخادم الآمن.');
@@ -195,49 +183,34 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
 
       const user = result.user;
       const userEmail = (user.email || '').toLowerCase().trim();
-      const adminName = user.displayName || 'مدير المنصة';
-      const adminPhoto = user.photoURL || '';
 
-      // Create or update admin account in Supabase (admin_users & users collections)
+      // التحقق من القايمة البيضاء على السيرفر — لا دخول لأي حساب غير مُصرّح
       try {
-        await setDoc(doc(db, 'admin_users', user.uid), {
-          uid: user.uid,
-          email: userEmail,
-          name: adminName,
-          photoURL: adminPhoto,
-          role: 'super_admin',
-          lastLogin: new Date().toISOString(),
-          authProvider: 'google',
-          status: 'active'
-        }, { merge: true });
+        const check = await verifyGoogleAdminAccess();
+        if (!check.allowed) {
+          await supabase?.auth.signOut();
+          clearAdminSession();
+          setErrorMessage('هذا الحساب غير مصرح له بالدخول الإداري.');
+          return;
+        }
 
-        await setDoc(doc(db, 'users', user.uid), {
-          uid: user.uid,
-          email: userEmail,
-          name: adminName,
+        // Save admin session in storage
+        saveAdminSession({
+          token: `google_admin_${user.uid}_${Date.now()}`,
+          email: check.email || userEmail,
+          expiresAt: Date.now() + 24 * 60 * 60 * 1000,
           role: 'admin',
-          avatarUrl: adminPhoto,
-          accountStatus: 'active',
-          emailVerified: true,
-          lastLogin: new Date().toISOString(),
-        }, { merge: true });
-      } catch (dbErr) {
-        console.warn('Admin Supabase record save notice:', dbErr);
+        });
+
+        setStep('success');
+        setSuccessMessage('تم تسجيل الدخول الإداري بنجاح! جاري نقلك إلى لوحة التحكم...');
+        setTimeout(() => {
+          onLoginSuccess(check.email || userEmail);
+        }, 500);
+      } catch (checkErr: any) {
+        console.warn('Admin access check notice:', checkErr);
+        setErrorMessage(checkErr?.message || 'تعذر التحقق من صلاحية الدخول الإداري.');
       }
-
-      // Save admin session in storage
-      saveAdminSession({
-        token: `google_admin_${user.uid}_${Date.now()}`,
-        email: userEmail,
-        expiresAt: Date.now() + 24 * 60 * 60 * 1000,
-        role: 'admin',
-      });
-
-      setStep('success');
-      setSuccessMessage(`تم تسجيل الدخول الإداري بنجاح (${userEmail})! جاري نقلك إلى لوحة التحكم...`);
-      setTimeout(() => {
-        onLoginSuccess(userEmail);
-      }, 500);
     } catch (err: any) {
       console.warn('Google Admin Auth notice:', err);
       if (err?.code === 'auth/popup-closed-by-user') {
@@ -266,14 +239,14 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
     setErrorMessage('');
 
     try {
-      const res = await verifyAdminMagicToken(targetInput);
+      const res = await verifyAdminMagicToken(targetInput, targetEmail);
 
       if (res.valid) {
         setStep('success');
         setSuccessMessage('تم التحقق من كود الإدارة بنجاح! تم فتح جلسة إدارية آمنة لمدة 24 ساعة.');
-        
+
         setTimeout(() => {
-          onLoginSuccess(OFFICIAL_ADMIN_EMAIL);
+          onLoginSuccess(res.email || targetEmail);
         }, 1000);
       } else {
         setErrorMessage(res.error || 'كود التحقق غير صحيح أو منتهي الصلاحية (صلاحية الكود ساعة واحدة).');
@@ -400,16 +373,17 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
                 <label className="block text-xs font-bold text-slate-200">
                   البريد الإلكتروني الإداري المعتمد
                 </label>
-                <div className="p-3 bg-slate-900/90 border border-slate-700 rounded-2xl flex items-center justify-between">
-                  <span className="text-xs font-mono font-bold text-blue-300" dir="ltr">
-                    {OFFICIAL_ADMIN_EMAIL}
-                  </span>
-                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-800/60 px-2 py-0.5 rounded-full">
-                    المسؤول الرسمي
-                  </span>
-                </div>
+                <input
+                  type="email"
+                  value={targetEmail}
+                  onChange={(e) => setTargetEmail(e.target.value)}
+                  placeholder="أدخل البريد الإداري المُصرّح له"
+                  autoComplete="off"
+                  dir="ltr"
+                  className="w-full p-3 bg-slate-900/90 border border-slate-700 rounded-2xl text-xs font-mono font-bold text-blue-300 placeholder:text-slate-600 placeholder:font-sans focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
+                />
                 <p className="text-[11px] text-slate-400 leading-relaxed">
-                  سيتم إرسال كود دخول رقمي مباشر (6 أرقام) إلى بريدك المسجل فور الضغط أدناه.
+                  سيتم إرسال كود دخول رقمي مباشر (6 أرقام) إلى البريد المُصرّح له فقط.
                 </p>
               </div>
 
@@ -460,7 +434,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
                 </div>
                 <h3 className="text-sm font-black text-white">أدخل كود التحقق الإداري (6 أرقام)</h3>
                 <p className="text-[11px] text-slate-400">
-                  تم إرسال الكود إلى <strong className="text-blue-300" dir="ltr">{OFFICIAL_ADMIN_EMAIL}</strong>
+                  تم إرسال الكود إلى <strong className="text-blue-300" dir="ltr">{maskedEmail || 'البريد المعتمد'}</strong>
                 </p>
               </div>
 

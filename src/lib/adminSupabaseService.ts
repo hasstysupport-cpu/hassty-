@@ -7,9 +7,8 @@ import {
   AccountBadgeType,
 } from '../types';
 
-const ADMIN_EMAILS = new Set(['hasstysupport@gmail.com', 'admin@hassty.com']);
-
-const isAdminEmail = (email?: string | null) => Boolean(email && ADMIN_EMAILS.has(email.toLowerCase().trim()));
+/* ملاحظة أمنية: لا توجد أي إيميلات إدارية في كود الواجهة —
+   صلاحية الإدارة تُتحقق من الخادم عبر القايمة البيضاء (/api/auth/admin-otp). */
 
 type ProfileRow = {
   id: string;
@@ -407,7 +406,7 @@ export async function dbDeleteAccount(accountId: string) {
 export async function dbApproveVerification(requestId: string, teacherId: string, adminEmail: string, teacherData?: Partial<AdminUserAccount>) {
   const client = requireSupabase();
   const now = new Date().toISOString();
-  if (!isAdminEmail(adminEmail)) throw new Error('Unauthorized admin');
+  if (!adminEmail) throw new Error('Unauthorized admin');
   const { error: requestError } = await client.from('teacher_verification_requests').update({ status: 'approved', actioned_at: now, actioned_by: adminEmail, rejection_reason: null, updated_at: now }).eq('id', requestId);
   if (requestError) throw requestError;
   const profilePatch: Record<string, any> = { account_status: 'active', badge: 'verified', updated_at: now };
@@ -437,7 +436,7 @@ export async function dbApproveVerification(requestId: string, teacherId: string
 export async function dbRejectVerification(requestId: string, reason: string, adminEmail: string) {
   const client = requireSupabase();
   const now = new Date().toISOString();
-  if (!isAdminEmail(adminEmail)) throw new Error('Unauthorized admin');
+  if (!adminEmail) throw new Error('Unauthorized admin');
   const { data: request, error: requestReadError } = await client.from('teacher_verification_requests').select('teacher_id').eq('id', requestId).maybeSingle();
   if (requestReadError) throw requestReadError;
   const { error } = await client.from('teacher_verification_requests').update({ status: 'rejected', rejection_reason: reason, actioned_at: now, actioned_by: adminEmail, updated_at: now }).eq('id', requestId);

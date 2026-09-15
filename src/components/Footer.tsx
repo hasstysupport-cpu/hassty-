@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mail, MessageCircle, MapPin, Send } from 'lucide-react';
+import { Mail, MapPin, Send } from 'lucide-react';
 import { BrandLogo } from './common/BrandLogo';
 
 interface FooterProps { onNavigate: (path: string) => void; }
@@ -10,11 +10,6 @@ const navLink = (e: React.MouseEvent<HTMLAnchorElement>, path: string, onNavigat
   if (!path.startsWith('http')) e.preventDefault();
   onNavigate(path);
 };
-
-const WHATSAPP_SUPPORT = [
-  { label: 'واتساب 1', number: '+201212281360', href: 'https://wa.me/201212281360' },
-  { label: 'واتساب 2', number: '+201080158828', href: 'https://wa.me/201080158828' },
-];
 
 export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
   return (
@@ -54,14 +49,6 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               <li><button onClick={() => onNavigate('/for-teachers')} className="hover:text-[#2563EB] transition-colors">العمولات والمزايا</button></li>
               <li><button onClick={() => onNavigate('/legal/teacher')} className="hover:text-[#2563EB] transition-colors">لماذا نطلب مستندات التوثيق؟</button></li>
               <li className="flex items-center gap-2 pt-1 text-xs"><Mail className="w-3.5 h-3.5 text-[#2563EB]" /><span>hasstysupport@gmail.com</span></li>
-              {WHATSAPP_SUPPORT.map((item) => (
-                <li key={item.number}>
-                  <a href={item.href} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-xs hover:text-emerald-700 transition-colors">
-                    <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>{item.label}: {item.number}</span>
-                  </a>
-                </li>
-              ))}
               <li>
                 <a href="https://t.me/MCV_M" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-xs hover:text-sky-700 transition-colors">
                   <Send className="w-3.5 h-3.5 text-sky-600" />

@@ -1,23 +1,32 @@
 /* ============================================================
-   POST /api/auth/admin-otp
-   بوابة دخول الإدارة عبر ميلر المنصة (Gmail SMTP) بدلًا من
-   إيميلات Supabase Auth المدمجة (محدودة بـ~2/ساعة على الباقة المجانية).
-   - action 'send'   : إصدار رمز login_otp للبريد الإداري الرسمي
-   - action 'verify' : التحقق من الرمز، ثم سكّ hashed_token لمagic link
+   POST /api/auth/admin-otp — بوابة الوصول الإداري الكاملة
+   ------------------------------------------------------------
+   أ) بدون توكن (صفحة دخول الإدارة):
+   - action 'send'   : إصدار رمز login_otp لأي بريد ضمن القايمة البيضاء
+   - action 'verify' : التحقق من الرمز ثم سكّ hashed_token لمagic link
                        (GoTrue admin generate_link) لتبديله بجلسة حقيقية
-                       من العميل عبر verifyOtp({ type:'magiclink' })
+   ب) بتوكن جلسة (Authorization: Bearer <supabase access_token>):
+   - action 'google-verify' : هل صاحب الجلسة مصرح له إداريًا؟ + ترقية دوره
+                              تلقائيًا إلى admin إذا كان بريده في القايمة
+   - action 'list'          : عرض إيميلات الإدارة (للأدمن فقط)
+   - action 'add'           : إضافة إيميل للقايمة (للأدمن فقط)
+   - action 'remove'        : حذف إيميل من القايمة (للأدمن فقط)
    الأمان:
-   - البريد مثبّت على البريد الإداري الرسمي (يُرفض غيره 403)
+   - لا يوجد أي بريد إداري مكتوب داخل كود الواجهة — القايمة على السيرفر
    - الرموز مُجزّأة (hashed) مع cooldown 60s + 5 محاولات + 5 رموز/6h (codes.js)
-   - hashed_token يُعاد فقط بعد نجاح التحقق من الرمز، وهو أحادي الاستخدام
-   Body: { action: 'send' | 'verify', code? }
+   - hashed_token يُعاد فقط بعد نجاح التحقق من الرمز وهو أحادي الاستخدام
    ============================================================ */
-import { readJsonBody, jsonOk, jsonErr, ARABIC_ERRORS } from '../_lib/config.js';
-import { findProfileByEmail, findAuthUserByEmail, generateLink } from '../_lib/supabase.js';
+import { readJsonBody, jsonOk, jsonErr, ARABIC_ERRORS, maskEmail } from '../_lib/config.js';
+import {
+  findProfileByEmail, findAuthUserByEmail, generateLink, getCallerUser,
+} from '../_lib/supabase.js';
 import { issueCode, verifyCode } from '../_lib/codes.js';
 import { sendAuthEmail } from '../_lib/mailer.js';
-
-const ADMIN_EMAIL = 'hasstysupport@gmail.com';
+import {
+  OWNER_EMAIL, MAX_ADMINS, normalizeEmail, isValidEmail,
+  getAdminWhitelist, isWhitelistedAdmin, setAdminWhitelist,
+  setProfileRoleByEmail, resolveAdminCaller,
+} from '../_lib/adminWhitelist.js';
 
 const reasonMessage = {
   expired: 'انتهت صلاحية الرمز. اطلب رمزًا جديدًا.',
@@ -26,10 +35,15 @@ const reasonMessage = {
   not_found: 'لم نجد رمزًا صالحًا. اطلب رمزًا جديدًا.',
 };
 
-async function resolveAdminUserId() {
-  const profile = await findProfileByEmail(ADMIN_EMAIL);
+function bearerToken(req) {
+  const authHeader = req.headers['authorization'] || '';
+  return authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+}
+
+async function resolveAdminUserId(email) {
+  const profile = await findProfileByEmail(email);
   if (profile?.id) return profile.id;
-  const authUser = await findAuthUserByEmail(ADMIN_EMAIL);
+  const authUser = await findAuthUserByEmail(email);
   return authUser?.id || null;
 }
 
@@ -41,37 +55,43 @@ export default async function handler(req, res) {
 
     const action = String(body.action || '');
 
-    /* ---------- send: issue the code over the platform mailer ---------- */
+    /* ---------- send: إصدار رمز دخول لأي بريد ضمن القايمة البيضاء ---------- */
     if (action === 'send') {
-      const requested = String(body.email || '').toLowerCase().trim();
-      if (requested && requested !== ADMIN_EMAIL) {
+      const target = normalizeEmail(body.email) || OWNER_EMAIL;
+      if (!isValidEmail(target)) return jsonErr(res, 'صيغة البريد غير صحيحة.', 422);
+      if (!(await isWhitelistedAdmin(target))) {
         return jsonErr(res, 'غير مصرح بهذا البريد.', 403);
       }
-
-      const userId = await resolveAdminUserId();
+      const userId = await resolveAdminUserId(target);
       if (!userId) return jsonErr(res, 'تعذر الوصول للحساب الإداري. تواصل مع الدعم.', 500);
 
       const { code, expiresInSeconds } = await issueCode({
-        email: ADMIN_EMAIL,
+        email: target,
         userId,
         purpose: 'login_otp',
         ip: req.headers['x-forwarded-for']?.split(',')[0]?.trim(),
       });
-      await sendAuthEmail({ to: ADMIN_EMAIL, purpose: 'login_otp', code, name: 'إدارة حِصّتي' });
+      await sendAuthEmail({ to: target, purpose: 'login_otp', code, name: 'إدارة حِصّتي' });
 
       return jsonOk(res, {
         sent: true,
         expiresIn: expiresInSeconds,
-        message: 'تم إرسال رمز الدخول الإداري إلى البريد الرسمي.',
+        maskedEmail: maskEmail(target),
+        message: 'تم إرسال رمز الدخول الإداري إلى البريد المعتمد.',
       });
     }
 
-    /* ---------- verify: check code, then mint a single-use magic token ---------- */
+    /* ---------- verify: فحص الرمز ثم سكّ جلسة إدارية أحادية الاستخدام ---------- */
     if (action === 'verify') {
       const code = String(body.code || '').replace(/\D/g, '');
       if (code.length !== 6) return jsonErr(res, 'كود الدخول يجب أن يكون 6 أرقام.', 422);
 
-      const result = await verifyCode({ email: ADMIN_EMAIL, code, purpose: 'login_otp' });
+      const target = normalizeEmail(body.email) || OWNER_EMAIL;
+      if (!(await isWhitelistedAdmin(target))) {
+        return jsonErr(res, 'غير مصرح بهذا البريد.', 403);
+      }
+
+      const result = await verifyCode({ email: target, code, purpose: 'login_otp' });
       if (!result.ok) {
         return jsonErr(res, reasonMessage[result.reason] || ARABIC_ERRORS.wrongCode, 400, {
           reason: result.reason,
@@ -79,15 +99,74 @@ export default async function handler(req, res) {
         });
       }
 
-      // The code proved control of the admin inbox → mint the session token.
-      // (GoTrue returns hashed_token at the top level; older docs show properties.hashed_token)
-      const { ok, status, data } = await generateLink({ type: 'magiclink', email: ADMIN_EMAIL });
+      // إثبات امتلاك صندوق البريد → سكّ التوكن أحادي الاستخدام
+      const { ok, status, data } = await generateLink({ type: 'magiclink', email: target });
       const tokenHash = data?.hashed_token || data?.properties?.hashed_token;
       if (!ok || !tokenHash) {
         return jsonErr(res, `تعذر إنشاء جلسة إدارية (${status}). حاول مجددًا.`, 502);
       }
 
-      return jsonOk(res, { verified: true, token_hash: tokenHash });
+      return jsonOk(res, { verified: true, token_hash: tokenHash, email: target });
+    }
+
+    /* ---------- من هنا للأسفل: يتطلب توكن جلسة سارية ---------- */
+    const caller = await getCallerUser(bearerToken(req));
+    if (!caller) return jsonErr(res, 'جلسة غير صالحة. سجل دخولك أولًا.', 401);
+    const callerEmail = normalizeEmail(caller.email);
+
+    /* ---------- google-verify: هل صاحب الجلسة مصرح له؟ + ترقية تلقائية ---------- */
+    if (action === 'google-verify') {
+      const allowed = await isWhitelistedAdmin(callerEmail);
+      if (!allowed) return jsonOk(res, { ok: true, allowed: false });
+
+      const profile = await findProfileByEmail(callerEmail);
+      let promoted = false;
+      if (profile?.id && profile.role !== 'admin') {
+        const r = await setProfileRoleByEmail(callerEmail, 'admin');
+        promoted = Boolean(r.ok && !r.unchanged);
+      }
+      return jsonOk(res, { ok: true, allowed: true, email: callerEmail, promoted });
+    }
+
+    /* ---------- list / add / remove: إدارة القايمة (أدمن فقط) ---------- */
+    if (action === 'list' || action === 'add' || action === 'remove') {
+      const gate = await resolveAdminCaller(caller);
+      if (!gate.allowed) return jsonErr(res, 'غير مصرح لك بإدارة إيميلات الإدارة.', 403);
+
+      if (action === 'list') {
+        const emails = await getAdminWhitelist();
+        return jsonOk(res, { emails, owner: OWNER_EMAIL, max: MAX_ADMINS });
+      }
+
+      if (action === 'add') {
+        const email = normalizeEmail(body.email);
+        if (!isValidEmail(email)) return jsonErr(res, 'صيغة البريد غير صحيحة.', 422);
+        const emails = await getAdminWhitelist();
+        if (emails.includes(email)) return jsonOk(res, { emails, message: 'البريد مضاف بالفعل.' });
+        if (emails.length >= MAX_ADMINS) {
+          return jsonErr(res, `الحد الأقصى ${MAX_ADMINS} إيميلات. احذف واحدًا أولًا.`, 400);
+        }
+        const next = [...emails, email];
+        const save = await setAdminWhitelist(next);
+        if (!save.ok) return jsonErr(res, 'تعذر حفظ القايمة. حاول مجددًا.', 500);
+        // ترقية فورية لحساب موجود بنفس البريد (إن وُجد)
+        await setProfileRoleByEmail(email, 'admin').catch(() => {});
+        return jsonOk(res, { emails: save.emails, message: 'تمت إضافة الإيميل وترقية حسابه إن وُجد.' });
+      }
+
+      if (action === 'remove') {
+        const email = normalizeEmail(body.email);
+        if (email === OWNER_EMAIL) {
+          return jsonErr(res, 'لا يمكن حذف بريد المالك الرسمي.', 400);
+        }
+        const emails = await getAdminWhitelist();
+        if (!emails.includes(email)) return jsonOk(res, { emails, message: 'البريد غير موجود في القايمة.' });
+        const save = await setAdminWhitelist(emails.filter((e) => e !== email));
+        if (!save.ok) return jsonErr(res, 'تعذر حفظ القايمة. حاول مجددًا.', 500);
+        // تخفيض دوره من لوحة الإدارة إن كان أدمن
+        await setProfileRoleByEmail(email, 'student').catch(() => {});
+        return jsonOk(res, { emails: save.emails, message: 'تم حذف الإيميل وتخفيض صلاحياته.' });
+      }
     }
 
     return jsonErr(res, 'إجراء غير معروف.', 422);

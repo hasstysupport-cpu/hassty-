@@ -30,8 +30,6 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
   // 4-digit or 6-digit fast verification code
   const [code, setCode] = useState(['', '', '', '']);
 
-  const isOfficialEmail = email.toLowerCase() === 'hasstysupport@gmail.com';
-
   useEffect(() => {
     let timer: any;
     if (resendCooldown > 0) {
@@ -106,11 +104,6 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
               <h3 className="text-base font-black text-slate-900">
                 تأكيد البريد الإلكتروني
               </h3>
-              {isOfficialEmail && (
-                <span className="text-[10px] font-bold bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full border border-purple-200">
-                  حساب الإدارة
-                </span>
-              )}
             </div>
             <p className="text-xs text-slate-500">
               أهلاً {userName}، أرسلنا رسالة تحقق وتفعيل إلى بريدك

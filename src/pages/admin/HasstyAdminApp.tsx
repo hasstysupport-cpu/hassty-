@@ -8,10 +8,11 @@ import { SafetyReportsPage } from './SafetyReportsPage';
 import { SiteAnalyticsPage } from './SiteAnalyticsPage';
 import { CommissionTrackingPage } from './CommissionTrackingPage';
 import { AdminLoginPage } from './AdminLoginPage';
+import { AdminAccessPage } from './AdminAccessPage';
 import { AccountBadgeType, AdminUserAccount } from '../../types';
 import { subscribeToUsers, subscribeToVerifications, subscribeToReports, subscribeToCommissions, dbUpdateAccountBadge, dbToggleAccountStatus, dbDeleteAccount, dbRejectVerification, dbSuspendTeacherFromReport, dbResolveReport, dbDismissReport, dbMarkCommissionPaid } from '../../lib/adminSupabaseService';
 import { approveTeacherVerificationAtomic } from '../../lib/adminTeacherVerification';
-import { OFFICIAL_ADMIN_EMAIL, isCurrentAdminSessionValid, clearAdminSession } from '../../lib/securityConfig';
+import { verifyGoogleAdminAccess, isCurrentAdminSessionValid, clearAdminSession } from '../../lib/securityConfig';
 import { supabase } from '../../lib/supabase';
 import { Loader2, AlertTriangle, RefreshCw, ShieldCheck } from 'lucide-react';
 import { signInWithPopup, GoogleAuthProvider } from '../../lib/supabaseAuthCompat';
@@ -21,7 +22,9 @@ interface HasstyAdminAppProps { onSwitchToPublicApp?: () => void; initialToken?:
 
 export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({ onSwitchToPublicApp, initialToken }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => isCurrentAdminSessionValid());
-  const [adminEmail, setAdminEmail] = useState<string>(() => OFFICIAL_ADMIN_EMAIL);
+  const [adminEmail, setAdminEmail] = useState<string>(() => {
+    try { return localStorage.getItem('hassty_admin_email') || 'جلسة إدارية'; } catch { return 'جلسة إدارية'; }
+  });
   const [currentTab, setCurrentTab] = useState<AdminTab>('dashboard');
   const [isDbLoading, setIsDbLoading] = useState(true);
   const [dbConnectionStatus, setDbConnectionStatus] = useState<'connected'|'connecting'|'failed'>('connecting');
@@ -63,9 +66,10 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({ onSwitchToPublic
         const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
         if (sessionError) throw sessionError;
         if (!sessionData.session?.user) throw new Error('جلسة Supabase غير موجودة. أعد تسجيل الدخول.');
-        const email = (sessionData.session.user.email || '').toLowerCase().trim();
-        if (email !== OFFICIAL_ADMIN_EMAIL.toLowerCase() && email !== 'admin@hassty.com') throw new Error('الحساب الحالي ليس حساب إدارة معتمدًا.');
-        if (!disposed) { setAdminEmail(email); setIsAuthenticated(true); }
+        // التحقق من الصلاحية من السيرفر (القايمة البيضاء) — بدون أي بريد مكتوب في الكود
+        const gate = await verifyGoogleAdminAccess();
+        if (!gate.allowed) throw new Error('الحساب الحالي ليس حساب إدارة معتمدًا.');
+        if (!disposed) { setAdminEmail(gate.email || 'إدارة معتمدة'); setIsAuthenticated(true); }
         const markLoaded = () => { if (!disposed) { setDbConnectionStatus('connected'); setDbErrorMessage(null); setIsDbLoading(false); } };
         unsubUsers = subscribeToUsers(data => { if (!disposed) { setAccounts(data); markLoaded(); } }, err => fail('قراءة المستخدمين', err));
         unsubVerifs = subscribeToVerifications(data => { if (!disposed) setVerificationRequests(data); }, err => fail('قراءة طلبات التوثيق', err));
@@ -82,9 +86,10 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({ onSwitchToPublic
     try {
       const provider = new GoogleAuthProvider(); provider.setCustomParameters({ prompt: 'select_account' });
       const result = await signInWithPopup(auth, provider); if (!result?.user) return;
-      const email = (result.user.email || '').toLowerCase().trim();
-      if (email !== OFFICIAL_ADMIN_EMAIL.toLowerCase() && email !== 'admin@hassty.com') { setDbConnectionStatus('failed'); setDbErrorMessage('هذا البريد ليس حساب الإدارة المعتمد.'); return; }
-      setAdminEmail(email); setIsAuthenticated(true); handleRetryConnection();
+      // التحقق من القايمة البيضاء على السيرفر — مفيش أي إيميل مسموح بالكود
+      const gate = await verifyGoogleAdminAccess();
+      if (!gate.allowed) { setDbConnectionStatus('failed'); setDbErrorMessage('هذا الحساب غير مصرح له بالدخول الإداري.'); return; }
+      setAdminEmail(gate.email || 'إدارة معتمدة'); setIsAuthenticated(true); handleRetryConnection();
     } catch (err: any) { setDbConnectionStatus('failed'); setDbErrorMessage(err?.message || 'فشل تسجيل دخول Google للإدارة.'); }
   };
   const handleLoginSuccess = (email: string) => { setIsAuthenticated(true); setAdminEmail(email); handleRetryConnection(); };
@@ -123,7 +128,8 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({ onSwitchToPublic
         {currentTab==='assistant_verification'&&<AssistantVerificationQueuePage onPendingCountChange={setPendingAssistantVerificationsCount}/>} 
         {currentTab==='reports'&&<SafetyReportsPage reports={safetyReports} onSuspendTeacher={handleSuspendTeacherFromReport} onResolveReport={handleResolveSafetyReport} onDismissReport={handleDismissSafetyReport}/>} 
         {currentTab==='analytics'&&<SiteAnalyticsPage accounts={accounts}/>} 
-        {currentTab==='commissions'&&<CommissionTrackingPage commissions={commissions} accounts={accounts} onMarkPaid={handleMarkCommissionPaid}/>} 
+        {currentTab==='commissions'&&<CommissionTrackingPage commissions={commissions} accounts={accounts} onMarkPaid={handleMarkCommissionPaid}/>}
+        {currentTab==='access'&&<AdminAccessPage/>}
       </>}
     </main>
   </div>;

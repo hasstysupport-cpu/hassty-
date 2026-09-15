@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Users, ShieldCheck, AlertOctagon, BarChart3, Percent, LogOut, ExternalLink, Database, RefreshCw, AlertTriangle, Menu, X, Bell, Send, Loader2, CheckCircle2, UserCheck } from 'lucide-react';
+import { LayoutDashboard, Users, ShieldCheck, AlertOctagon, BarChart3, Percent, LogOut, ExternalLink, Database, RefreshCw, AlertTriangle, Menu, X, Bell, Send, Loader2, CheckCircle2, UserCheck, ShieldAlert } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
-export type AdminTab = 'dashboard' | 'accounts' | 'verification' | 'assistant_verification' | 'reports' | 'analytics' | 'commissions';
+export type AdminTab = 'dashboard' | 'accounts' | 'verification' | 'assistant_verification' | 'reports' | 'analytics' | 'commissions' | 'access';
 
 interface AdminSidebarProps {
   currentTab: AdminTab;
@@ -25,6 +25,7 @@ const menuItems: Array<{ id: AdminTab; label: string; subtitle: string; icon: an
   { id: 'reports', label: 'البلاغات والشكاوى', subtitle: 'متابعة أمان المنصة', icon: AlertOctagon, key: 'reports' },
   { id: 'analytics', label: 'إحصائيات الموقع', subtitle: 'نمو المستخدمين والمحافظات', icon: BarChart3, key: null },
   { id: 'commissions', label: 'متابعة العمولات', subtitle: 'الشرائح والتحصيلات الشهرية', icon: Percent, key: null },
+  { id: 'access', label: 'أمان الوصول', subtitle: 'إيميلات الإدارة المصرح لها بالدخول', icon: ShieldAlert, key: null },
 ];
 
 export const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentTab, onSelectTab, pendingVerificationsCount, pendingAssistantVerificationsCount = 0, pendingReportsCount, adminEmail, onLogout, onSwitchToPublicApp, dbConnectionStatus = 'connected', onRetryDbConnection }) => {

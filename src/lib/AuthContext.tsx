@@ -4,6 +4,28 @@ import { supabase } from './supabase';
 import { authApi, getDeviceId, setStoredToken } from './authApi';
 import type { RegisterPayload } from './authApi';
 
+/* مزامنة الدور الإداري من الخادم (القايمة البيضاء) لحسابات جوجل فقط —
+   لو البريد مُصرّح له، الخادم يرقّي profile.role إلى admin تلقائيًا */
+const syncGoogleAdminRole = async (sessionUser: any): Promise<boolean> => {
+  try {
+    const meta = sessionUser?.app_metadata || {};
+    const isGoogle = meta.provider === 'google' || (Array.isArray(meta.providers) && meta.providers.includes('google'));
+    if (!isGoogle || !sessionUser?.email) return false;
+    const { data: sessionData } = await supabase!.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) return false;
+    const res = await fetch('/api/auth/admin-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ action: 'google-verify' }),
+    });
+    const data = await res.json().catch(() => null);
+    return Boolean(data?.ok && data?.allowed && data?.promoted);
+  } catch {
+    return false;
+  }
+};
+
 export interface UserSession {
   uid: string;
   email: string;
@@ -142,7 +164,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return;
         }
         const profile = await getProfile(data.session.user.id);
-        persistSession(mapProfileToSession(data.session.user, profile));
+        // لو حساب جوجل مُصرّح إداريًا وترقّي دوره للتو → أعد قراءة الملف بالدور الجديد
+        const promoted = await syncGoogleAdminRole(data.session.user);
+        const finalProfile = promoted ? (await getProfile(data.session.user.id)) || profile : profile;
+        persistSession(mapProfileToSession(data.session.user, finalProfile));
         cleanOAuthUrl();
       } catch (error) {
         console.warn('Auth hydration warning:', error);
@@ -165,8 +190,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
       try {
+        const promoted = await syncGoogleAdminRole(authSession.user);
         const profile = await getProfile(authSession.user.id);
-        persistSession(mapProfileToSession(authSession.user, profile));
+        const finalProfile = promoted ? (await getProfile(authSession.user.id)) || profile : profile;
+        persistSession(mapProfileToSession(authSession.user, finalProfile));
         cleanOAuthUrl();
       } catch (error) {
         console.warn('Auth profile sync warning:', error);
