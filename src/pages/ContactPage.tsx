@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useSEO } from '../lib/useSEO';
 import {
-  Mail,
   MapPin,
   Send,
   CheckCircle2,
@@ -102,8 +101,7 @@ export const ContactPage: React.FC<ContactPageProps> = ({ onNavigate }) => {
             </div>
 
             <div className="bg-white border border-[#E5E7EB] rounded-3xl p-6 space-y-4">
-              <div className="flex items-start gap-3.5 pb-4 border-b border-gray-100"><div className="w-9 h-9 rounded-xl bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center shrink-0"><Mail className="w-4 h-4" /></div><div><h4 className="text-xs font-bold text-[#6B7280]">البريد الإلكتروني</h4><p className="text-xs font-bold text-[#1E3A8A] font-mono mt-0.5">hasstysupport@gmail.com</p><p className="text-[11px] text-gray-400">الرد خلال ساعتين بحد أقصى</p></div></div>
-              <div className="flex items-start gap-3.5"><div className="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0"><Send className="w-4 h-4" /></div><div><h4 className="text-xs font-bold text-[#6B7280]">تليجرام</h4><div className="space-y-1 mt-1">{TELEGRAM_SUPPORT.map((item) => <a key={item.username} href={item.href} target="_blank" rel="noreferrer" className="block text-xs font-bold text-[#1E3A8A] hover:text-sky-700">{item.label}: {item.username}</a>)}</div></div></div>
+              <div className="flex items-start gap-3.5 pb-4"><div className="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0"><Send className="w-4 h-4" /></div><div><h4 className="text-xs font-bold text-[#6B7280]">تليجرام</h4><div className="space-y-1 mt-1">{TELEGRAM_SUPPORT.map((item) => <a key={item.username} href={item.href} target="_blank" rel="noreferrer" className="block text-xs font-bold text-[#1E3A8A] hover:text-sky-700">{item.label}: {item.username}</a>)}</div></div></div>
               <div className="flex items-start gap-3.5 pt-4 border-t border-gray-100"><div className="w-9 h-9 rounded-xl bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center shrink-0"><MapPin className="w-4 h-4" /></div><div><h4 className="text-xs font-bold text-[#6B7280]">المقر الرئيسي</h4><p className="text-xs font-bold text-[#1E3A8A] mt-0.5">القاهرة الجديدة — التجمع الخامس، مصر</p></div></div>
             </div>
           </div>

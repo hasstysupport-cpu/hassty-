@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mail, MapPin, Send } from 'lucide-react';
+import { MapPin, Send } from 'lucide-react';
 import { BrandLogo } from './common/BrandLogo';
 
 interface FooterProps { onNavigate: (path: string) => void; }
@@ -48,7 +48,6 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             <ul className="space-y-2.5 text-sm text-[#6B7280]">
               <li><button onClick={() => onNavigate('/for-teachers')} className="hover:text-[#2563EB] transition-colors">العمولات والمزايا</button></li>
               <li><button onClick={() => onNavigate('/legal/teacher')} className="hover:text-[#2563EB] transition-colors">لماذا نطلب مستندات التوثيق؟</button></li>
-              <li className="flex items-center gap-2 pt-1 text-xs"><Mail className="w-3.5 h-3.5 text-[#2563EB]" /><span>hasstysupport@gmail.com</span></li>
               <li>
                 <a href="https://t.me/MCV_M" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-xs hover:text-sky-700 transition-colors">
                   <Send className="w-3.5 h-3.5 text-sky-600" />
