@@ -20,8 +20,7 @@ interface ContactPageProps {
 }
 
 const TELEGRAM_SUPPORT = [
-  { label: 'تليجرام 1', username: '@MCV_M', href: 'https://t.me/MCV_M' },
-  { label: 'تليجرام 2', username: '@MCV_W', href: 'https://t.me/MCV_W' },
+  { label: 'تليجرام', username: 'جروب الدعم الرسمي', href: 'https://t.me/+-gGdGyw60wA2MDRk' },
 ];
 
 export const ContactPage: React.FC<ContactPageProps> = ({ onNavigate }) => {
@@ -41,7 +40,7 @@ export const ContactPage: React.FC<ContactPageProps> = ({ onNavigate }) => {
 
   useSEO({
     title: 'اتصل بنا والدعم الفني',
-    description: 'تواصل مع فريق الدعم الفني لمنصة حصتي للاستفسارات العامة، دعم المدرسين والطلاب، أو عبر تليجرام والبريد الإلكتروني المباشر.',
+    description: 'تواصل مع فريق الدعم الفني لمنصة حصتي للاستفسارات العامة، دعم المدرسين والطلاب، عبر جروب تليجرام الرسمي.',
     canonicalPath: '/contact',
     breadcrumbs: ['اتصل بنا'],
     keywords: 'اتصل بنا حصتي, دعم منصة حصتي, خدمة العملاء, مساعدة أولياء الأمور والطلاب',
@@ -96,7 +95,7 @@ export const ContactPage: React.FC<ContactPageProps> = ({ onNavigate }) => {
           <div className="space-y-4">
             <div className="bg-sky-500 text-white rounded-3xl p-6 sm:p-7 shadow-xs space-y-4">
               <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center"><Send className="w-7 h-7" /></div>
-              <div><span className="text-xs font-bold bg-white/20 px-2 py-0.5 rounded-md">أسرع وسيلة تواصل</span><h3 className="text-lg font-black mt-2 mb-1">دعم تليجرام الفوري</h3><p className="text-xs text-sky-100 leading-relaxed">تواصل معنا مباشرة عبر حسابات تليجرام الرسمية للدعم والاستفسارات.</p></div>
+              <div><span className="text-xs font-bold bg-white/20 px-2 py-0.5 rounded-md">أسرع وسيلة تواصل</span><h3 className="text-lg font-black mt-2 mb-1">دعم تليجرام الفوري</h3><p className="text-xs text-sky-100 leading-relaxed">تواصل معنا مباشرة عبر جروب تليجرام الرسمي للدعم والاستفسارات.</p></div>
               <div className="space-y-2">{TELEGRAM_SUPPORT.map((item) => <a key={item.username} href={item.href} target="_blank" rel="noreferrer" className="w-full py-3 bg-white hover:bg-sky-50 text-sky-800 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"><span>{item.label}: {item.username}</span><Send className="w-3.5 h-3.5" /></a>)}</div>
             </div>
 

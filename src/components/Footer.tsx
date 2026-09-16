@@ -49,15 +49,9 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               <li><button onClick={() => onNavigate('/for-teachers')} className="hover:text-[#2563EB] transition-colors">العمولات والمزايا</button></li>
               <li><button onClick={() => onNavigate('/legal/teacher')} className="hover:text-[#2563EB] transition-colors">لماذا نطلب مستندات التوثيق؟</button></li>
               <li>
-                <a href="https://t.me/MCV_M" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-xs hover:text-sky-700 transition-colors">
+                <a href="https://t.me/+-gGdGyw60wA2MDRk" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-xs hover:text-sky-700 transition-colors">
                   <Send className="w-3.5 h-3.5 text-sky-600" />
-                  <span>تليجرام: @MCV_M</span>
-                </a>
-              </li>
-              <li>
-                <a href="https://t.me/MCV_W" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-xs hover:text-sky-700 transition-colors">
-                  <Send className="w-3.5 h-3.5 text-sky-600" />
-                  <span>تليجرام: @MCV_W</span>
+                  <span>تليجرام: جروب الدعم الرسمي</span>
                 </a>
               </li>
             </ul>

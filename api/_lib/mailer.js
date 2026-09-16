@@ -134,7 +134,7 @@ function layout({ title, intro, code, ctaLink, ctaText, note }) {
           <tr>
             <td bgcolor="#F8FAFF" style="padding:16px 28px;border-top:1px solid #E2E8F0;" align="center">
               <div style="font-size:12px;color:${C.navy};font-weight:800;">حِصّتي — منصة إدارة الدروس الخصوصية</div>
-              <div style="font-size:11px;color:${C.subText};margin-top:4px;">للدعم: تليجرام <a href="https://t.me/MCV_M" style="color:${C.brand};text-decoration:none;">@MCV_M</a> / <a href="https://t.me/MCV_W" style="color:${C.brand};text-decoration:none;">@MCV_W</a></div>
+              <div style="font-size:11px;color:${C.subText};margin-top:4px;">للدعم: <a href="https://t.me/+-gGdGyw60wA2MDRk" style="color:${C.brand};text-decoration:none;">جروب تليجرام الرسمي</a></div>
               <div style="font-size:10px;color:#94A3B8;margin-top:6px;">هذه رسالة آلية — لا تردّ عليها مباشرةً.</div>
             </td>
           </tr>
