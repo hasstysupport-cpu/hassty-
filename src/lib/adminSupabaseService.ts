@@ -259,8 +259,12 @@ async function syncCurrentCommissionRows() {
     const old = existingByTeacher.get(teacher.id);
     const rate = getCommissionRate(count);
     const due = Number((gross * rate / 100).toFixed(2));
+    /* ⚠️ ممنوع إرسال id هنا: upsert بالمصفوفة يجعل postgrest-js يرسل باراميتر
+       columns مشتقًا من مفاتيح الصفوف — ولو ذُكر id وغاب عن JSON معينًا يعامله
+       PostgREST كـ NULL (لا يطبّق DEFAULT) فيفشل الإدخال بـ 23502 not-null
+       violation. التحديث يتم عبر onConflict(teacher_id,billing_cycle) والإدراج
+       الجديد يأخذ gen_random_uuid() من قاعدة البيانات تلقائيًا. */
     return {
-      id: old?.id,
       teacher_id: teacher.id,
       billing_cycle: billingCycle,
       active_students_count: count,
