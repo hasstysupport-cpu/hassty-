@@ -19,8 +19,9 @@ interface ContactPageProps {
   onNavigate: (path: string) => void;
 }
 
-const TELEGRAM_SUPPORT = [
+const SUPPORT_CHANNELS = [
   { label: 'تليجرام', username: 'جروب الدعم الرسمي', href: 'https://t.me/+-gGdGyw60wA2MDRk' },
+  { label: 'واتساب', username: 'جروب الدعم الرسمي', href: 'https://chat.whatsapp.com/DDU2o4jiLASAcVeEb6BnNu' },
 ];
 
 export const ContactPage: React.FC<ContactPageProps> = ({ onNavigate }) => {
@@ -40,7 +41,7 @@ export const ContactPage: React.FC<ContactPageProps> = ({ onNavigate }) => {
 
   useSEO({
     title: 'اتصل بنا والدعم الفني',
-    description: 'تواصل مع فريق الدعم الفني لمنصة حصتي للاستفسارات العامة، دعم المدرسين والطلاب، عبر جروب تليجرام الرسمي.',
+    description: 'تواصل مع فريق الدعم الفني لمنصة حصتي للاستفسارات العامة، دعم المدرسين والطلاب، عبر جروبات الدعم الرسمية على تليجرام وواتساب.',
     canonicalPath: '/contact',
     breadcrumbs: ['اتصل بنا'],
     keywords: 'اتصل بنا حصتي, دعم منصة حصتي, خدمة العملاء, مساعدة أولياء الأمور والطلاب',
@@ -95,12 +96,12 @@ export const ContactPage: React.FC<ContactPageProps> = ({ onNavigate }) => {
           <div className="space-y-4">
             <div className="bg-sky-500 text-white rounded-3xl p-6 sm:p-7 shadow-xs space-y-4">
               <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center"><Send className="w-7 h-7" /></div>
-              <div><span className="text-xs font-bold bg-white/20 px-2 py-0.5 rounded-md">أسرع وسيلة تواصل</span><h3 className="text-lg font-black mt-2 mb-1">دعم تليجرام الفوري</h3><p className="text-xs text-sky-100 leading-relaxed">تواصل معنا مباشرة عبر جروب تليجرام الرسمي للدعم والاستفسارات.</p></div>
-              <div className="space-y-2">{TELEGRAM_SUPPORT.map((item) => <a key={item.username} href={item.href} target="_blank" rel="noreferrer" className="w-full py-3 bg-white hover:bg-sky-50 text-sky-800 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"><span>{item.label}: {item.username}</span><Send className="w-3.5 h-3.5" /></a>)}</div>
+              <div><span className="text-xs font-bold bg-white/20 px-2 py-0.5 rounded-md">أسرع وسيلة تواصل</span><h3 className="text-lg font-black mt-2 mb-1">دعم فوري — تليجرام وواتساب</h3><p className="text-xs text-sky-100 leading-relaxed">تواصل معنا مباشرة عبر جروبات الدعم الرسمية على تليجرام وواتساب.</p></div>
+              <div className="space-y-2">{SUPPORT_CHANNELS.map((item) => <a key={item.href} href={item.href} target="_blank" rel="noreferrer" className="w-full py-3 bg-white hover:bg-sky-50 text-sky-800 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"><span>{item.label}: {item.username}</span><Send className="w-3.5 h-3.5" /></a>)}</div>
             </div>
 
             <div className="bg-white border border-[#E5E7EB] rounded-3xl p-6 space-y-4">
-              <div className="flex items-start gap-3.5 pb-4"><div className="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0"><Send className="w-4 h-4" /></div><div><h4 className="text-xs font-bold text-[#6B7280]">تليجرام</h4><div className="space-y-1 mt-1">{TELEGRAM_SUPPORT.map((item) => <a key={item.username} href={item.href} target="_blank" rel="noreferrer" className="block text-xs font-bold text-[#1E3A8A] hover:text-sky-700">{item.label}: {item.username}</a>)}</div></div></div>
+              <div className="flex items-start gap-3.5 pb-4"><div className="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0"><Send className="w-4 h-4" /></div><div><h4 className="text-xs font-bold text-[#6B7280]">تليجرام وواتساب</h4><div className="space-y-1 mt-1">{SUPPORT_CHANNELS.map((item) => <a key={item.href} href={item.href} target="_blank" rel="noreferrer" className="block text-xs font-bold text-[#1E3A8A] hover:text-sky-700">{item.label}: {item.username}</a>)}</div></div></div>
               <div className="flex items-start gap-3.5 pt-4 border-t border-gray-100"><div className="w-9 h-9 rounded-xl bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center shrink-0"><MapPin className="w-4 h-4" /></div><div><h4 className="text-xs font-bold text-[#6B7280]">المقر الرئيسي</h4><p className="text-xs font-bold text-[#1E3A8A] mt-0.5">القاهرة الجديدة — التجمع الخامس، مصر</p></div></div>
             </div>
           </div>

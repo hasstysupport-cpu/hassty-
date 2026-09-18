@@ -125,7 +125,7 @@ export const LegalPage: React.FC<LegalPageProps> = ({ section = 'terms', onNavig
     <p>يمكنك طلب الوصول إلى بياناتك، تصحيحها، تحديثها، محوها، سحب موافقة أو الاعتراض/تقييد معالجة عندما ينطبق ذلك. قد نطلب تحققًا إضافيًا من الهوية قبل تنفيذ الطلب لحماية الحساب.</p>
     <div className="mt-6 p-5 rounded-2xl bg-slate-50 border border-slate-200">
       <p className="font-bold">طريقة الطلب:</p>
-      <p>من حسابك أرسل الطلب من قسم الإعدادات أو عبر تليجرام على <a className="text-blue-600 font-bold" href="https://t.me/+-gGdGyw60wA2MDRk" target="_blank" rel="noreferrer">جروب الدعم الرسمي</a> مع نوع الطلب ووصف مختصر. لا ترسل صورة بطاقة الهوية إلا إذا طلبناها عبر قناة آمنة.</p>
+      <p>من حسابك أرسل الطلب من قسم الإعدادات أو عبر <a className="text-blue-600 font-bold" href="https://t.me/+-gGdGyw60wA2MDRk" target="_blank" rel="noreferrer">جروب الدعم على تليجرام</a> أو <a className="text-blue-600 font-bold" href="https://chat.whatsapp.com/DDU2o4jiLASAcVeEb6BnNu" target="_blank" rel="noreferrer">جروب الدعم على واتساب</a> مع نوع الطلب ووصف مختصر. لا ترسل صورة بطاقة الهوية إلا إذا طلبناها عبر قناة آمنة.</p>
     </div>
     <p className="mt-5">نحتفظ بسجل للطلبات والموافقات اللازمة لإثبات التنفيذ وإدارة النزاعات والامتثال.</p>
   </>;

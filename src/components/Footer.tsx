@@ -1,5 +1,5 @@
 import React from 'react';
-import { MapPin, Send } from 'lucide-react';
+import { MapPin, Send, MessageCircle } from 'lucide-react';
 import { BrandLogo } from './common/BrandLogo';
 
 interface FooterProps { onNavigate: (path: string) => void; }
@@ -52,6 +52,12 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                 <a href="https://t.me/+-gGdGyw60wA2MDRk" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-xs hover:text-sky-700 transition-colors">
                   <Send className="w-3.5 h-3.5 text-sky-600" />
                   <span>تليجرام: جروب الدعم الرسمي</span>
+                </a>
+              </li>
+              <li>
+                <a href="https://chat.whatsapp.com/DDU2o4jiLASAcVeEb6BnNu" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-xs hover:text-emerald-700 transition-colors">
+                  <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>واتساب: جروب الدعم الرسمي</span>
                 </a>
               </li>
             </ul>
