@@ -7,6 +7,52 @@ import { GMAIL_USER, GMAIL_PASS, SITE_URL, CODE_TTL_MINUTES } from './config.js'
 
 let cachedTransporter = null;
 
+/* ---------- مزود البريد (Provider selection) ----------
+   الأولوية: 1) Resend API (من دومين hassty.site الرسمي — الحل الاحترافي ضد السبام)
+             2) SMTP خارجي (Brevo/SendGrid/غيره عبر متغيرات SMTP_*)
+             3) Gmail SMTP (الخطة الاحتياطية الحالية) */
+const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
+const SMTP_HOST = process.env.SMTP_HOST || '';
+const SMTP_PORT = Number(process.env.SMTP_PORT || 465);
+const SMTP_USER = process.env.SMTP_USER || '';
+const SMTP_PASS = process.env.SMTP_PASS || '';
+const MAIL_FROM = process.env.MAIL_FROM || '';
+
+function getProvider() {
+  if (RESEND_API_KEY) return 'resend';
+  if (SMTP_HOST && SMTP_USER && SMTP_PASS) return 'smtp';
+  return 'gmail';
+}
+
+function getFromAddress(provider) {
+  if (MAIL_FROM) return MAIL_FROM;
+  if (provider === 'resend') return 'منصة حِصّتي <noreply@hassty.site>';
+  if (provider === 'smtp') return `"منصة حِصّتي" <${SMTP_USER}>`;
+  return `"منصة حِصّتي" <${GMAIL_USER}>`;
+}
+
+async function sendViaResend(mail) {
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: mail.from,
+      to: [mail.to],
+      subject: mail.subject,
+      html: mail.html,
+      text: mail.text,
+      headers: mail.headers,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Resend API ${res.status}: ${body.slice(0, 300)}`);
+  }
+}
+
 /* ---------- توجيه بريد حسابات الاختبار (QA) ----------
    حسابات الاختبار أدناه لها عناوين بريد وهمية لا يملكها أحد،
    لذا يُسلَّم رمزها إلى بريد الدعم الرسمي (GMAIL_USER) الذي نتحكم به —
@@ -28,15 +74,24 @@ const QA_ACCOUNT_REDIRECT = new Set([
 
 function getTransporter() {
   if (!cachedTransporter) {
-    if (!GMAIL_USER || !GMAIL_PASS) {
-      throw new Error('GMAIL credentials are not configured');
+    if (getProvider() === 'smtp') {
+      cachedTransporter = nodemailer.createTransport({
+        host: SMTP_HOST,
+        port: SMTP_PORT,
+        secure: SMTP_PORT === 465,
+        auth: { user: SMTP_USER, pass: SMTP_PASS },
+      });
+    } else {
+      if (!GMAIL_USER || !GMAIL_PASS) {
+        throw new Error('GMAIL credentials are not configured');
+      }
+      cachedTransporter = nodemailer.createTransport({
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true,
+        auth: { user: GMAIL_USER, pass: GMAIL_PASS },
+      });
     }
-    cachedTransporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 465,
-      secure: true,
-      auth: { user: GMAIL_USER, pass: GMAIL_PASS },
-    });
   }
   return cachedTransporter;
 }
@@ -208,17 +263,25 @@ export async function sendAuthEmail({ to, purpose, code, name = '', extraQuery =
 
   const { subject, html } = tpl({ code, name, link, note });
 
-  await getTransporter().sendMail({
-    from: `"منصة حِصّتي" <${GMAIL_USER}>`,
+  const provider = getProvider();
+  const mail = {
+    from: getFromAddress(provider),
     to: recipient,
     subject,
     html,
     text: `${subject}\n\nالرمز: ${code} — صالح ${CODE_TTL_MINUTES} دقائق.\n${link}${isQaAccount ? `\n(رمز حساب اختبار: ${to})` : ''}`,
     headers: {
       'X-Entity-Ref-ID': `hassty-${purpose}-${Date.now()}`,
+      'Auto-Submitted': 'auto-generated',
       ...(isQaAccount ? { 'X-Hassty-QA-Account': to } : {}),
     },
-  });
+  };
 
-  return { subject, link };
+  if (provider === 'resend') {
+    await sendViaResend(mail);
+  } else {
+    await getTransporter().sendMail(mail);
+  }
+
+  return { subject, link, provider };
 }
