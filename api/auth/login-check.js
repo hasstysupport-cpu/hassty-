@@ -12,6 +12,7 @@ import {
 import { getCallerUser } from '../_lib/supabase.js';
 import { isTrustedDevice, issueCode } from '../_lib/codes.js';
 import { sendAuthEmail } from '../_lib/mailer.js';
+import { sendCodeWhatsApp } from '../_lib/otp-whatsapp.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return jsonErr(res, ARABIC_ERRORS.method, 405);
@@ -46,13 +47,23 @@ export default async function handler(req, res) {
     });
     await sendAuthEmail({ to: email, purpose: 'login_otp', code, name: user.user_metadata?.full_name || '' });
 
+    /* WhatsApp OTP dual delivery — same code, second channel (best-effort) */
+    const waOtp = await sendCodeWhatsApp({
+      phone: user.user_metadata?.phone,
+      code,
+      purpose: 'login_otp',
+      name: user.user_metadata?.full_name || '',
+    });
+
     return jsonOk(res, {
       otpRequired: true,
       action: 'otp',
       maskedEmail: maskEmail(email),
       expiresIn: expiresInSeconds,
       ttlMinutes: CODE_TTL_MINUTES,
-      message: 'أرسلنا رمز التحقق إلى بريدك لتأمين الدخول من هذا الجهاز.',
+      message: waOtp.sent
+        ? 'أرسلنا رمز التحقق إلى بريدك وعلى واتسابك لتأمين الدخول من هذا الجهاز.'
+        : 'أرسلنا رمز التحقق إلى بريدك لتأمين الدخول من هذا الجهاز.',
     });
   } catch (err) {
     if (err?.status && err?.message) return jsonErr(res, err.message, err.status, { waitSeconds: err.waitSeconds, code: err.error });

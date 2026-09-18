@@ -11,6 +11,7 @@ import {
 import { findPendingByEmail, findProfileByEmail, findAuthUserByEmail, dbUpsert, getUserById } from '../_lib/supabase.js';
 import { issueCode } from '../_lib/codes.js';
 import { sendAuthEmail } from '../_lib/mailer.js';
+import { sendCodeWhatsApp } from '../_lib/otp-whatsapp.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return jsonErr(res, ARABIC_ERRORS.method, 405);
@@ -47,11 +48,19 @@ export default async function handler(req, res) {
       const { data: user } = await getUserById(userId);
       await sendAuthEmail({ to: email, purpose, code, name: user?.user_metadata?.full_name || '' });
 
+      /* WhatsApp OTP dual delivery — same code, second channel (best-effort) */
+      const waOtp = await sendCodeWhatsApp({
+        phone: user?.user_metadata?.phone,
+        code,
+        purpose,
+        name: user?.user_metadata?.full_name || '',
+      });
+
       return jsonOk(res, {
         sent: true,
         maskedEmail: maskEmail(email),
         expiresIn: expiresInSeconds,
-        message: 'تم إرسال رمز التفعيل إلى بريدك.',
+        message: waOtp.sent ? 'تم إرسال رمز التفعيل إلى بريدك وعلى واتسابك.' : 'تم إرسال رمز التفعيل إلى بريدك.',
       });
     }
 
@@ -67,11 +76,19 @@ export default async function handler(req, res) {
     });
     await sendAuthEmail({ to: email, purpose, code, name: profile.full_name || '' });
 
+    /* WhatsApp OTP dual delivery — same code, second channel (best-effort) */
+    const waOtp = await sendCodeWhatsApp({
+      phone: profile.phone,
+      code,
+      purpose,
+      name: profile.full_name || '',
+    });
+
     return jsonOk(res, {
       sent: true,
       maskedEmail: maskEmail(email),
       expiresIn: expiresInSeconds,
-      message: 'أرسلنا رمز استعادة كلمة المرور إلى بريدك.',
+      message: waOtp.sent ? 'أرسلنا رمز استعادة كلمة المرور إلى بريدك وعلى واتسابك.' : 'أرسلنا رمز استعادة كلمة المرور إلى بريدك.',
     });
   } catch (err) {
     if (err?.status && err?.message) return jsonErr(res, err.message, err.status, { waitSeconds: err.waitSeconds, code: err.error });

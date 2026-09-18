@@ -12,6 +12,7 @@ import {
 } from '../_lib/supabase.js';
 import { issueCode } from '../_lib/codes.js';
 import { sendAuthEmail } from '../_lib/mailer.js';
+import { sendCodeWhatsApp } from '../_lib/otp-whatsapp.js';
 import { isPhoneTaken, resetProfileForRole } from '../_lib/profile.js';
 import { sendText } from '../_lib/green.js';
 
@@ -112,6 +113,9 @@ export default async function handler(req, res) {
     const { code, expiresInSeconds } = await issueCode({ email, userId, purpose: 'signup_verify', ip: req.headers['x-forwarded-for']?.split(',')?.[0]?.trim() });
     await sendAuthEmail({ to: email, purpose: 'signup_verify', code, name: fullName });
 
+    /* WhatsApp OTP dual delivery — same code, second channel (best-effort) */
+    const waOtp = await sendCodeWhatsApp({ phone, code, purpose: 'signup_verify', name: fullName });
+
     // WhatsApp welcome is best-effort and never blocks registration.
     try {
       await sendText(phone, `*منصة حِصّتي — أهلاً بك* 👋\n\nمرحباً *${fullName}*! تم إنشاء حسابك بنجاح كـ *${role === 'parent' ? 'ولي أمر' : role === 'teacher' ? 'مدرس' : role === 'assistant' ? 'مساعد' : 'طالب'}*.\n\nبعد تفعيل البريد ستصلك على هذا الرقم إشعارات الحجز والحضور والدفع والفواتير المهمة. 🎓`);
@@ -119,7 +123,7 @@ export default async function handler(req, res) {
       console.warn('[register] WhatsApp welcome skipped:', waError?.message || waError);
     }
 
-    return jsonOk(res, { userId, maskedEmail: maskEmail(email), expiresIn: expiresInSeconds, resendAfter: CODE_RESEND_COOLDOWN, message: 'تم إنشاء حسابك بنجاح! أرسلنا رمز التفعيل إلى بريدك الإلكتروني.', ttlMinutes: CODE_TTL_MINUTES });
+    return jsonOk(res, { userId, maskedEmail: maskEmail(email), expiresIn: expiresInSeconds, resendAfter: CODE_RESEND_COOLDOWN, message: waOtp.sent ? 'تم إنشاء حسابك بنجاح! أرسلنا رمز التفعيل إلى بريدك الإلكتروني وعلى واتسابك.' : 'تم إنشاء حسابك بنجاح! أرسلنا رمز التفعيل إلى بريدك الإلكتروني.', ttlMinutes: CODE_TTL_MINUTES });
   } catch (err) {
     if (err?.status && err?.message) return jsonErr(res, err.message, err.status, { waitSeconds: err.waitSeconds, code: err.error });
     console.error('[register]', err);
