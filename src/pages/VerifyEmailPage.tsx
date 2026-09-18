@@ -111,7 +111,7 @@ export const VerifyEmailPage: React.FC<VerifyEmailPageProps> = ({ onNavigate, on
       setOtpDigits(Array(6).fill(''));
       setStage('code');
       setResendTimer(res.resendAfter || 60);
-      setSuccessMessage(`أرسلنا رمز التفعيل إلى ${res.maskedEmail || target}.`);
+      setSuccessMessage(`أرسلنا رمز التفعيل إلى ${res.maskedEmail || target} — قد يصل الرمز في صندوق الرسائل غير المرغوب فيها (Spam).`);
     } catch (err: any) {
       setErrorMessage(err?.message || 'تعذر إرسال الرمز.');
     } finally {

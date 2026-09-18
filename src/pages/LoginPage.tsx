@@ -125,7 +125,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigate, onLoginSuccess
         setOtpDigits(Array(6).fill(''));
         setStage('otp');
         startTimer();
-        setSuccessMessage(`أرسلنا رمز التحقق إلى ${result.email} لتأمين الدخول من هذا الجهاز.`);
+        setSuccessMessage(`أرسلنا رمز التحقق إلى ${result.email} لتأمين الدخول من هذا الجهاز — قد يصل الرمز في صندوق الرسائل غير المرغوب فيها (Spam).`);
         return;
       }
 
@@ -164,7 +164,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigate, onLoginSuccess
         setErrorMessage(res.message || 'تعذر إرسال رمز التفعيل.');
       } else {
         startTimer(res.resendAfter || 60);
-        setSuccessMessage(`أرسلنا رمز التفعيل إلى ${res.maskedEmail || targetEmail}.`);
+        setSuccessMessage(`أرسلنا رمز التفعيل إلى ${res.maskedEmail || targetEmail} — قد يصل الرمز في صندوق الرسائل غير المرغوب فيها (Spam).`);
       }
     } catch (e: any) {
       setErrorMessage(e?.message || 'تعذر إرسال رمز التفعيل.');
@@ -233,7 +233,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigate, onLoginSuccess
       if (result.status === 'otp_required') {
         setOtpDigits(Array(6).fill(''));
         startTimer();
-        setSuccessMessage('تم إرسال رمز جديد إلى بريدك.');
+        setSuccessMessage('تم إرسال رمز جديد إلى بريدك — قد يصل الرمز في صندوق الرسائل غير المرغوب فيها (Spam).');
       } else {
         setErrorMessage('انتهت صلاحية الجلسة. أعد إدخال بياناتك.');
         setStage('credentials');

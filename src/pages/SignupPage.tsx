@@ -157,7 +157,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onNavigate, onSignupSucc
       setOtpDigits(Array(6).fill(''));
       setResendTimer(res.resendAfter || 60);
       goStep(4);
-      setSuccessMessage(`أرسلنا رمز التفعيل إلى ${res.maskedEmail || email}. فحص صندوق الوارد (والبريد غير الهام).`);
+      setSuccessMessage(`أرسلنا رمز التفعيل إلى ${res.maskedEmail || email}. فحص صندوق الوارد — وقد يصل الرمز في صندوق الرسائل غير المرغوب فيها (Spam).`);
     } catch (err: any) {
       setErrorMessage(err?.message || 'تعذر إنشاء الحساب.');
     } finally {
@@ -211,7 +211,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onNavigate, onSignupSucc
         setErrorMessage(res.message || 'تعذر إعادة إرسال الرمز.');
       } else {
         setResendTimer(res.resendAfter || 60);
-        setSuccessMessage('تم إرسال رمز جديد إلى بريدك.');
+        setSuccessMessage('تم إرسال رمز جديد إلى بريدك — قد يصل الرمز في صندوق الرسائل غير المرغوب فيها (Spam).');
         setOtpDigits(Array(6).fill(''));
       }
     } catch (e: any) {
