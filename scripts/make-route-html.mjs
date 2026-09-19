@@ -37,6 +37,71 @@ const ROUTES = [
     breadcrumbName: 'انضم كمدرس',
   },
   {
+    path: '/qr-attendance',
+    title: 'نظام تسجيل حضور الطلاب بكود QR للمدرسين والسناتر',
+    description: 'سجّل حضور الطلاب بكود QR في أقل من ثانية من موبايل المدرس: بطاقة رقمية فريدة لكل طالب، إشعار فوري لولي الأمر على الواتساب، وتقارير حضور وغياب للسناتر والمجموعات — مجانًا داخل منصة حصتي.',
+    keywords: 'تسجيل حضور الطلاب ب QR, نظام حضور وانصراف QR, كود QR للحضور والانصراف, برنامج حضور الطلاب للسنتر, نظام متابعة حضور الطلاب, تسجيل الحضور بالباركود, حضور الطلاب واتساب, QR attendance system Egypt',
+    noscript: 'نظام تسجيل حضور الطلاب بكود QR من منصة حصتي: كل طالب يحصل على بطاقة رقمية بكود QR فريد، والمدرس يمسح الكود بكاميرا موبايله أول ما الطالب يدخل الحصة فيتسجل الحضور لحظيًا بالتاريخ والوقت ويصل إشعار فوري لولي الأمر على الواتساب. النظام يوفر تقارير حضور وغياب لكل طالب ومجموعة، ويدعم المساعدين في السناتر ومراكز التقوية، وأكواده فريدة غير قابلة للتزوير — بديل كامل عن كشوف الحضور الورقية، ومجاني داخل منصة حصتي بدون اشتراك شهري.',
+    breadcrumbName: 'نظام حضور الطلاب بكود QR',
+    // محتوى GEO غني لزواحف الذكاء الاصطناعي التي لا تنفّذ JS (GPTBot/ClaudeBot/PerplexityBot)
+    noscriptExtra: `
+        <h2 style="font-size:18px;color:#1E3A8A;margin:24px 0 8px">إزاي بتسجّل حضور الطلاب بـ QR؟ (5 خطوات)</h2>
+        <ol style="padding-inline-start:20px;line-height:2">
+          <li>اكتب اسم الطالب في المنصة — يتولّد له كود QR فريد على بطاقة حضور رقمية.</li>
+          <li>الطالب يفتح بطاقته من موبايله أو يحملها مطبوعة.</li>
+          <li>المدرس يمسح الكود من ماسح حصتي بكاميرا الموبايل عند دخول الطالب.</li>
+          <li>الحضور يتسجل لحظيًا بالتاريخ والوقت في قاعدة البيانات.</li>
+          <li>ولي الأمر يستقبل إشعار واتساب فوري يؤكد وصول الطالب للحصة.</li>
+        </ol>
+        <h2 style="font-size:18px;color:#1E3A8A;margin:24px 0 8px">ليه أكتر من كشف الحضور الورقي؟</h2>
+        <ul style="padding-inline-start:20px;line-height:2">
+          <li>تسجيل 60 طالبًا في أقل من 3 دقائق بدل 10-15 دقيقة نداء بالاسم.</li>
+          <li>أكواد فريدة مربوطة بحساب الطالب — مستحيل تسجيل حضور مكاني.</li>
+          <li>تقارير انتظام وغياب جاهزة لكل طالب ومجموعة بضغطة واحدة.</li>
+          <li>مناسب للمدرس الفردي والمجموعات والسناتر مع دعم المساعدين.</li>
+          <li>مجاني للطلاب وأولياء الأمور وبدون اشتراك شهري للمدرسين.</li>
+        </ul>`,
+    // JSON-LD كامل لزواحف الـ AI: SoftwareApplication + HowTo + FAQPage
+    pageGraph: [
+      {
+        '@type': 'SoftwareApplication',
+        '@id': `${BASE}/qr-attendance#app`,
+        name: 'حصتي — نظام تسجيل حضور الطلاب بكود QR',
+        applicationCategory: 'EducationalApplication',
+        operatingSystem: 'Web',
+        description: 'نظام حضور ذكي للدروس الخصوصية والسناتر في مصر: بطاقة QR فريدة لكل طالب، مسح بكاميرا الموبايل، إشعار فوري لولي الأمر على الواتساب، وتقارير انتظام تفصيلية.',
+        url: `${BASE}/qr-attendance`,
+        inLanguage: 'ar-EG',
+        offers: { '@type': 'Offer', price: '0', priceCurrency: 'EGP', description: 'مجاني للطلاب وأولياء الأمور وبدون اشتراك شهري للمدرسين' },
+      },
+      {
+        '@type': 'HowTo',
+        '@id': `${BASE}/qr-attendance#howto`,
+        name: 'كيف تسجّل حضور الطلاب بكود QR في منصة حصتي',
+        totalTime: 'PT2M',
+        tool: 'موبايل المدرس بكاميرا + منصة حصتي',
+        step: [
+          { '@type': 'HowToStep', position: 1, name: 'اكتب اسم الطالب في المنصة', text: 'المدرس أو المساعد يضيف طلاب مجموعته على منصة حصتي، فيولّد النظام لكل طالب بطاقة حضور رقمية شخصية تحمل كود QR فريد.' },
+          { '@type': 'HowToStep', position: 2, name: 'الطالب يحمل بطاقة الـ QR بتاعته', text: 'الطالب يفتح بطاقته الرقمية من موبايله أو يحمل نسخة مطبوعة من كود QR.' },
+          { '@type': 'HowToStep', position: 3, name: 'المدرس يمسح الكود من موبايله', text: 'أول ما الطالب يدخل القاعة، المدرس يفتح ماسح الـ QR من منصة حصتي على موبايله ويمسح كود الطالب بكاميرا الهاتف مباشرة.' },
+          { '@type': 'HowToStep', position: 4, name: 'الحضور يتسجل لحظيًا في النظام', text: 'في أقل من ثانية واحدة يتسجل الطالب حاضرًا بتاريخ ووقت الحصة بدقة، ويُحدَّث عدد حضوره في التقارير تلقائيًا.' },
+          { '@type': 'HowToStep', position: 5, name: 'ولي الأمر يستقبل إشعارًا فوريًا', text: 'بمجرد المسح يصل إشعار فوري لولي الأمر على الواتساب يؤكد وصول ابنه للحصة في وقته.' },
+        ],
+      },
+      {
+        '@type': 'FAQPage',
+        '@id': `${BASE}/qr-attendance#faq`,
+        mainEntity: [
+          { '@type': 'Question', name: 'إيه هو نظام تسجيل حضور الطلاب بكود QR؟', acceptedAnswer: { '@type': 'Answer', text: 'نظام آلي لتوثيق حضور وانصراف الطلاب: كل طالب يملك بطاقة رقمية بكود QR فريد يمسحه المدرس بكاميرا موبايله عند دخول الطالب، فيتسجل الحضور لحظيًا ويصل إشعار فوري لولي الأمر على الواتساب — بديل كامل عن كشوف الحضور الورقية.' } },
+          { '@type': 'Question', name: 'إزاي أسجل حضور الطلاب بكود QR من الموبايل؟', acceptedAnswer: { '@type': 'Answer', text: 'افتح ماسح الـ QR من حسابك كمدرس في منصة حصتي، وجّه كاميرا الموبايل لكود الطالب، وهيتسجل الحضور في أقل من ثانية — بدون تحميل تطبيقات.' } },
+          { '@type': 'Question', name: 'هل يمكن للسناتر ومراكز التقوية استخدام نظام الحضور بالـ QR؟', acceptedAnswer: { '@type': 'Answer', text: 'نعم، كل مجموعة ليها قائمة طلابها وأكوادها، والمساعد أو موظف الاستقبال يمسح أكواد الطلاب الواردين، والمالك يتابع تقارير الحضور لكل مجموعات المركز من لوحة واحدة.' } },
+          { '@type': 'Question', name: 'هل يوصل ولي الأمر إشعار لحظة تسجيل الحضور؟', acceptedAnswer: { '@type': 'Answer', text: 'نعم، أول ما المدرس يمسح كود الطالب يصل ولي الأمر إشعار فوري على الواتساب يوضح اسم الطالب ووقت وصوله للحصة.' } },
+          { '@type': 'Question', name: 'هل نظام حضور الـ QR في حصتي مجاني؟', acceptedAnswer: { '@type': 'Answer', text: 'نعم، متاح لكل المدرسين الاعتماديين بدون اشتراك شهري — المنصة مجانية للطلاب وأولياء الأمور، والمدرس يدفع عمولة تنازلية تنخفض كلما زاد عدد طلابه.' } },
+        ],
+      },
+    ],
+  },
+  {
     path: '/about',
     title: 'عن منصة حصتي — الرؤية والرسالة التعليمية في مصر | منصة حصتي',
     description: 'تعرف على قصة منصة حصتي، المنظومة المصرية المبتكرة لربط الطلاب والمدرسين الخصوصيين بنظام الحضور الذكي بالـ QR كود وتقارير المتابعة الفورية لأولياء الأمور.',
@@ -95,32 +160,60 @@ const ROUTES = [
 ];
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-const jsonldFor = (r) => JSON.stringify({
-  '@context': 'https://schema.org',
-  '@graph': [
-    {
-      '@type': 'BreadcrumbList',
-      itemListElement: [
-        { '@type': 'ListItem', position: 1, name: 'الرئيسية', item: `${BASE}/` },
-        { '@type': 'ListItem', position: 2, name: r.breadcrumbName, item: `${BASE}${r.path}` },
+const jsonldFor = (r) => {
+  // صفحات بتوفر JSON-LD كامل خاص بيها (مثل /qr-attendance): نحقن الـ @graph كامل مع Breadcrumb وWebPage
+  if (r.pageGraph) {
+    return JSON.stringify({
+      '@context': 'https://schema.org',
+      '@graph': [
+        {
+          '@type': 'BreadcrumbList',
+          itemListElement: [
+            { '@type': 'ListItem', position: 1, name: 'الرئيسية', item: `${BASE}/` },
+            { '@type': 'ListItem', position: 2, name: r.breadcrumbName, item: `${BASE}${r.path}` },
+          ],
+        },
+        {
+          '@type': 'WebPage',
+          '@id': `${BASE}${r.path}#webpage`,
+          url: `${BASE}${r.path}`,
+          name: r.title,
+          description: r.description,
+          isPartOf: { '@id': `${BASE}/#website` },
+          inLanguage: 'ar-EG',
+        },
+        ...r.pageGraph,
       ],
-    },
-    {
-      '@type': 'WebPage',
-      '@id': `${BASE}${r.path}#webpage`,
-      url: `${BASE}${r.path}`,
-      name: r.title,
-      description: r.description,
-      isPartOf: { '@id': `${BASE}/#website` },
-      inLanguage: 'ar-EG',
-    },
-  ],
-});
+    });
+  }
+  return JSON.stringify({
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'الرئيسية', item: `${BASE}/` },
+          { '@type': 'ListItem', position: 2, name: r.breadcrumbName, item: `${BASE}${r.path}` },
+        ],
+      },
+      {
+        '@type': 'WebPage',
+        '@id': `${BASE}${r.path}#webpage`,
+        url: `${BASE}${r.path}`,
+        name: r.title,
+        description: r.description,
+        isPartOf: { '@id': `${BASE}/#website` },
+        inLanguage: 'ar-EG',
+      },
+    ],
+  });
+};
 
 const NOSCRIPT = (r) => {
   const inner = [
     `        <h1 style="font-size:22px;color:#1D4ED8;margin-bottom:12px">${esc(r.title)}</h1>`,
     `        <p>${esc(r.noscript)}</p>`,
+    ...(r.noscriptExtra ? [r.noscriptExtra] : []),
     `        <ul style="padding-inline-start:20px">`,
     `          <li><a href="/" style="color:#2563EB">منصة حصتي — الرئيسية</a></li>`,
     `          <li><a href="/search" style="color:#2563EB">البحث عن مدرسين خصوصيين معتمدين</a></li>`,

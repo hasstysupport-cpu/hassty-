@@ -29,6 +29,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               <li><button onClick={() => onNavigate('/search')} className="hover:text-[#2563EB] transition-colors">البحث عن مدرسين</button></li>
               <li><button onClick={() => onNavigate('/about')} className="hover:text-[#2563EB] transition-colors">عن المنصة</button></li>
               <li><button onClick={() => onNavigate('/for-teachers')} className="hover:text-[#2563EB] transition-colors">بوابة المعلمين</button></li>
+              <li><button onClick={() => onNavigate('/qr-attendance')} className="hover:text-[#2563EB] transition-colors">نظام الحضور بـ QR</button></li>
               <li><button onClick={() => onNavigate('/contact')} className="hover:text-[#2563EB] transition-colors">الدعم والتواصل</button></li>
             </ul>
           </div>
