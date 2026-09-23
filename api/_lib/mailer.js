@@ -3,7 +3,7 @@
    RTL Arabic, simple & professional, matching the platform identity.
    ============================================================ */
 import nodemailer from 'nodemailer';
-import { GMAIL_USER, GMAIL_PASS, SITE_URL, CODE_TTL_MINUTES } from './config.js';
+import { GMAIL_USER, GMAIL_PASS, SITE_URL, SUPPORT_EMAIL, CODE_TTL_MINUTES } from './config.js';
 
 let cachedTransporter = null;
 
