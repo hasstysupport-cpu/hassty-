@@ -109,7 +109,7 @@ const C = {
 };
 
 /* ---------- Shared layout (email-safe: tables + inline styles) ---------- */
-function layout({ title, intro, code, ctaLink, ctaText, note }) {
+function layout({ title, intro, code, ctaLink, ctaText, note, hideExpiry }) {
   const codeBlock = code
     ? `
       <tr>
@@ -124,6 +124,15 @@ function layout({ title, intro, code, ctaLink, ctaText, note }) {
       <tr>
         <td align="center" style="padding:4px 8px 18px">
           <a href="${ctaLink}" style="display:inline-block;background:${C.brand};color:#ffffff;text-decoration:none;font-weight:800;font-size:15px;padding:13px 38px;border-radius:999px;">${ctaText || 'متابعة'}</a>
+        </td>
+      </tr>`
+    : '';
+
+  const expiryBlock = (code && !hideExpiry)
+    ? `
+      <tr>
+        <td style="padding:0 28px 8px;">
+          <div style="font-size:12px;color:${C.subText};line-height:1.8;">⏱ الرمز صالح لمدة ${CODE_TTL_MINUTES} دقائق فقط، ويمكن استخدامه مرة واحدة.</div>
         </td>
       </tr>`
     : '';
@@ -163,12 +172,7 @@ function layout({ title, intro, code, ctaLink, ctaText, note }) {
           ${codeBlock}
           ${ctaBlock}
 
-          <!-- Expiry note -->
-          <tr>
-            <td style="padding:0 28px 8px;">
-              <div style="font-size:12px;color:${C.subText};line-height:1.8;">⏱ الرمز صالح لمدة ${CODE_TTL_MINUTES} دقائق فقط، ويمكن استخداره مرة واحدة.</div>
-            </td>
-          </tr>
+          ${expiryBlock}
 
           ${note ? `
           <!-- QA routing note -->
@@ -236,7 +240,72 @@ const TEMPLATES = {
       note,
     }),
   }),
+  teacher_verification_approved: ({ name, link }) => ({
+    subject: 'تم اعتماد حسابك كمعلم موثق في حِصّتي',
+    html: layout({
+      title: `تهانينا ${name || 'أستاذ'}! تم اعتماد حسابك ✅`,
+      intro: 'بعد مراجعة إدارة منصة حِصّتي، تم اعتماد توثيق حسابك كمدرس. أصبح حسابك الآن موثقًا رسميًا، وظهر اسمك في دليل المدرسين المعتمدين على المنصة، ويمكن للطلاب وأولياء الأمور الوصول إليك بثقة.',
+      ctaLink: link || `${SITE_URL}/login`,
+      ctaText: 'الدخول إلى لوحة المدرس',
+      hideExpiry: true,
+    }),
+  }),
+  teacher_verification_rejected: ({ name, reason, link }) => ({
+    subject: 'بخصوص طلب توثيق حسابك في حِصّتي',
+    html: layout({
+      title: `${name ? `${name}، ` : ''}لم يتم اعتماد طلب التوثيق حاليًا`,
+      intro: `شكرًا لاهتمامك بالانضمام كمدرس موثق في منصة حِصّتي. بعد المراجعة، لم يتم اعتماد طلب التوثيق في الوقت الحالي.${reason ? `<br><br><b>سبب القرار:</b> ${reason}` : ''}<br><br>يمكنك التواصل مع فريق الدعم للاستفسار عن التفاصيل أو إعادة التقديم بعد استيفاء المتطلبات.`,
+      ctaLink: link || `${SITE_URL}/contact`,
+      ctaText: 'التواصل مع الدعم',
+      hideExpiry: true,
+    }),
+  }),
+  teacher_verification_admin_alert: ({ name, subject: subj, governorate, phone }) => ({
+    subject: `طلب توثيق مدرس جديد بانتظار المراجعة: ${name || 'مدرس جديد'}`,
+    html: layout({
+      title: 'طلب توثيق مدرس جديد في الطابور',
+      intro: `مدرس جديد سجّل في المنصة وطلب توثيق حسابه:<br><br>\n<b>الاسم:</b> ${name || '—'}<br>\n<b>المادة:</b> ${subj || '—'}<br>\n<b>المحافظة:</b> ${governorate || '—'}<br>\n<b>الهاتف:</b> ${phone || '—'}<br><br>\nالطلب في انتظار مراجعتكم من طابور التوثيق في لوحة الإدارة.`,
+      ctaLink: `${SITE_URL}/admin`,
+      ctaText: 'فتح لوحة الإدارة',
+      hideExpiry: true,
+    }),
+  }),
 };
+
+/* ---------- Verification-flow sender (webhook-driven) ----------
+   event: 'approved' | 'rejected' | 'new_request'
+   approved/rejected → بريد المدرس | new_request → بريد الدعم (الإدارة) */
+export async function sendVerificationEmail({ event, teacherEmail, teacherName = '', subject = '', governorate = '', phone = '', reason = '' }) {
+  const EVENTS = {
+    approved: { tpl: TEMPLATES.teacher_verification_approved, to: teacherEmail },
+    rejected: { tpl: TEMPLATES.teacher_verification_rejected, to: teacherEmail },
+    new_request: { tpl: TEMPLATES.teacher_verification_admin_alert, to: SUPPORT_EMAIL },
+  };
+  const entry = EVENTS[event];
+  if (!entry) throw new Error(`Unknown verification event: ${event}`);
+  if (!entry.to) return { skipped: true, reason: 'no recipient' };
+
+  const { subject: subj, html } = entry.tpl({ name: teacherName, subject, governorate, phone, reason });
+  const provider = getProvider();
+  const mail = {
+    from: getFromAddress(provider),
+    to: entry.to,
+    subject: subj,
+    html,
+    text: subj,
+    headers: {
+      'X-Entity-Ref-ID': `hassty-verif-${event}-${Date.now()}`,
+      'Auto-Submitted': 'auto-generated',
+    },
+  };
+
+  if (provider === 'resend') {
+    await sendViaResend(mail);
+  } else {
+    await getTransporter().sendMail(mail);
+  }
+  return { ok: true, provider, to: entry.to };
+}
 
 /* ---------- Sender ---------- */
 /* الروابط تختلف حسب الغرض:

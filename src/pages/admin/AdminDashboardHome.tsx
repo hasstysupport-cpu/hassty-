@@ -280,11 +280,17 @@ export const AdminDashboardHome: React.FC<AdminDashboardHomeProps> = ({
                   className="p-3.5 rounded-2xl bg-gray-50/80 hover:bg-blue-50/50 border border-gray-200 transition-colors flex items-center justify-between gap-3"
                 >
                   <div className="flex items-center gap-3">
-                    <img
-                      src={item.idCardImageUrl}
-                      alt="National ID Preview"
-                      className="w-10 h-10 rounded-xl object-cover border border-gray-300"
-                    />
+                    {item.idCardImageUrl ? (
+                      <img
+                        src={item.idCardImageUrl}
+                        alt="National ID Preview"
+                        className="w-10 h-10 rounded-xl object-cover border border-gray-300"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center shrink-0">
+                        <ShieldCheck className="w-4 h-4 text-blue-500" />
+                      </div>
+                    )}
                     <div>
                       <h5 className="text-xs font-black text-[#1E3A8A]">{item.teacherName}</h5>
                       <p className="text-[11px] text-gray-500">

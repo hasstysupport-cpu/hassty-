@@ -399,8 +399,17 @@ export async function dbToggleAccountStatus(accountId: string, currentStatus: 'a
 }
 
 export async function dbDeleteAccount(accountId: string) {
-  const { error } = await requireSupabase().from('profiles').delete().eq('id', accountId);
-  if (error) throw error;
+  /* حذف نهائي: عبر endpoint سيرفري يمسح حساب auth أيضًا —
+     الحذف من profiles فقط كان يترك حساب الدخول حيًا فيرجع يمسجل */
+  const { data: sessionData } = await requireSupabase().auth.getSession();
+  const accessToken = sessionData?.session?.access_token || '';
+  const res = await fetch('/api/admin/delete-account', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId: accountId, accessToken }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data?.ok === false) throw new Error(data?.error || `تعذر حذف الحساب (HTTP ${res.status})`);
 }
 
 export async function dbApproveVerification(requestId: string, teacherId: string, adminEmail: string, teacherData?: Partial<AdminUserAccount>) {

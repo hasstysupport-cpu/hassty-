@@ -1,8 +1,6 @@
 import {
   SubjectItem,
   TutorProfile,
-  TestimonialItem,
-  StatItem,
   FeatureItem,
   StepItem,
   LessonItem,
@@ -518,62 +516,6 @@ export const FEATURES_DATA: FeatureItem[] = [
     iconName: 'RefreshCw',
     highlight: 'مرونة كاملة'
   },
-];
-
-export const STATS_DATA: StatItem[] = [
-  {
-    value: '+2,400',
-    label: 'مدرس موثّق',
-    description: 'تم التحقق من هوياتهم ومؤهلاتهم'
-  },
-  {
-    value: '+15,000',
-    label: 'طالب',
-    description: 'يتعلمون بانتظام عبر المنصة'
-  },
-  {
-    value: '27',
-    label: 'محافظة',
-    description: 'تغطية جغرافية كاملة في مصر'
-  },
-  {
-    value: '+50,000',
-    label: 'تسجيل حضور',
-    description: 'تم توثيقها بنجاح مع إشعارات واتساب'
-  },
-];
-
-export const TESTIMONIALS_DATA: TestimonialItem[] = [
-  {
-    id: '1',
-    name: 'م. أشرف الشناوي',
-    role: 'ولي أمر طالبين (ثانوية وإعدادي)',
-    governorate: 'القاهرة - التجمع الخامس',
-    quote: 'أكتر حاجة مريحة في حصتي هي إشعار الواتساب اللي بيوصلني فوراً لما ابني يوصل السنتر، مع ملاحظات الواجب بعد الحصة. وجميل إني بتابع ابني التاني في الإعدادي من نفس الشاشة.',
-    rating: 5,
-    avatar: '👨‍💼',
-    relatedSubject: 'فيزياء ورياضيات'
-  },
-  {
-    id: '2',
-    name: 'نورهان طارق',
-    role: 'طالبة بالصف الثالث الثانوي',
-    governorate: 'الجيزة - الدقي',
-    quote: 'البطاقة الرقمية وكود الحضور خلاني ادخل كل حصصي في ثانية. ولما غبت بسبب دور برد قدمت طلب حصة تعويضية وماتحسبش عليا غياب ولا أثر على تقييمي.',
-    rating: 5,
-    avatar: '👩‍🎓',
-    relatedSubject: 'كيمياء ولغات'
-  },
-  {
-    id: '3',
-    name: 'أ. حسام إبراهيم',
-    role: 'مدرس أول كيمياء',
-    governorate: 'القاهرة - مدينة نصر',
-    quote: 'نظام نافذة الحضور وطلبات الحجز ريحني جداً من دوشة الواتساب ودخول طلاب بدون تسجيل مسبق، ومتابعة الواجبات بتربطني بأولياء الأمور باحترافية عالية.',
-    rating: 5,
-    avatar: '👨‍🏫',
-    relatedSubject: 'كيمياء الثانوية'
-  }
 ];
 
 export const DEFAULT_SLOTS: AvailableSlot[] = [
