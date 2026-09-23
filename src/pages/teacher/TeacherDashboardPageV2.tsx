@@ -20,13 +20,14 @@ export const TeacherDashboardPageV2: React.FC<Props> = ({ onNavigate }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [verificationPending, setVerificationPending] = useState<boolean | null>(null);
 
   const load = useCallback(async () => {
     if (!teacherId || !supabase) { setLoading(false); return; }
     setRefreshing(true);
     try {
-      // الموجة 1 (متوازية): المجموعات + الطلاب + الحجوزات المعلقة — لا اعتماد بينها
-      const [liveGroups, liveStudents, pendingBookings] = await Promise.all([
+      // الموجة 1 (متوازية): المجموعات + الطلاب + الحجوزات المعلقة + حالة التوثيق — لا اعتماد بينها
+      const [liveGroups, liveStudents, pendingBookings, tutorVerification] = await Promise.all([
         loadTeacherGroups(teacherId),
         loadTeacherStudents(teacherId),
         supabase.from('booking_requests')
@@ -37,7 +38,14 @@ export const TeacherDashboardPageV2: React.FC<Props> = ({ onNavigate }) => {
           .limit(20)
           .then((r: any) => r.data || [])
           .catch((err: any) => { console.warn('Booking fetch warning:', err); return []; }),
+        supabase.from('tutor_profiles')
+          .select('is_verified,verification_status')
+          .eq('user_id', teacherId)
+          .maybeSingle()
+          .then((r: any) => r.data)
+          .catch(() => null),
       ]);
+      setVerificationPending(tutorVerification ? tutorVerification.is_verified !== true : false);
       setGroups(liveGroups);
       setStudents(liveStudents);
       setBookings(pendingBookings.map((r: any) => ({
@@ -124,6 +132,13 @@ export const TeacherDashboardPageV2: React.FC<Props> = ({ onNavigate }) => {
         <div className="rounded-2xl border border-blue-200 bg-blue-50 text-blue-900 px-4 py-3 text-sm font-bold flex items-center justify-between gap-3">
           <span>{notice}</span>
           <button onClick={() => setNotice(null)} className="text-blue-600">×</button>
+        </div>
+      )}
+
+      {verificationPending && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 text-amber-900 px-4 py-3 text-sm font-bold flex items-center gap-2" role="status">
+          <Clock3 className="w-4 h-4 shrink-0 text-amber-600" />
+          <span>حسابك قيد التوثيق من إدارة المنصة — سيتم تفعيل ظهورك في دليل المدرسين المعتمدين فور موافقة الإدارة.</span>
         </div>
       )}
 

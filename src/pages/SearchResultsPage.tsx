@@ -132,7 +132,9 @@ export const SearchResultsPage: React.FC<SearchResultsPageProps> = ({
               profileMap = new Map((profs || []).map((p: any) => [p.id, p]));
             }
 
-            return (tpList || []).map((t: any) => {
+            return (tpList || [])
+              .filter((t: any) => t.is_verified === true || t.verification_status === 'approved')
+              .map((t: any) => {
               const p = profileMap.get(t.user_id) || {};
               return {
                 id: t.user_id,

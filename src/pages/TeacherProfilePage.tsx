@@ -65,7 +65,10 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({ tutorId,
           supabase.from('tutor_profiles').select('*').eq('user_id', tutorId).maybeSingle(),
         ]);
         if (pData || tpData) {
-          row = {
+          // fallback محمي بالتوثيق: غير الموثق لا تُعرض صفحته العامة
+          const isVerifiedTeacher = tpData?.is_verified === true || tpData?.verification_status === 'approved';
+          if (isVerifiedTeacher) {
+            row = {
             id: tutorId,
             name: pData?.full_name || 'مدرس معتمد',
             title: tpData?.title || 'معلم متخصص',
@@ -84,6 +87,7 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({ tutorId,
             avatar_url: pData?.avatar_url || '',
             metadata: { ...(pData?.metadata || {}), ...(tpData?.metadata || {}) },
           };
+          }
         }
       }
 
