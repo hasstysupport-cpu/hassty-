@@ -1,3 +1,12 @@
+/**
+ * Hassty — منصة حِصّتي التعليمية
+ * جميع الحقوق محفوظة لدي Tikzoom © | MCV_M
+ * المبرمج: محمود على محمود مدكور
+ * بصمة حقوق الملكية: هذا الموقع بجميع ملفاته وأكواده وتصاميمه ملك خاص للمالك Mahmoudmadkour وجميع الأملاك له فقط،
+ * ويُمنع النسخ أو النقل أو إعادة استخدام أي جزء منه دون إذن كتابي مسبق من المالك.
+ * Copyright (c) Mahmoudmadkour — All Rights Reserved.
+ */
+
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, BookOpen, CalendarDays, Check, CheckCircle2, Clock3, FileText, Filter, MessageCircle, Paperclip, Send, Star, Trash2, UserRound, X } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';

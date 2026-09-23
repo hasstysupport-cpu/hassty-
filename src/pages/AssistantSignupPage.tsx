@@ -1,3 +1,12 @@
+/**
+ * Hassty — منصة حِصّتي التعليمية
+ * جميع الحقوق محفوظة لدي Tikzoom © | MCV_M
+ * المبرمج: محمود على محمود مدكور
+ * بصمة حقوق الملكية: هذا الموقع بجميع ملفاته وأكواده وتصاميمه ملك خاص للمالك Mahmoudmadkour وجميع الأملاك له فقط،
+ * ويُمنع النسخ أو النقل أو إعادة استخدام أي جزء منه دون إذن كتابي مسبق من المالك.
+ * Copyright (c) Mahmoudmadkour — All Rights Reserved.
+ */
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useSEO } from '../lib/useSEO';
 import { BriefcaseBusiness, CheckCircle2, FileBadge, MapPin, ShieldCheck, User, Eye, EyeOff, Loader2, RefreshCw, Mail } from 'lucide-react';

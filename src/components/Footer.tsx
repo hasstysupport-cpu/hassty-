@@ -1,3 +1,12 @@
+/**
+ * Hassty — منصة حِصّتي التعليمية
+ * جميع الحقوق محفوظة لدي Tikzoom © | MCV_M
+ * المبرمج: محمود على محمود مدكور
+ * بصمة حقوق الملكية: هذا الموقع بجميع ملفاته وأكواده وتصاميمه ملك خاص للمالك Mahmoudmadkour وجميع الأملاك له فقط،
+ * ويُمنع النسخ أو النقل أو إعادة استخدام أي جزء منه دون إذن كتابي مسبق من المالك.
+ * Copyright (c) Mahmoudmadkour — All Rights Reserved.
+ */
+
 import React from 'react';
 import { MapPin, Send, MessageCircle } from 'lucide-react';
 import { BrandLogo } from './common/BrandLogo';
@@ -31,6 +40,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               <li><button onClick={() => onNavigate('/for-teachers')} className="hover:text-[#2563EB] transition-colors">بوابة المعلمين</button></li>
               <li><button onClick={() => onNavigate('/qr-attendance')} className="hover:text-[#2563EB] transition-colors">نظام الحضور بـ QR</button></li>
               <li><button onClick={() => onNavigate('/contact')} className="hover:text-[#2563EB] transition-colors">الدعم والتواصل</button></li>
+              <li><button onClick={() => onNavigate('/team')} className="hover:text-[#2563EB] transition-colors">لوحة المطورين</button></li>
             </ul>
           </div>
 
@@ -79,7 +89,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             <span>•</span>
             <a href="/legal/rights" aria-label="Data Rights" title="Data Rights" onClick={(e) => navLink(e, '/legal/rights', onNavigate)} className="hover:text-[#2563EB]">حقوق البيانات</a>
           </div>
-          <p className="text-center">© 2026 حِصّتي. جميع الحقوق محفوظة.</p>
+          <p className="text-center">جميع الحقوق محفوظة Tikzoom© | Hassty</p>
         </div>
       </div>
     </footer>

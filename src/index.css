@@ -1,3 +1,12 @@
+/*
+ * Hassty — منصة حِصّتي التعليمية
+ * جميع الحقوق محفوظة لدي Tikzoom © | MCV_M
+ * المبرمج: محمود على محمود مدكور
+ * بصمة حقوق الملكية: هذا الموقع بجميع ملفاته وأكواده وتصاميمه ملك خاص للمالك Mahmoudmadkour وجميع الأملاك له فقط،
+ * ويُمنع النسخ أو النقل أو إعادة استخدام أي جزء منه دون إذن كتابي مسبق من المالك.
+ * Copyright (c) Mahmoudmadkour — All Rights Reserved.
+ */
+
 @import "tailwindcss";
 
 @layer base {
@@ -652,4 +661,34 @@ form button[type="submit"] + button[type="button"] {
 
 @media (prefers-reduced-motion: reduce) {
   .auth-brand .auth-blob, .auth-brand .auth-ring, .auth-btn::after { animation: none !important; }
+}
+
+/* ============================================================
+   DEVELOPERS PANEL (/team) — ambient motion & tech patterns
+   أنماط لوحة المطورين: توهجات محيطة + شبكات تقنية خفيفة
+   ============================================================ */
+@keyframes ambientFloat {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(10px, -12px) scale(1.03); }
+}
+@keyframes ambientFloatAlt {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-12px, 14px) scale(0.97); }
+}
+@keyframes subtleGlow {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.04); }
+}
+.animate-ambient-float { animation: ambientFloat 14s ease-in-out infinite; }
+.animate-ambient-float-alt { animation: ambientFloatAlt 18s ease-in-out infinite; }
+.animate-subtle-glow { animation: subtleGlow 8s ease-in-out infinite; }
+.bg-tech-grid {
+  background-size: 32px 32px;
+  background-image:
+    linear-gradient(to right, rgba(37, 99, 235, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(37, 99, 235, 0.04) 1px, transparent 1px);
+}
+.bg-tech-dots {
+  background-size: 24px 24px;
+  background-image: radial-gradient(rgba(37, 99, 235, 0.08) 1px, transparent 1px);
 }

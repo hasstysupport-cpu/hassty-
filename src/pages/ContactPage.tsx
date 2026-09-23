@@ -1,3 +1,12 @@
+/**
+ * Hassty — منصة حِصّتي التعليمية
+ * جميع الحقوق محفوظة لدي Tikzoom © | MCV_M
+ * المبرمج: محمود على محمود مدكور
+ * بصمة حقوق الملكية: هذا الموقع بجميع ملفاته وأكواده وتصاميمه ملك خاص للمالك Mahmoudmadkour وجميع الأملاك له فقط،
+ * ويُمنع النسخ أو النقل أو إعادة استخدام أي جزء منه دون إذن كتابي مسبق من المالك.
+ * Copyright (c) Mahmoudmadkour — All Rights Reserved.
+ */
+
 import React, { useState } from 'react';
 import { useSEO } from '../lib/useSEO';
 import {
@@ -8,7 +17,9 @@ import {
   ChevronUp,
   Clock,
   Sparkles,
-  HelpCircle
+  HelpCircle,
+  Code2,
+  ArrowUpRight
 } from 'lucide-react';
 import { FAQ_ITEMS } from '../data/mockData';
 import { Badge } from '../components/common/Badge';
@@ -102,7 +113,7 @@ export const ContactPage: React.FC<ContactPageProps> = ({ onNavigate }) => {
 
             <div className="bg-white border border-[#E5E7EB] rounded-3xl p-6 space-y-4">
               <div className="flex items-start gap-3.5 pb-4"><div className="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0"><Send className="w-4 h-4" /></div><div><h4 className="text-xs font-bold text-[#6B7280]">تليجرام وواتساب</h4><div className="space-y-1 mt-1">{SUPPORT_CHANNELS.map((item) => <a key={item.href} href={item.href} target="_blank" rel="noreferrer" className="block text-xs font-bold text-[#1E3A8A] hover:text-sky-700">{item.label}: {item.username}</a>)}</div></div></div>
-              <div className="flex items-start gap-3.5 pt-4 border-t border-gray-100"><div className="w-9 h-9 rounded-xl bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center shrink-0"><MapPin className="w-4 h-4" /></div><div><h4 className="text-xs font-bold text-[#6B7280]">المقر الرئيسي</h4><p className="text-xs font-bold text-[#1E3A8A] mt-0.5">القاهرة الجديدة — التجمع الخامس، مصر</p></div></div>
+              <div className="flex items-start gap-3.5 pt-4 border-t border-gray-100"><div className="w-9 h-9 rounded-xl bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center shrink-0"><Code2 className="w-4 h-4" /></div><div><h4 className="text-xs font-bold text-[#6B7280]">لوحة المطورين</h4><button type="button" onClick={() => onNavigate('/team')} className="text-xs font-bold text-[#1E3A8A] hover:text-sky-700 mt-0.5 flex items-center gap-1 group cursor-pointer">فريق تطوير منصة حِصّتي <ArrowUpRight className="w-3 h-3 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" /></button><p className="text-[11px] text-[#9CA3AF] mt-0.5">تعرّف على الفريق الذي بني المنصة</p></div></div>
             </div>
           </div>
 

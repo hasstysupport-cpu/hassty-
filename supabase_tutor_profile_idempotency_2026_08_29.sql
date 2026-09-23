@@ -1,3 +1,10 @@
+-- Hassty — منصة حِصّتي التعليمية
+-- جميع الحقوق محفوظة لدي Tikzoom © | MCV_M
+-- المبرمج: محمود على محمود مدكور
+-- بصمة حقوق الملكية: هذا الموقع بجميع ملفاته وأكواده وتصاميمه ملك خاص للمالك Mahmoudmadkour وجميع الأملاك له فقط،
+-- ويُمنع النسخ أو النقل أو إعادة استخدام أي جزء منه دون إذن كتابي مسبق من المالك.
+-- Copyright (c) Mahmoudmadkour — All Rights Reserved.
+
 -- HASSTY: prevent duplicate/orphan tutor_profiles during account editing
 -- Applied to Supabase project mxryrgoxofsvjsvpxzew on 2026-08-29.
 

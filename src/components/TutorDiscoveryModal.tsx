@@ -1,3 +1,12 @@
+/**
+ * Hassty — منصة حِصّتي التعليمية
+ * جميع الحقوق محفوظة لدي Tikzoom © | MCV_M
+ * المبرمج: محمود على محمود مدكور
+ * بصمة حقوق الملكية: هذا الموقع بجميع ملفاته وأكواده وتصاميمه ملك خاص للمالك Mahmoudmadkour وجميع الأملاك له فقط،
+ * ويُمنع النسخ أو النقل أو إعادة استخدام أي جزء منه دون إذن كتابي مسبق من المالك.
+ * Copyright (c) Mahmoudmadkour — All Rights Reserved.
+ */
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Search, MapPin, Star, ShieldCheck, Check, QrCode, Calendar, Users, Phone, ArrowLeft, Loader2 } from 'lucide-react';
@@ -238,7 +247,7 @@ export const TutorDiscoveryModal: React.FC<TutorDiscoveryModalProps> = ({
                           <div className="flex items-center justify-between">
                             <h3 className="text-base font-bold text-[#1F2937] truncate flex items-center gap-1">
                               {tutor.name}
-                              <ShieldCheck className="w-4 h-4 text-[#2563EB] shrink-0" title="مدرس موثق ومعتمد" />
+                              <span title="مدرس موثق ومعتمد" className="shrink-0 flex"><ShieldCheck className="w-4 h-4 text-[#2563EB]" /></span>
                             </h3>
                             <span className="text-xs font-bold text-[#2563EB] bg-[#EFF6FF] px-2 py-0.5 rounded-md shrink-0">
                               {tutor.subject}

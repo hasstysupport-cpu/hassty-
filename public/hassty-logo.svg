@@ -1,0 +1,9 @@
+<!--
+  Hassty — منصة حِصّتي التعليمية
+  جميع الحقوق محفوظة لدي Tikzoom © | MCV_M
+  المبرمج: محمود على محمود مدكور
+  بصمة حقوق الملكية: هذا الموقع بجميع ملفاته وأكواده وتصاميمه ملك خاص للمالك Mahmoudmadkour وجميع الأملاك له فقط،
+  ويُمنع النسخ أو النقل أو إعادة استخدام أي جزء منه دون إذن كتابي مسبق من المالك.
+  Copyright (c) Mahmoudmadkour — All Rights Reserved.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#2563eb"/><stop offset="1" stop-color="#0ea5e9"/></linearGradient></defs><rect width="128" height="128" rx="28" fill="#eff6ff"/><rect x="18" y="18" width="92" height="92" rx="24" fill="url(#g)"/><path d="M35 38v52h14V71h30v19h14V38H79v19H49V38z" fill="#fff"/></svg>

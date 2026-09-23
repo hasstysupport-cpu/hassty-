@@ -1,3 +1,12 @@
+/**
+ * Hassty — منصة حِصّتي التعليمية
+ * جميع الحقوق محفوظة لدي Tikzoom © | MCV_M
+ * المبرمج: محمود على محمود مدكور
+ * بصمة حقوق الملكية: هذا الموقع بجميع ملفاته وأكواده وتصاميمه ملك خاص للمالك Mahmoudmadkour وجميع الأملاك له فقط،
+ * ويُمنع النسخ أو النقل أو إعادة استخدام أي جزء منه دون إذن كتابي مسبق من المالك.
+ * Copyright (c) Mahmoudmadkour — All Rights Reserved.
+ */
+
 /** @license SPDX-License-Identifier: Apache-2.0 */
 import React,{useState,useEffect,useRef,lazy,Suspense} from 'react';
 import { AccountRole } from './types';
@@ -23,6 +32,8 @@ const AboutPage = lazy(() => import('./pages/AboutPage').then(m => ({ default: m
 const ContactPage = lazy(() => import('./pages/ContactPage').then(m => ({ default: m.ContactPage })));
 const ForTeachersPage = lazy(() => import('./pages/ForTeachersPage').then(m => ({ default: m.ForTeachersPage })));
 const QrAttendancePage = lazy(() => import('./pages/QrAttendancePage').then(m => ({ default: m.QrAttendancePage })));
+/* لوحة المطورين — صفحة مستقلة بتصميمها الخاص (navbar/footer داخليان) */
+const DevelopersPage = lazy(() => import('./pages/DevelopersPage').then(m => ({ default: m.DevelopersPage })));
 const LoginPage = lazy(() => import('./pages/LoginPage').then(m => ({ default: m.LoginPage })));
 const SignupPage = lazy(() => import('./pages/SignupPage').then(m => ({ default: m.SignupPage })));
 const AssistantSignupPage = lazy(() => import('./pages/AssistantSignupPage').then(m => ({ default: m.AssistantSignupPage })));
@@ -125,7 +136,7 @@ export default function App(){
  const isAdminAppRoute=currentPath.startsWith(SECRET_ADMIN_ROUTE)||currentPath.startsWith('/admin')||(typeof window!=='undefined'&&window.location.hostname.startsWith('admin.'));
  const isUnverified=isLoggedIn&&!user?.emailVerified&&user?.role!=='admin'&&user?.role!=='assistant'; const isSignupRoute=currentPath==='/signup'; const isAssistantSignupRoute=currentPath==='/assistant/signup';
  /* المسارات العامة المعروفة — أي مسار آخر يعرض صفحة 404 */
- const knownPublicPaths=['/','/search','/about','/contact','/for-teachers','/qr-attendance','/login','/signup','/assistant/signup','/verify-email','/setup-profile','/whatsapp-studio'];
+ const knownPublicPaths=['/','/search','/about','/contact','/for-teachers','/qr-attendance','/team','/login','/signup','/assistant/signup','/verify-email','/setup-profile','/whatsapp-studio'];
  const legalMatch0=currentPath.match(/^\/legal\/(terms|privacy|teacher|cookies|acceptable|refund|rights)$/);
  const isKnownPublicPath=knownPublicPaths.includes(currentPath)||currentPath.startsWith('/tutor')||Boolean(legalMatch0);
  useEffect(()=>{let cancelled=false;const check=async()=>{if(!user?.uid||user.role==='admin'||user.role==='assistant'||!supabase){if(!cancelled){setNeedsProfileSetup(false);setIsCheckingProfile(false)}return}setIsCheckingProfile(true);try{const{data,error}=await supabase.from('profiles').select('full_name,phone,governorate,city,grade,role,metadata').eq('id',user.uid).maybeSingle();if(error)throw error;const metadata=(data?.metadata||{}) as Record<string,any>;const role=(data?.role||user.role) as AccountRole;const commonComplete=Boolean(data?.full_name?.trim()&&data?.phone?.trim()&&data?.governorate?.trim()&&data?.city?.trim());const roleComplete=role==='teacher'?Boolean((metadata.subject||user.profileData?.subject)?.toString().trim()&&(metadata.experienceYears||user.profileData?.experienceYears)?.toString().trim()):role==='student'?Boolean((data?.grade||metadata.grade||user.profileData?.grade)?.toString().trim()):true;if(!cancelled)setNeedsProfileSetup(!data||!commonComplete||!roleComplete)}catch{if(!cancelled)setNeedsProfileSetup(false)}finally{if(!cancelled)setIsCheckingProfile(false)}};void check();return()=>{cancelled=true}},[user]);
@@ -166,6 +177,8 @@ export default function App(){
  if(isSignupRoute&&!isLoggedIn)return <div className="min-h-screen w-full bg-[#F8FAFF] text-[#1F2937] font-['IBM_Plex_Sans_Arabic',sans-serif] antialiased"><Suspense fallback={<PageLoader/>}><SignupPage onNavigate={handleNavigate} onSignupSuccess={handleLogin}/></Suspense></div>;
  if(isLoggedIn&&needsProfileSetup&&!isUnverified&&currentPath==='/setup-profile')return <div className="min-h-screen bg-[#F7FAFF] text-[#1F2937] font-['IBM_Plex_Sans_Arabic',sans-serif] antialiased"><Suspense fallback={<PageLoader/>}><ProfileSetupPage onComplete={handleProfileSetupComplete} onLogout={handleLogout}/></Suspense></div>;
  const legalMatch=currentPath.match(/^\/legal\/(terms|privacy|teacher|cookies|acceptable|refund|rights)$/); if(legalMatch)return <Suspense fallback={<PageLoader/>}><LegalPage section={legalMatch[1] as LegalSection} onNavigate={handleNavigate}/></Suspense>;
+ /* لوحة المطورين (/team): شريحة مستقلة كاملة — لها navbar وفوتر داخليان فلا نغلفها بقشرة الموقع */
+ if(currentPath==='/team')return <ToastProvider><Suspense fallback={<PageLoader/>}><DevelopersPage onNavigate={handleNavigate}/></Suspense></ToastProvider>;
  return <ToastProvider><div data-role={currentRole} className="min-h-screen bg-[#F8FAFF] text-[#1F2937] flex flex-col antialiased">
   {isLoggedIn&&isDashboardRoute&&!isUnverified&&!needsProfileSetup?<LoggedInNavbar currentRole={currentRole} currentPath={currentPath} userName={user?.name} userAvatar={user?.avatarUrl||user?.profileData?.avatarUrl} onNavigate={handleNavigate} onRoleChange={(r)=>setCurrentPath(`/${r}/dashboard`)} onLogout={handleLogout}/>:<PublicNavbar currentPath={currentPath} isLoggedIn={isLoggedIn&&!isUnverified&&!needsProfileSetup} user={user} currentRole={currentRole} onNavigate={handleNavigate} onOpenLogin={()=>handleNavigate('/login')} onOpenSignup={()=>handleNavigate('/signup')} onLogout={handleLogout}/>}
   {isLoggedIn&&isDashboardRoute&&!isUnverified&&!needsProfileSetup&&<Suspense fallback={null}><PushPermissionBanner/></Suspense>}
