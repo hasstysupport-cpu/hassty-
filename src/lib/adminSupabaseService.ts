@@ -403,10 +403,10 @@ export async function dbDeleteAccount(accountId: string) {
      الحذف من profiles فقط كان يترك حساب الدخول حيًا فيرجع يمسجل */
   const { data: sessionData } = await requireSupabase().auth.getSession();
   const accessToken = sessionData?.session?.access_token || '';
-  const res = await fetch('/api/admin/delete-account', {
+  const res = await fetch('/api/admin/ops', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId: accountId, accessToken }),
+    body: JSON.stringify({ action: 'delete_account', userId: accountId, accessToken }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || data?.ok === false) throw new Error(data?.error || `تعذر حذف الحساب (HTTP ${res.status})`);

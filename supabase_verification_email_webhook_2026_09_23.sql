@@ -15,7 +15,7 @@ security definer
 set search_path = 'pg_catalog', 'public', 'net'
 as $function$
 declare
-  v_url text := 'https://hassty.site/api/emails/verification-webhook';
+  v_url text := 'https://hassty.site/api/admin/ops';
   v_secret text := 'k7hd6oMmdzKFNGoq48SNZ2iFwwTAmd0i';
   v_headers jsonb := jsonb_build_object(
     'Content-Type', 'application/json',
@@ -28,6 +28,7 @@ begin
     -- طلب جديد → تنبيه بريد الإدارة
     select p.email into v_teacher_email from public.profiles p where p.id = new.teacher_id;
     v_payload := jsonb_build_object(
+      'action', 'verification_email',
       'event', 'new_request',
       'teacherEmail', coalesce(v_teacher_email, ''),
       'teacherName', coalesce(new.teacher_name, ''),
@@ -45,6 +46,7 @@ begin
      and new.status in ('approved', 'rejected') then
     select p.email into v_teacher_email from public.profiles p where p.id = new.teacher_id;
     v_payload := jsonb_build_object(
+      'action', 'verification_email',
       'event', new.status,
       'teacherEmail', coalesce(v_teacher_email, ''),
       'teacherName', coalesce(new.teacher_name, ''),
