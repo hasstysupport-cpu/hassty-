@@ -16,7 +16,10 @@
      ولن يظهر البريد إطلاقًا في حزمة الواجهة (Bundle).
    - بريد المالك الرسمي محمي دائمًا ولا يمكن حذفه من القايمة.
    ============================================================ */
-import { dbSelect, dbUpdate, findProfileByEmail } from './supabase.js';
+import crypto from 'crypto';
+import {
+  dbSelect, dbUpdate, dbInsert, findProfileByEmail, findAuthUserByEmail, createUser,
+} from './supabase.js';
 
 export const OWNER_EMAIL = String(process.env.ADMIN_OFFICIAL_EMAIL || 'hasstysupport@gmail.com')
   .toLowerCase()
@@ -61,10 +64,15 @@ export async function isWhitelistedAdmin(email) {
   return list.includes(clean);
 }
 
-/** كتابة القايمة كاملة داخل metadata بروفايل المالك */
+/** كتابة القايمة كاملة داخل metadata بروفايل المالك
+ *  (مع تهيئة حساب المالك تلقائيًا إن لم يوجد — قاعدة فاضية تعمل) */
 export async function setAdminWhitelist(list) {
   const clean = sanitizeList(list);
-  const profile = await findProfileByEmail(OWNER_EMAIL);
+  let profile = await findProfileByEmail(OWNER_EMAIL);
+  if (!profile?.id) {
+    await ensureAdminAccount(OWNER_EMAIL).catch(() => {});
+    profile = await findProfileByEmail(OWNER_EMAIL);
+  }
   if (!profile?.id) return { ok: false, error: 'owner_profile_missing', emails: clean };
   const fresh = await dbSelect('profiles', {
     select: 'id,metadata',
@@ -95,6 +103,71 @@ export async function setProfileRoleByEmail(email, role) {
     `id=eq.${profile.id}`,
   );
   return error ? { ok: false, error: error?.message || 'update_failed' } : { ok: true };
+}
+
+/* ============================================================
+   ensureAdminAccount — تهيئة حساب إداري حقيقي تلقائيًا
+   ------------------------------------------------------------
+   يضمن أن أي بريد مصرح له إداريًا له:
+   1) حساب auth حقيقي في Supabase (password عشوائي + email_confirm)
+   2) صف profiles حقيقي (ينشئه تريجر handle_new_auth_user تلقائيًا،
+      وننشئه يدويًا كحل احتياطي إن لم يصل التريجر)
+   يُستدعى قبل إرسال رمز الدخول الإداري وقبل إضافة إيميل للقايمة —
+   بهذا تعمل إضافة الأدمن والدخول الإداري حتى بقاعدة بيانات فاضية تمامًا.
+   ============================================================ */
+export async function ensureAdminAccount(email) {
+  const clean = normalizeEmail(email);
+  if (!isValidEmail(clean)) return { ok: false, error: 'invalid_email' };
+
+  // 1) حساب auth موجود؟
+  let authUser = await findAuthUserByEmail(clean);
+  if (!authUser?.id) {
+    const password = crypto.randomBytes(24).toString('base64url');
+    const res = await createUser({
+      email: clean,
+      password,
+      email_confirm: true,
+      user_metadata: { role: 'admin', full_name: 'إدارة حِصّتي' },
+    });
+    if (!res.ok) {
+      // سباق بسيط: لو أُنشئ بالتوازي نحاول قراءته مرة أخرى
+      authUser = await findAuthUserByEmail(clean);
+      if (!authUser?.id) return { ok: false, error: 'create_user_failed', status: res.status };
+    } else {
+      authUser = res.data;
+    }
+  }
+  const userId = authUser.id;
+
+  // 2) بروفايل موجود؟ (التريجر ينشئه — نتحقق وننشئه احتياطيًا إن لزم)
+  let profile = await findProfileByEmail(clean);
+  if (!profile?.id) {
+    await new Promise((r) => setTimeout(r, 700));
+    profile = await findProfileByEmail(clean);
+    if (!profile?.id) {
+      const ins = await dbInsert('profiles', {
+        id: userId,
+        email: clean,
+        full_name: 'إدارة حِصّتي',
+        phone: null,
+        role: 'admin',
+        account_status: 'active',
+        metadata: {
+          role: 'admin',
+          authProvider: 'server_provisioned',
+          onboardingComplete: true,
+          isVerified: true,
+          verificationStatus: 'not_required',
+        },
+      });
+      if (!ins.ok) return { ok: false, error: 'profile_insert_failed' };
+      profile = await findProfileByEmail(clean);
+    }
+  }
+
+  // 3) ترقية الدور إلى admin (هادئ — بعض التريجرات قد تمنع غيرها)
+  await setProfileRoleByEmail(clean, 'admin').catch(() => {});
+  return { ok: true, userId: profile?.id || userId, email: clean, created: true };
 }
 
 /** بوابة صلاحية: هل صاحب التوكن أدمن؟ (بريد في القايمة أو دور admin) */

@@ -11,6 +11,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useSEO } from '../lib/useSEO';
 import { Star, ShieldCheck, MapPin, BookOpen, Award, Users, MessageSquare, Flag, Calendar, CheckCircle2, Loader2, AlertCircle, Send, ArrowLeft, GraduationCap, Sparkles } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { swrFetch, swrInvalidate, SWR_TTL } from '../lib/swrCache';
 import { ScrollReveal } from '../components/common/ScrollReveal';
 import { TutorProfile } from '../types';
 
@@ -55,29 +56,26 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({ tutorId,
   const [sendingReport, setSendingReport] = useState(false);
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const load = async () => {
-    if (!supabase || !tutorId) {
-      setLoadError('تعذر تحميل بيانات المدرس.');
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setLoadError('');
-    try {
-      let row: any = null;
-      const { data: viewRow, error: tutorError } = await supabase.from('public_verified_teachers').select('*').eq('id', tutorId).maybeSingle();
-      if (!tutorError && viewRow) {
-        row = viewRow;
-      } else {
-        const [{ data: pData }, { data: tpData }] = await Promise.all([
-          supabase.from('profiles').select('*').eq('id', tutorId).maybeSingle(),
-          supabase.from('tutor_profiles').select('*').eq('user_id', tutorId).maybeSingle(),
-        ]);
-        if (pData || tpData) {
-          // fallback محمي بالتوثيق: غير الموثق لا تُعرض صفحته العامة
-          const isVerifiedTeacher = tpData?.is_verified === true || tpData?.verification_status === 'approved';
-          if (isVerifiedTeacher) {
-            row = {
+  /* الجزء العام من ملف المدرس (البيانات + التقييمات) — يُخدم من كاش SWR
+     (TTL دقيقتين) حتى لا يتكرر جلب نفس الملف من قاعدة البيانات مع كل زيارة.
+     الجزء الخاص بالمستخدم (الحجوزات) يبقى مباشرًا لأنه شخصي ومتغير. */
+  type PublicProfilePayload = { row: any; reviewRows: any[] } | null;
+
+  const loadPublicPart = async (): Promise<PublicProfilePayload> => {
+    let row: any = null;
+    const { data: viewRow, error: tutorError } = await supabase!.from('public_verified_teachers').select('*').eq('id', tutorId).maybeSingle();
+    if (!tutorError && viewRow) {
+      row = viewRow;
+    } else {
+      const [{ data: pData }, { data: tpData }] = await Promise.all([
+        supabase!.from('profiles').select('*').eq('id', tutorId).maybeSingle(),
+        supabase!.from('tutor_profiles').select('*').eq('user_id', tutorId).maybeSingle(),
+      ]);
+      if (pData || tpData) {
+        // fallback محمي بالتوثيق: غير الموثق لا تُعرض صفحته العامة
+        const isVerifiedTeacher = tpData?.is_verified === true || tpData?.verification_status === 'approved';
+        if (isVerifiedTeacher) {
+          row = {
             id: tutorId,
             name: pData?.full_name || 'مدرس معتمد',
             title: tpData?.title || 'معلم متخصص',
@@ -96,52 +94,76 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({ tutorId,
             avatar_url: pData?.avatar_url || '',
             metadata: { ...(pData?.metadata || {}), ...(tpData?.metadata || {}) },
           };
-          }
         }
       }
+    }
 
-      let reviewRows: any[] = [];
-      try {
-        const { data: revs } = await supabase.from('tutor_reviews').select('id,rating,comment,created_at,teaching_quality,punctuality,behavior,value_for_money,verified_session').eq('tutor_id', tutorId).order('created_at', { ascending: false });
-        reviewRows = revs || [];
-      } catch {
-        // reviews optional
-      }
-      if (!row) {
+    let reviewRows: any[] = [];
+    try {
+      const { data: revs } = await supabase!.from('tutor_reviews').select('id,rating,comment,created_at,teaching_quality,punctuality,behavior,value_for_money,verified_session').eq('tutor_id', tutorId).order('created_at', { ascending: false });
+      reviewRows = revs || [];
+    } catch {
+      // reviews optional
+    }
+    return row ? { row, reviewRows } : null;
+  };
+
+  const applyPublicPart = (payload: NonNullable<PublicProfilePayload>) => {
+    const { row, reviewRows } = payload;
+    const levels = Array.isArray(row.grades) ? row.grades : [];
+    const subjects = Array.isArray(row.subjects) ? row.subjects : [];
+    const mapped: TutorProfile = {
+      id: row.id,
+      name: row.name || '',
+      title: row.title || '',
+      subject: subjects[0] || '',
+      governorate: row.governorate || '',
+      area: row.city || '',
+      rating: Number(row.rating || 0),
+      reviewsCount: Number(row.reviews_count || 0),
+      studentsCount: 0,
+      pricePerSession: Number(row.price_per_session || 0),
+      isVerified: true,
+      joinCode: String(row.metadata?.joinCode || ''),
+      levels,
+      avatarUrl: row.avatar_url || '',
+      bio: row.bio || row.headline || '',
+      experienceYears: Number(row.experience_years || 0),
+      centers: Array.isArray(row.center_names) ? row.center_names : [],
+      phone: '',
+      email: '',
+      education: String(row.metadata?.education || ''),
+      accountStatus: 'active',
+      reviews: [],
+      availableSlots: Array.isArray(row.availability_slots) ? row.availability_slots : [],
+    };
+    setTutor(mapped);
+    setReviews((reviewRows || []) as ReviewRow[]);
+  };
+
+  const load = async () => {
+    if (!supabase || !tutorId) {
+      setLoadError('تعذر تحميل بيانات المدرس.');
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setLoadError('');
+    try {
+      const cacheKey = `teacher-profile:${tutorId}`;
+      const payload = await swrFetch<PublicProfilePayload>(
+        cacheKey,
+        SWR_TTL.PROFILE,
+        loadPublicPart,
+        (fresh) => { if (fresh) applyPublicPart(fresh); },
+      );
+      if (!payload || !payload.row) {
         setTutor(null);
         setLoadError('هذا المدرس غير موجود أو غير موثق حاليًا.');
         setLoading(false);
         return;
       }
-      const levels = Array.isArray(row.grades) ? row.grades : [];
-      const subjects = Array.isArray(row.subjects) ? row.subjects : [];
-      const mapped: TutorProfile = {
-        id: row.id,
-        name: row.name || '',
-        title: row.title || '',
-        subject: subjects[0] || '',
-        governorate: row.governorate || '',
-        area: row.city || '',
-        rating: Number(row.rating || 0),
-        reviewsCount: Number(row.reviews_count || 0),
-        studentsCount: 0,
-        pricePerSession: Number(row.price_per_session || 0),
-        isVerified: true,
-        joinCode: String(row.metadata?.joinCode || ''),
-        levels,
-        avatarUrl: row.avatar_url || '',
-        bio: row.bio || row.headline || '',
-        experienceYears: Number(row.experience_years || 0),
-        centers: Array.isArray(row.center_names) ? row.center_names : [],
-        phone: '',
-        email: '',
-        education: String(row.metadata?.education || ''),
-        accountStatus: 'active',
-        reviews: [],
-        availableSlots: Array.isArray(row.availability_slots) ? row.availability_slots : [],
-      };
-      setTutor(mapped);
-      setReviews((reviewRows || []) as ReviewRow[]);
+      applyPublicPart(payload);
       const { data: session } = await supabase.auth.getSession();
       if (session.session?.user) {
         const userId = session.session.user.id;
@@ -247,6 +269,8 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({ tutorId,
     }
     setReviewComment('');
     setNotice({ type: 'success', text: 'تم إرسال تقييمك بنجاح ✅' });
+    // إبطال الكاش حتى يظهر التقييم الجديد فورًا في الإعادة
+    swrInvalidate(`teacher-profile:${tutorId}`);
     await load();
   };
 

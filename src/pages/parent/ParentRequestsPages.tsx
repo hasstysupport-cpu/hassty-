@@ -11,6 +11,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowLeftRight, CheckCircle2, ClipboardCheck, Plus, RefreshCw, Send, Trash2, UserRound, Users, XCircle } from 'lucide-react';
 import { useAuth } from '../../lib/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { swrFetch, SWR_TTL } from '../../lib/swrCache';
 import { Btn, Card, ConfirmDialog, DataTable, EmptyState, ErrorBlock, LoadingBlock, PageHeader, StatCard, StatusBadge, Tabs, fmtDate, fmtDateTime, useToast } from '../../components/common/ui';
 import { getCleanAvatarUrl } from '../../lib/avatarHelper';
 import { sendParentLinkRequest } from '../../lib/parentStudentService';
@@ -150,11 +151,17 @@ export const ParentTeacherChangePage: React.FC = () => {
     setLoading(true); setError('');
     try {
       const childIds = (await supabase.from('parent_children').select('child_id,child_name').eq('parent_id', user.uid)).data?.map((r: any) => r.child_id) || [];
+      /* قايمة المدرسين العامة — تُخدم من كاش SWR (دليل نصف ثابت) بدل جلبها
+         من قاعدة البيانات مع كل فتح للصفحة */
       const [reqs, tchs] = await Promise.all([
         childIds.length ? supabase.from('teacher_change_requests').select('*').in('student_id', childIds).order('created_at', { ascending: false }) : Promise.resolve({ data: [] as any[] }),
-        supabase.from('public_verified_teachers').select('id,name,subject,subjects,rating').limit(200),
+        swrFetch<any[]>(
+          'parent-req-teachers-200',
+          SWR_TTL.DIRECTORY,
+          () => supabase!.from('public_verified_teachers').select('id,name,subject,subjects,rating').limit(200).then((r: any) => r.data || []),
+        ),
       ]);
-      setRows(reqs.data || []); setTeachers(tchs.data || []);
+      setRows(reqs.data || []); setTeachers(tchs || []);
       const { data: links } = await supabase.from('parent_children').select('child_id,child_name').eq('parent_id', user.uid);
       setChildren(links || []);
     } catch (e: any) { setError(e?.message || 'تعذر تحميل طلبات تغيير المدرس.'); } finally { setLoading(false); }

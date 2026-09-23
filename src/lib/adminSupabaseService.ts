@@ -8,6 +8,7 @@
  */
 
 import { supabase } from './supabase';
+import { swrFetch, forceRevalidate, SWR_TTL } from './swrCache';
 import {
   AdminUserAccount,
   TeacherVerificationRequest,
@@ -116,25 +117,87 @@ async function loadAccountRows(): Promise<AdminUserAccount[]> {
   });
 }
 
-function subscribeTables<T>(channelName: string, tables: string[], loader: () => Promise<T>, callback: (data: T) => void, onError?: (error: any) => void) {
+/* ============================================================
+   subscribeTables — اشتراك ذكي مع كاش فوري و Debounce
+   ------------------------------------------------------------
+   المشكلة السابقة: كل حدث realtime كان يعمل reload كاملًا لكل
+   الجداول فورًا — عدة أحداث متتالية = عدة reloads متزامنة =
+   ضغط زائد على قاعدة البيانات وبطء في اللوحة.
+
+   الحل الحالي:
+   1) الفتح يُخدم أول مرة من كاش SWR (فوري 0ms) ثم جلب خلفي واحد.
+   2) أحداث realtime المتتالية تُجمّع في reload واحد (debounce 400ms).
+   3) حد أدنى بين الـ reloads الكاملة (1.5s) لحماية قاعدة البيانات.
+   ============================================================ */
+const RELOAD_DEBOUNCE_MS = 400;
+const RELOAD_MIN_INTERVAL_MS = 1500;
+
+function subscribeTables<T>(
+  channelName: string,
+  tables: string[],
+  loader: () => Promise<T>,
+  callback: (data: T) => void,
+  onError?: (error: any) => void,
+) {
   const client = requireSupabase();
+  const cacheKey = `${channelName}:snapshot`;
   let disposed = false;
-  const load = async () => {
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  let lastReloadAt = 0;
+  let pendingReload = false;
+
+  /* جلب عبر الكاش: فتح اللوحة يعرض آخر لقطة معروفة فورًا، والجلب الفعلي
+     يحدث في الخلفية مرة واحدة — لا ضغط على قاعدة البيانات عند الفتح. */
+  const cachedLoad = async () => {
     try {
-      const data = await loader();
+      const data = await swrFetch<T>(cacheKey, SWR_TTL.ADMIN_SNAPSHOT, loader);
       if (!disposed) callback(data);
     } catch (error) {
       if (!disposed) onError?.(error);
     }
   };
-  void load();
+
+  /* reload مجمّع: آخر حدث يفوز — مع حد أدنى بين الجلبات الكاملة */
+  const scheduleReload = () => {
+    if (disposed) return;
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null;
+      const since = Date.now() - lastReloadAt;
+      if (since < RELOAD_MIN_INTERVAL_MS) {
+        if (!pendingReload) {
+          pendingReload = true;
+          setTimeout(() => {
+            pendingReload = false;
+            if (!disposed) void doReload();
+          }, RELOAD_MIN_INTERVAL_MS - since);
+        }
+        return;
+      }
+      void doReload();
+    }, RELOAD_DEBOUNCE_MS);
+  };
+
+  const doReload = async () => {
+    if (disposed) return;
+    lastReloadAt = Date.now();
+    try {
+      const data = await forceRevalidate<T>(cacheKey, loader);
+      if (!disposed) callback(data);
+    } catch (error) {
+      if (!disposed) onError?.(error);
+    }
+  };
+
+  void cachedLoad();
   const channel = client.channel(channelName);
-  tables.forEach((table) => channel.on('postgres_changes', { event: '*', schema: 'public', table }, () => void load()));
+  tables.forEach((table) => channel.on('postgres_changes', { event: '*', schema: 'public', table }, () => scheduleReload()));
   channel.subscribe((status) => {
     if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') onError?.(new Error(`Realtime channel ${channelName}: ${status}`));
   });
   return () => {
     disposed = true;
+    if (debounceTimer) clearTimeout(debounceTimer);
     void client.removeChannel(channel);
   };
 }

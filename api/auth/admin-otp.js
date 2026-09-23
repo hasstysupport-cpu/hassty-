@@ -34,7 +34,7 @@ import { sendAuthEmail } from '../_lib/mailer.js';
 import {
   OWNER_EMAIL, MAX_ADMINS, normalizeEmail, isValidEmail,
   getAdminWhitelist, isWhitelistedAdmin, setAdminWhitelist,
-  setProfileRoleByEmail, resolveAdminCaller,
+  setProfileRoleByEmail, resolveAdminCaller, ensureAdminAccount,
 } from '../_lib/adminWhitelist.js';
 const reasonMessage = {
   expired: 'انتهت صلاحية الرمز. اطلب رمزًا جديدًا.',
@@ -70,8 +70,13 @@ export default async function handler(req, res) {
       if (!(await isWhitelistedAdmin(target))) {
         return jsonErr(res, 'غير مصرح بهذا البريد.', 403);
       }
-      const userId = await resolveAdminUserId(target);
-      if (!userId) return jsonErr(res, 'تعذر الوصول للحساب الإداري. تواصل مع الدعم.', 500);
+      /* تهيئة حساب حقيقي تلقائيًا (auth + profiles) إن لم يوجد —
+         بهذا يعمل الدخول الإداري حتى بقاعدة بيانات فاضية تمامًا */
+      const ensured = await ensureAdminAccount(target);
+      if (!ensured.ok || !ensured.userId) {
+        return jsonErr(res, 'تعذر تهيئة الحساب الإداري. تواصل مع الدعم.', 500);
+      }
+      const userId = ensured.userId;
 
       const { code, expiresInSeconds } = await issueCode({
         email: target,
@@ -153,6 +158,10 @@ export default async function handler(req, res) {
       if (action === 'add') {
         const email = normalizeEmail(body.email);
         if (!isValidEmail(email)) return jsonErr(res, 'صيغة البريد غير صحيحة.', 422);
+        /* إضافة حقيقية 100%: تهيئة حساب المالك + حفظ القايمة في قاعدة
+           البيانات + إنشاء حساب auth/بروفايل فعلي للبريد المضاف */
+        const ensuredOwner = await ensureAdminAccount(OWNER_EMAIL);
+        if (!ensuredOwner.ok) return jsonErr(res, 'تعذر تهيئة حساب المالك. حاول مجددًا.', 500);
         const emails = await getAdminWhitelist();
         if (emails.includes(email)) return jsonOk(res, { emails, message: 'البريد مضاف بالفعل.' });
         if (emails.length >= MAX_ADMINS) {
@@ -161,9 +170,10 @@ export default async function handler(req, res) {
         const next = [...emails, email];
         const save = await setAdminWhitelist(next);
         if (!save.ok) return jsonErr(res, 'تعذر حفظ القايمة. حاول مجددًا.', 500);
-        // ترقية فورية لحساب موجود بنفس البريد (إن وُجد)
-        await setProfileRoleByEmail(email, 'admin').catch(() => {});
-        return jsonOk(res, { emails: save.emails, message: 'تمت إضافة الإيميل وترقية حسابه إن وُجد.' });
+        // إنشاء حساب حقيقي للبريد المضاف + ترقية دوره فورًا
+        const ensured = await ensureAdminAccount(email).catch(() => ({ ok: false }));
+        if (!ensured.ok) await setProfileRoleByEmail(email, 'admin').catch(() => {});
+        return jsonOk(res, { emails: save.emails, message: 'تمت إضافة الإيميل وإنشاء حسابه الإداري بنجاح.' });
       }
 
       if (action === 'remove') {

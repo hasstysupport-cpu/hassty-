@@ -25,6 +25,11 @@ export const supabase = isSupabaseConfigured
         flowType: 'implicit',
         storageKey: 'hassty-supabase-auth',
       },
+      realtime: {
+        // حماية من عاصفة أحداث الـ realtime: 5 أحداث/ثانية كحد أقصى لكل قناة —
+        // الأحداث الزائدة يلتقطها الـ reload المجمّع في لوحة الأدمن تلقائيًا
+        params: { eventsPerSecond: 5 },
+      },
     })
   : null;
 
