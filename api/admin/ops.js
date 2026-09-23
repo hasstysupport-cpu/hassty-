@@ -17,11 +17,21 @@
                           معتمد عبر توكن جلسة + القايمة البيضاء
    ============================================================ */
 import { sendVerificationEmail } from '../_lib/mailer.js';
-import { getCallerUser } from '../_lib/supabase.js';
+import { getCallerUser, findProfileByEmail } from '../_lib/supabase.js';
+import { isWhitelistedAdmin } from '../_lib/adminWhitelist.js';
 import { SUPABASE_URL, SERVICE_KEY, jsonOk, jsonErr, readJsonBody } from '../_lib/config.js';
 
 const INTERNAL_SECRET = String(process.env.WHATSAPP_INTERNAL_SECRET || '');
-const ADMIN_EMAILS = new Set(['hasstysupport@gmail.com', 'admin@hassty.com']);
+
+/* هل هذا البريد إداري؟ — القايمة الديناميكية (مصدر الحقيقة الوحيد)
+   نفس القايمة المُدارة من صفحة "أمان الوصول" + دور البروفايل admin */
+async function isAdminEmail(email) {
+  const clean = String(email || '').toLowerCase().trim();
+  if (!clean) return false;
+  if (await isWhitelistedAdmin(clean)) return true;
+  const profile = await findProfileByEmail(clean);
+  return profile?.role === 'admin';
+}
 
 async function handleVerificationEmail(req, res, body) {
   const { event, teacherEmail = '', teacherName = '', subject = '', governorate = '', phone = '', reason = '' } = body;
@@ -50,10 +60,10 @@ async function handleDeleteAccount(req, res, body) {
   const targetUserId = String(body?.userId || '');
   if (!targetUserId) return jsonErr(res, 'معرّف الحساب مطلوب.', 400);
 
-  /* 1) تحقق هوية المستدعي + صلاحيته الإدارية (القايمة البيضاء) */
+  /* 1) تحقق هوية المستدعي + صلاحيته الإدارية (القايمة الديناميكية) */
   const caller = await getCallerUser(accessToken);
   const callerEmail = String(caller?.email || '').toLowerCase();
-  if (!caller || !ADMIN_EMAILS.has(callerEmail)) {
+  if (!caller || !(await isAdminEmail(callerEmail))) {
     return jsonErr(res, 'غير مصرح — العملية للأدمن المعتمد فقط.', 403);
   }
 
@@ -63,7 +73,7 @@ async function handleDeleteAccount(req, res, body) {
     headers: restBase,
   }).then((r) => (r.ok ? r.json() : [])).catch(() => []);
   const targetEmail = String(profData?.[0]?.email || '').toLowerCase();
-  if (ADMIN_EMAILS.has(targetEmail)) {
+  if (profData?.[0]?.role === 'admin' || (await isAdminEmail(targetEmail))) {
     return jsonErr(res, 'لا يمكن حذف حساب إداري من هنا.', 403);
   }
 

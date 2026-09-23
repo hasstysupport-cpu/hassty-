@@ -36,7 +36,6 @@ import {
   getAdminWhitelist, isWhitelistedAdmin, setAdminWhitelist,
   setProfileRoleByEmail, resolveAdminCaller,
 } from '../_lib/adminWhitelist.js';
-
 const reasonMessage = {
   expired: 'انتهت صلاحية الرمز. اطلب رمزًا جديدًا.',
   exhausted: 'استنفدت عدد المحاولات. اطلب رمزًا جديدًا.',
@@ -114,6 +113,10 @@ export default async function handler(req, res) {
       if (!ok || !tokenHash) {
         return jsonErr(res, `تعذر إنشاء جلسة إدارية (${status}). حاول مجددًا.`, 502);
       }
+
+      // ترقية الدور إلى admin في قاعدة البيانات — الدخول الإداري يصبح حقيقيًا 100%
+      // (مطابق لتدفق google-verify — القايمة تحققت مسبقًا أعلاه)
+      await setProfileRoleByEmail(target, 'admin').catch(() => {});
 
       return jsonOk(res, { verified: true, token_hash: tokenHash, email: target });
     }
