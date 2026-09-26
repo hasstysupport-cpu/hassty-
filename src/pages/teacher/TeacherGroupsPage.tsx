@@ -186,8 +186,16 @@ export const TeacherGroupsPage: React.FC = () => {
     const teacherId = user?.uid || 'teacher-current';
     try {
       await saveTeacherGroup(teacherId, newGroup);
-    } catch (createErr) {
-      console.warn('saveTeacherGroup error:', createErr);
+    } catch (createErr: any) {
+      /* لا نجاح كاذب: نعرض سبب الفشل الحقيقي للمدرس */
+      const msg = String(createErr?.message || createErr || '');
+      if (msg.includes('42501') || msg.toLowerCase().includes('row-level security')) {
+        setActionFeedback('حسابك قيد التوثيق من إدارة المنصة 🔒 — إنشاء المجموعات يتفعل تلقائيًا فور اعتماد حسابك.');
+      } else {
+        setActionFeedback(`تعذر إنشاء المجموعة: ${msg.slice(0, 90)}`);
+      }
+      setTimeout(() => setActionFeedback(null), 7000);
+      return;
     }
 
     setGroups((prev) => [newGroup, ...prev]);

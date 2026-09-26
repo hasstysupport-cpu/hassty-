@@ -24,8 +24,8 @@ import { SUPABASE_URL, SERVICE_KEY } from './_lib/config.js';
 const FALLBACK_ORIGIN = 'https://hassty.site';
 
 function originFrom(req) {
-  const dep = String(req.headers['x-vercel-deployment-url'] || '');
-  if (dep && /^[\w.-]+$/.test(dep)) return `https://${dep}`;
+  /* جلب HTML الإقلاع من الدومين المخصص حصرًا — نطاقات النشر (vercel.app)
+     محمية بـ SSO Deployment Protection وتعيد صفحة دخول Vercel بدل الموقع */
   return FALLBACK_ORIGIN;
 }
 

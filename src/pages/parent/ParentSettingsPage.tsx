@@ -20,10 +20,13 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { Badge } from '../../components/common/Badge';
+import { useAuth } from '../../lib/AuthContext';
 
 export const ParentSettingsPage: React.FC = () => {
-  const [whatsappPhone, setWhatsappPhone] = useState('01234567890');
-  const [emergencyPhone, setEmergencyPhone] = useState('01011223344');
+  const { user } = useAuth();
+  /* أرقام حقيقية من حساب ولي الأمر — لا أرقام وهمية مثبتة بالكود */
+  const [whatsappPhone, setWhatsappPhone] = useState(user?.phone || '');
+  const [emergencyPhone, setEmergencyPhone] = useState('');
   const [notifyOnAttendance, setNotifyOnAttendance] = useState(true);
   const [notifyOnAbsence, setNotifyOnAbsence] = useState(true);
   const [notifyTenMinutesLate, setNotifyTenMinutesLate] = useState(true);

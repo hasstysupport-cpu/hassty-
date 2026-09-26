@@ -192,7 +192,9 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ currentRole,
   }, [sections, q]);
 
   const displayName = user?.name || (currentRole === 'student' ? 'طالب حِصّتي' : currentRole === 'parent' ? 'ولي أمر حِصّتي' : currentRole === 'assistant' ? 'مساعد حِصّتي' : 'معلم حِصّتي');
-  const roleLabel = currentRole === 'student' ? 'حساب طالب' : currentRole === 'parent' ? 'حساب ولي أمر' : currentRole === 'assistant' ? 'حساب مساعد' : 'حساب معلم معتمد';
+  /* شارة حالة المعلم حقيقية — لا «معتمد» كاذبة لحساب ما زال قيد التوثيق */
+  const teacherApproved = currentRole === 'teacher' && (user?.profileData?.verificationStatus === 'approved' || user?.profileData?.isVerified === true);
+  const roleLabel = currentRole === 'student' ? 'حساب طالب' : currentRole === 'parent' ? 'حساب ولي أمر' : currentRole === 'assistant' ? 'حساب مساعد' : teacherApproved ? 'حساب معلم معتمد' : 'حساب معلم — قيد التوثيق';
   const avatarSrc = getCleanAvatarUrl(user?.avatarUrl || user?.profileData?.avatarUrl, currentRole, displayName);
 
   const isActive = (path: string) => currentPath === path || (path !== `/${currentRole}/dashboard` && currentPath.startsWith(path + '/'));
