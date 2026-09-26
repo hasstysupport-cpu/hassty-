@@ -51,10 +51,21 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentTab, onSelect
     if (!supabase) { setResult('Supabase غير مهيأ.'); return; }
     setSending(true); setResult('');
     try {
-      const { data, error } = await supabase.functions.invoke('admin-send-notification', { body: { title: title.trim(), message: message.trim(), type: 'announcement', role: role === 'all' ? null : role } });
-      if (error) throw error;
-      setResult(`تم إرسال الإشعار بنجاح إلى ${data?.sent ?? 0} حساب.`); setTitle(''); setMessage('');
-    } catch (error: any) { setResult(error?.message || 'تعذر إرسال الإشعار. استخدم تسجيل دخول Google الإداري المرتبط بـSupabase.'); }
+      /* الإرسال عبر /api/admin/ops (سيرفر + service key) — بدل دالة Edge
+         الوهمية التي كانت ترمي «Failed to send a request to the Edge Function» */
+      const { data: sessData } = await supabase.auth.getSession();
+      const accessToken = sessData?.session?.access_token || '';
+      const res = await fetch('/api/admin/ops', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'broadcast_notification', accessToken, title: title.trim(), message: message.trim(), role: role === 'all' ? null : role }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.ok !== true) throw new Error(json?.error || 'تعذر إرسال الإشعار.');
+      const extra = json?.pushed ? ` (ووصل ${json.pushed} إشعار متصفح)` : '';
+      setResult(`تم إرسال الإشعار بنجاح إلى ${json?.sent ?? 0} حساب.${extra}`);
+      setTitle(''); setMessage('');
+    } catch (error: any) { setResult(error?.message || 'تعذر إرسال الإشعار. تأكد من تسجيل الدخول بحساب إداري معتمد.'); }
     finally { setSending(false); }
   };
 

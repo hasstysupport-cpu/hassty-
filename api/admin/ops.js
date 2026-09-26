@@ -19,6 +19,7 @@
 import { sendVerificationEmail } from '../_lib/mailer.js';
 import { getCallerUser, findProfileByEmail } from '../_lib/supabase.js';
 import { isWhitelistedAdmin } from '../_lib/adminWhitelist.js';
+import { sendPushToUser } from '../_lib/push.js';
 import { SUPABASE_URL, SERVICE_KEY, jsonOk, jsonErr, readJsonBody } from '../_lib/config.js';
 
 const INTERNAL_SECRET = String(process.env.WHATSAPP_INTERNAL_SECRET || '');
@@ -98,6 +99,84 @@ async function handleDeleteAccount(req, res, body) {
   return jsonOk(res, { deleted: true, userId: targetUserId });
 }
 
+/* ============================================================
+   broadcast_notification — إشعار جماعي لكل الحسابات أو لنوع محدد
+   يستبدل دالة Edge الوهمية (admin-send-notification) التي كانت
+   تسبب «Failed to send a request to the Edge Function».
+   الإدراج مباشرة في جدول notifications بمفتاح الخدمة — الإشعار
+   يصل فورًا عبر Realtime لجرس الإشعارات، مع Web Push best-effort
+   لأول PUSH_CAP حساب (حماية من تجاوز زمن الدالة).
+   ============================================================ */
+const BROADCAST_PUSH_CAP = 150;
+const NOTIF_PAGE = 1000;
+
+async function handleBroadcastNotification(req, res, body) {
+  if (!SERVICE_KEY) return jsonErr(res, 'الخدمة غير مهيأة على السيرفر.', 500);
+
+  const accessToken = String(body?.accessToken || '');
+  const title = String(body?.title || '').trim();
+  const message = String(body?.message || '').trim();
+  const link = body?.link ? String(body.link).slice(0, 200) : null;
+  const role = ['student', 'parent', 'teacher', 'assistant'].includes(body?.role) ? body.role : null;
+  if (!title || !message) return jsonErr(res, 'العنوان ونص الإشعار مطلوبان.', 400);
+  if (title.length > 200 || message.length > 1000) return jsonErr(res, 'العنوان أو النص طويل جدًا.', 400);
+
+  /* 1) تحقق هوية المستدعي + صلاحيته الإدارية (نفس نمط delete_account) */
+  const caller = await getCallerUser(accessToken);
+  const callerEmail = String(caller?.email || '').toLowerCase();
+  if (!caller || !(await isAdminEmail(callerEmail))) {
+    return jsonErr(res, 'غير مصرح — العملية للأدمن المعتمد فقط.', 403);
+  }
+
+  const restHeaders = { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' };
+
+  /* 2) جلب معرفات المستهدفين بالصفحات (profiles) */
+  const ids = [];
+  for (let from = 0; from < 100000; from += NOTIF_PAGE) {
+    const filter = role ? `&role=eq.${role}` : '&role=in.(student,parent,teacher,assistant)';
+    const url = `${SUPABASE_URL}/rest/v1/profiles?select=id${filter}&order=created_at.asc&id=gt.${ids.length ? encodeURIComponent(ids[ids.length - 1]) : '00000000-0000-0000-0000-000000000000'}`;
+    const page = await fetch(url, { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, Range: `${from}-${from + NOTIF_PAGE - 1}` } })
+      .then((r) => (r.ok ? r.json() : [])).catch(() => []);
+    if (!Array.isArray(page) || !page.length) break;
+    for (const row of page) if (row?.id) ids.push(row.id);
+    if (page.length < NOTIF_PAGE / 2) break;
+  }
+  if (!ids.length) return jsonOk(res, { sent: 0, pushed: 0, role: role || 'all' });
+
+  /* 3) إدراج الإشعارات دفعات */
+  let inserted = 0;
+  const CHUNK = 500;
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const rows = ids.slice(i, i + CHUNK).map((uid) => ({
+      user_id: uid,
+      title,
+      message,
+      type: 'announcement',
+      link,
+    }));
+    const insRes = await fetch(`${SUPABASE_URL}/rest/v1/notifications`, {
+      method: 'POST',
+      headers: { ...restHeaders, Prefer: 'return=minimal' },
+      body: JSON.stringify(rows),
+    });
+    if (!insRes.ok) {
+      const t = await insRes.text().catch(() => '');
+      return jsonErr(res, `تعذر إدراج الإشعارات (${inserted}/${ids.length}): ${t.slice(0, 150)}`, 502);
+    }
+    inserted += rows.length;
+  }
+
+  /* 4) Web Push best-effort لأول PUSH_CAP حساب — لا يفشل العملية */
+  let pushed = 0;
+  const pushTargets = ids.slice(0, BROADCAST_PUSH_CAP);
+  await Promise.allSettled(pushTargets.map(async (uid) => {
+    const r = await sendPushToUser(uid, { title, body: message, link: link || '/', tag: 'hassty-broadcast' }).catch(() => null);
+    if (r?.sent) pushed += r.sent;
+  }));
+
+  return jsonOk(res, { sent: inserted, pushed, role: role || 'all' });
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return jsonErr(res, 'طريقة الطلب غير مسموحة.', 405);
 
@@ -114,6 +193,10 @@ export default async function handler(req, res) {
 
   if (body.action === 'delete_account') {
     return handleDeleteAccount(req, res, body);
+  }
+
+  if (body.action === 'broadcast_notification') {
+    return handleBroadcastNotification(req, res, body);
   }
 
   return jsonErr(res, 'action غير معروف.', 400);
