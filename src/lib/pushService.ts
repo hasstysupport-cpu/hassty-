@@ -19,7 +19,39 @@ export type PushState = 'enabled' | 'blocked' | 'prompt' | 'unsupported';
 
 const LS_ENABLED = 'hassty_push_enabled';
 const LS_DECLINED_AT = 'hassty_push_declined_at';
-const DECLINE_COOLDOWN_MS = 3 * 24 * 60 * 60 * 1000; // لا نزعج المستخدم 3 أيام بعد "لاحقًا"
+const LS_AUTOASK_AT = 'hassty_push_autoask_at';
+const SS_AUTOASK_DONE = 'hassty_push_autoask_done';
+const DECLINE_COOLDOWN_MS = 24 * 60 * 60 * 1000; // تهدئة يوم واحد بعد "لاحقًا"
+const AUTOASK_COOLDOWN_MS = 24 * 60 * 60 * 1000; // الطلب التلقائي مرة كل 24 ساعة كحد أقصى
+
+/**
+ * هل يمكن طلب إذن الإشعارات الآن؟ (الإذن لا يزال «افتراضيًا» وليس في فترة تهدئة)
+ * تُستخدم لآلية الطلب التلقائي: أول نقرة للمستخدم بعد الدخول تُطلق نافذة المتصفح.
+ */
+export function canAskBrowserPermissionNow(): boolean {
+  if (!isPushSupported() || typeof Notification === 'undefined') return false;
+  if (Notification.permission !== 'default') return false;
+  if (wasPushDeclinedRecently()) return false;
+  try {
+    if (sessionStorage.getItem(SS_AUTOASK_DONE) === '1') return false;
+    const at = Number(localStorage.getItem(LS_AUTOASK_AT) || 0);
+    if (at > 0 && Date.now() - at < AUTOASK_COOLDOWN_MS) return false;
+  } catch { /* ignore */ }
+  return true;
+}
+
+/** توثيق نتيجة محاولة طلب الإذن (منع التكرار المزعج + تهدئة عند الرفض) */
+export function noteBrowserPermissionAskResult(ok: boolean, denied: boolean): void {
+  try {
+    sessionStorage.setItem(SS_AUTOASK_DONE, '1');
+    localStorage.setItem(LS_AUTOASK_AT, String(Date.now()));
+    if (denied) localStorage.setItem(LS_DECLINED_AT, String(Date.now()));
+    if (ok) {
+      localStorage.setItem(LS_ENABLED, '1');
+      localStorage.removeItem(LS_DECLINED_AT);
+    }
+  } catch { /* ignore */ }
+}
 
 export function isPushSupported(): boolean {
   return (
@@ -90,7 +122,10 @@ export async function enablePushNotifications(): Promise<{ ok: boolean; state: P
   const permission = await Notification.requestPermission();
   if (permission !== 'granted') {
     if (permission === 'denied') {
-      try { localStorage.setItem(LS_DECLINED_AT, String(Date.now())); } catch { /* ignore */ }
+      try {
+        localStorage.setItem(LS_DECLINED_AT, String(Date.now()));
+        sessionStorage.setItem(SS_AUTOASK_DONE, '1');
+      } catch { /* ignore */ }
     }
     return { ok: false, state: permission === 'denied' ? 'blocked' : 'prompt', error: 'لم يتم السماح بالإشعارات.' };
   }

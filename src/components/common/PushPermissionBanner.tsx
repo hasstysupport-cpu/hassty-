@@ -9,7 +9,16 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Bell, BellOff, X } from 'lucide-react';
-import { enablePushNotifications, getPushState, isPushSupported, wasPushDeclinedRecently, type PushState } from '../../lib/pushService';
+import {
+  canAskBrowserPermissionNow,
+  enablePushNotifications,
+  getPushState,
+  isPushSupported,
+  noteBrowserPermissionAskResult,
+  showLocalNotification,
+  wasPushDeclinedRecently,
+  type PushState,
+} from '../../lib/pushService';
 import { useAuth } from '../../lib/AuthContext';
 
 /**
@@ -36,6 +45,44 @@ export const PushPermissionBanner: React.FC = () => {
     return () => { cancelled = true; if (timerRef.current) window.clearTimeout(timerRef.current); };
   }, [user?.uid]);
 
+  /* طلب الإذن التلقائي من المتصفح: أول نقرة للمستخدم بعد الدخول تُطلق نافذة
+     إذن الإشعارات الأصلية مباشرة — بدون انتظار ضغط البانر (وهذا كان سبب
+     «المتصفح لا يطلب الإذن أبدًا»). مرة واحدة في الجلسة + تهدئة يوم كحد أقصى،
+     والنقرات على البانر نفسه مستثناة (زر التفعيل هناك يتكفل بالمهمة). */
+  useEffect(() => {
+    if (!user?.uid || !isPushSupported()) return;
+    let disarmed = false;
+    let listener: ((ev: Event) => void) | null = null;
+    let timer: number | null = null;
+    timer = window.setTimeout(() => {
+      if (disarmed || !canAskBrowserPermissionNow()) return;
+      listener = (ev: Event) => {
+        const target = ev.target as HTMLElement | null;
+        if (target?.closest?.('[data-push-banner]')) return;
+        if (listener) document.removeEventListener('click', listener, true);
+        listener = null;
+        void (async () => {
+          const res = await enablePushNotifications();
+          noteBrowserPermissionAskResult(res.ok, res.state === 'blocked');
+          if (res.ok) {
+            void showLocalNotification(
+              'تم تفعيل إشعارات حِصّتي 🔔',
+              'هنبعتلك الحجوزات والحضور والمدفوعات فورًا من الموقع.',
+              '/',
+              'hassty-welcome',
+            );
+          }
+        })();
+      };
+      document.addEventListener('click', listener, true);
+    }, 1500);
+    return () => {
+      disarmed = true;
+      if (timer) window.clearTimeout(timer);
+      if (listener) document.removeEventListener('click', listener, true);
+    };
+  }, [user?.uid]);
+
   const dismiss = () => {
     setVisible(false);
     try { localStorage.setItem('hassty_push_declined_at', String(Date.now())); } catch { /* ignore */ }
@@ -58,7 +105,7 @@ export const PushPermissionBanner: React.FC = () => {
   if (!visible) return null;
 
   return (
-    <div className="fixed bottom-4 inset-x-4 sm:inset-x-auto sm:left-6 sm:right-auto sm:w-[380px] z-[70] animate-[fadeUp_.35s_ease-out]" dir="rtl">
+    <div data-push-banner className="fixed bottom-4 inset-x-4 sm:inset-x-auto sm:left-6 sm:right-auto sm:w-[380px] z-[70] animate-[fadeUp_.35s_ease-out]" dir="rtl">
       <div className="bg-white border border-[#E5E7EB] rounded-2xl shadow-[0_20px_60px_-20px_rgba(15,23,42,0.35)] p-4">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 shrink-0 rounded-xl bg-gradient-to-br from-[#2563EB] to-[#7C3AED] text-white flex items-center justify-center">
