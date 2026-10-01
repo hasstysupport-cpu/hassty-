@@ -23,18 +23,22 @@ import {
   Calendar,
   Sparkles,
   Award,
-  X
+  X,
+  Loader2
 } from 'lucide-react';
 import { TeacherVerificationRequest } from '../../types';
 
 interface TeacherVerificationQueuePageProps {
   requests: TeacherVerificationRequest[];
+  /** id الطلب الذي تتم معالجته حاليًا (اعتماد/رفض) — لتعطيل الأزرار وإظهار التحميل */
+  busyRequestId?: string | null;
   onApproveRequest: (requestId: string) => void;
   onRejectRequest: (requestId: string, reason: string) => void;
 }
 
 export const TeacherVerificationQueuePage: React.FC<TeacherVerificationQueuePageProps> = ({
   requests,
+  busyRequestId,
   onApproveRequest,
   onRejectRequest,
 }) => {
@@ -254,7 +258,8 @@ export const TeacherVerificationQueuePage: React.FC<TeacherVerificationQueuePage
                 <div className="flex flex-wrap items-center justify-end gap-2.5 pt-3 border-t border-gray-100">
                   <button
                     onClick={() => setRejectingRequest(request)}
-                    className="px-4 py-2.5 bg-gray-100 hover:bg-red-50 text-gray-700 hover:text-red-700 border border-gray-300 hover:border-red-300 rounded-2xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                    disabled={!!busyRequestId}
+                    className="px-4 py-2.5 bg-gray-100 hover:bg-red-50 text-gray-700 hover:text-red-700 border border-gray-300 hover:border-red-300 rounded-2xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <XCircle className="w-4 h-4" />
                     <span>رفض الطلب ✗</span>
@@ -262,10 +267,13 @@ export const TeacherVerificationQueuePage: React.FC<TeacherVerificationQueuePage
 
                   <button
                     onClick={() => onApproveRequest(request.id)}
-                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-bold transition-all shadow-md shadow-emerald-600/20 flex items-center gap-1.5 cursor-pointer"
+                    disabled={!!busyRequestId}
+                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-bold transition-all shadow-md shadow-emerald-600/20 flex items-center gap-1.5 cursor-pointer disabled:opacity-60 disabled:cursor-wait"
                   >
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>توثيق الحساب وتفعيله ✓</span>
+                    {busyRequestId === request.id
+                      ? <Loader2 className="w-4 h-4 animate-spin" />
+                      : <CheckCircle2 className="w-4 h-4" />}
+                    <span>{busyRequestId === request.id ? 'جاري التوثيق...' : 'توثيق الحساب وتفعيله ✓'}</span>
                   </button>
                 </div>
               )}
@@ -318,14 +326,17 @@ export const TeacherVerificationQueuePage: React.FC<TeacherVerificationQueuePage
             <div className="grid grid-cols-2 gap-2 pt-2">
               <button
                 type="submit"
-                className="py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md"
+                disabled={!!busyRequestId}
+                className="py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md disabled:opacity-60 disabled:cursor-wait flex items-center justify-center gap-2"
               >
-                تأكيد الرفض
+                {busyRequestId === rejectingRequest.id && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <span>{busyRequestId === rejectingRequest.id ? 'جاري الرفض...' : 'تأكيد الرفض'}</span>
               </button>
               <button
                 type="button"
                 onClick={() => setRejectingRequest(null)}
-                className="py-2.5 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold cursor-pointer"
+                disabled={!!busyRequestId}
+                className="py-2.5 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold cursor-pointer disabled:opacity-50"
               >
                 إلغاء
               </button>

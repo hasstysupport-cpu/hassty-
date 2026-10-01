@@ -19,7 +19,8 @@ import { CommissionTrackingPage } from './CommissionTrackingPage';
 import { AdminLoginPage } from './AdminLoginPage';
 import { AdminAccessPage } from './AdminAccessPage';
 import { AccountBadgeType, AdminUserAccount } from '../../types';
-import { subscribeToUsers, subscribeToVerifications, subscribeToReports, subscribeToCommissions, dbUpdateAccountBadge, dbToggleAccountStatus, dbDeleteAccount, dbRejectVerification, dbSuspendTeacherFromReport, dbResolveReport, dbDismissReport, dbMarkCommissionPaid } from '../../lib/adminSupabaseService';
+import { subscribeToUsers, subscribeToVerifications, subscribeToReports, subscribeToCommissions, dbUpdateAccountBadge, dbToggleAccountStatus, dbDeleteAccount, dbRejectVerification, dbSuspendTeacherFromReport, dbResolveReport, dbDismissReport, dbMarkCommissionPaid, refreshAdminSnapshots, ADMIN_SNAPSHOT_KEYS } from '../../lib/adminSupabaseService';
+import { swrInvalidate } from '../../lib/swrCache';
 import { approveTeacherVerificationAtomic } from '../../lib/adminTeacherVerification';
 import { verifyGoogleAdminAccess, isCurrentAdminSessionValid, clearAdminSession } from '../../lib/securityConfig';
 import { supabase } from '../../lib/supabase';
@@ -105,22 +106,37 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({ onSwitchToPublic
   const handleLogout = () => { setIsAuthenticated(false); clearAdminSession(); };
 
   const failSafely = (err:any) => { setDbConnectionStatus('connected'); setDbErrorMessage(err?.message || 'فشلت العملية في Supabase.'); };
-  const handleUpdateAccountBadge = async (accountId:string,newBadge:AccountBadgeType) => { try { await dbUpdateAccountBadge(accountId,newBadge); handleRetryConnection(); } catch(e){ failSafely(e); } };
-  const handleToggleAccountStatus = async (accountId:string) => { const target=accounts.find(a=>a.id===accountId); if(!target)return; try { await dbToggleAccountStatus(accountId,target.status); handleRetryConnection(); } catch(e){ failSafely(e); } };
-  const handleDeleteAccount = async (accountId:string) => { try { await dbDeleteAccount(accountId); handleRetryConnection(); } catch(e){ failSafely(e); } };
+  /* بعد أي كتابة ناجحة: إبطال الكاش + تحديث خفيف للقنوات (جلب حقيقي واحد
+     لكل قناة) — بدون هدم الاشتراكات ولا إعادة تهيئة ولا سبينر كامل.
+     ممنوع استدعاء handleRetryConnection بعد العمليات: كان يُعيد التهيئة
+     فيعرض لقطة كاش قديمة فوق التحديث التفاؤلي فيبدو أن الاعتماد/الرفض لم يحدث. */
+  const afterAdminWrite = (keys: Array<keyof typeof ADMIN_SNAPSHOT_KEYS>) => {
+    keys.forEach((k) => swrInvalidate(ADMIN_SNAPSHOT_KEYS[k]));
+    refreshAdminSnapshots();
+  };
+  const [verifyBusyId, setVerifyBusyId] = useState<string|null>(null);
+  const handleUpdateAccountBadge = async (accountId:string,newBadge:AccountBadgeType) => { try { await dbUpdateAccountBadge(accountId,newBadge); afterAdminWrite(['users']); } catch(e){ failSafely(e); } };
+  const handleToggleAccountStatus = async (accountId:string) => { const target=accounts.find(a=>a.id===accountId); if(!target)return; try { await dbToggleAccountStatus(accountId,target.status); afterAdminWrite(['users']); } catch(e){ failSafely(e); } };
+  const handleDeleteAccount = async (accountId:string) => { try { await dbDeleteAccount(accountId); afterAdminWrite(['users','verifications']); } catch(e){ failSafely(e); } };
   const handleApproveTeacherVerification = async (requestId:string) => {
+    if (verifyBusyId) return;
     const targetReq=verificationRequests.find(r=>r.id===requestId); if(!targetReq)return;
+    setVerifyBusyId(requestId);
     try {
       await approveTeacherVerificationAtomic({ requestId, teacherId:targetReq.teacherId, adminEmail, name:targetReq.teacherName, phone:targetReq.phone, governorate:targetReq.governorate, city:targetReq.area, grade:targetReq.stage, subject:targetReq.subject });
       setVerificationRequests(prev=>prev.map(r=>r.id===requestId?{...r,status:'approved'}:r));
-      handleRetryConnection();
-    } catch(e){ failSafely(e); }
+      afterAdminWrite(['verifications','users']);
+    } catch(e){ failSafely(e); } finally { setVerifyBusyId(null); }
   };
-  const handleRejectTeacherVerification = async (requestId:string,reason:string) => { try { await dbRejectVerification(requestId,reason,adminEmail); setVerificationRequests(prev=>prev.map(r=>r.id===requestId?{...r,status:'rejected',rejectionReason:reason}:r)); handleRetryConnection(); } catch(e){ failSafely(e); } };
-  const handleSuspendTeacherFromReport = async (teacherId:string,reportId:string) => { try { await dbSuspendTeacherFromReport(teacherId,reportId); handleRetryConnection(); } catch(e){ failSafely(e); } };
-  const handleResolveSafetyReport = async (reportId:string) => { try { await dbResolveReport(reportId); handleRetryConnection(); } catch(e){ failSafely(e); } };
-  const handleDismissSafetyReport = async (reportId:string) => { try { await dbDismissReport(reportId); handleRetryConnection(); } catch(e){ failSafely(e); } };
-  const handleMarkCommissionPaid = async (id:string) => { try { await dbMarkCommissionPaid(id); handleRetryConnection(); } catch(e){ failSafely(e); } };
+  const handleRejectTeacherVerification = async (requestId:string,reason:string) => {
+    if (verifyBusyId) return;
+    setVerifyBusyId(requestId);
+    try { await dbRejectVerification(requestId,reason,adminEmail); setVerificationRequests(prev=>prev.map(r=>r.id===requestId?{...r,status:'rejected',rejectionReason:reason}:r)); afterAdminWrite(['verifications','users']); } catch(e){ failSafely(e); } finally { setVerifyBusyId(null); }
+  };
+  const handleSuspendTeacherFromReport = async (teacherId:string,reportId:string) => { try { await dbSuspendTeacherFromReport(teacherId,reportId); afterAdminWrite(['reports','users']); } catch(e){ failSafely(e); } };
+  const handleResolveSafetyReport = async (reportId:string) => { try { await dbResolveReport(reportId); afterAdminWrite(['reports']); } catch(e){ failSafely(e); } };
+  const handleDismissSafetyReport = async (reportId:string) => { try { await dbDismissReport(reportId); afterAdminWrite(['reports']); } catch(e){ failSafely(e); } };
+  const handleMarkCommissionPaid = async (id:string) => { try { await dbMarkCommissionPaid(id); afterAdminWrite(['commissions']); } catch(e){ failSafely(e); } };
 
   if(!isAuthenticated)return <AdminLoginPage onLoginSuccess={handleLoginSuccess} onBackToPublicSite={onSwitchToPublicApp} initialToken={initialToken}/>;
   const pendingVerificationsCount=verificationRequests.filter(v=>v.status==='pending').length;
@@ -133,7 +149,7 @@ export const HasstyAdminApp: React.FC<HasstyAdminAppProps> = ({ onSwitchToPublic
       {isDbLoading?<div className="py-20 flex flex-col items-center justify-center gap-3 text-slate-500"><Loader2 className="w-8 h-8 animate-spin text-blue-600"/><p className="text-sm font-bold">جاري قراءة البيانات الحقيقية من Supabase...</p></div>:<>
         {currentTab==='dashboard'&&<AdminDashboardHome accounts={accounts} verificationRequests={verificationRequests} safetyReports={safetyReports} onNavigateTab={setCurrentTab}/>} 
         {currentTab==='accounts'&&<AccountsManagementPage accounts={accounts} onUpdateAccountBadge={handleUpdateAccountBadge} onToggleAccountStatus={handleToggleAccountStatus} onDeleteAccount={handleDeleteAccount}/>} 
-        {currentTab==='verification'&&<TeacherVerificationQueuePage requests={verificationRequests} onApproveRequest={handleApproveTeacherVerification} onRejectRequest={handleRejectTeacherVerification}/>} 
+        {currentTab==='verification'&&<TeacherVerificationQueuePage requests={verificationRequests} busyRequestId={verifyBusyId} onApproveRequest={handleApproveTeacherVerification} onRejectRequest={handleRejectTeacherVerification}/>} 
         {currentTab==='assistant_verification'&&<AssistantVerificationQueuePage onPendingCountChange={setPendingAssistantVerificationsCount}/>} 
         {currentTab==='reports'&&<SafetyReportsPage reports={safetyReports} onSuspendTeacher={handleSuspendTeacherFromReport} onResolveReport={handleResolveSafetyReport} onDismissReport={handleDismissSafetyReport}/>} 
         {currentTab==='analytics'&&<SiteAnalyticsPage accounts={accounts}/>} 

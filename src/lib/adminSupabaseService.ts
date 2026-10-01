@@ -8,7 +8,7 @@
  */
 
 import { supabase } from './supabase';
-import { swrFetch, forceRevalidate, SWR_TTL } from './swrCache';
+import { swrFetch, forceRevalidate, swrInvalidate, SWR_TTL } from './swrCache';
 import {
   AdminUserAccount,
   TeacherVerificationRequest,
@@ -132,6 +132,29 @@ async function loadAccountRows(): Promise<AdminUserAccount[]> {
 const RELOAD_DEBOUNCE_MS = 400;
 const RELOAD_MIN_INTERVAL_MS = 1500;
 
+/* مفاتيح لقطات الكاش لكل قناة لوحة — تُستخدم لإبطال الكاش بعد الكتابات
+   حتى لا تعيد إعادة الاشتراك لقطة قديمة فوق التحديث التفاؤلي. */
+export const ADMIN_SNAPSHOT_KEYS = {
+  users: 'admin:users:snapshot',
+  verifications: 'admin:teacher-verification-requests:snapshot',
+  reports: 'admin:safety-reports:snapshot',
+  commissions: 'admin:commission-tracking:snapshot',
+} as const;
+
+/* سجل دوال التحديث الفوري لقنوات اللوحة — يتيح refresh خفيفًا
+   (جلب واحد لكل قناة) بدون هدم الاشتراكات وإعادة التهيئة الكاملة. */
+const reloadRegistry = new Map<string, () => void>();
+
+/** تحديث خفيف لكل قنوات اللوحة (أو قناة محددة) — جلب حقيقي من القاعدة
+    مع الحفاظ على الاشتراكات والحالة، وتخليه عبر debounce الداخلي. */
+export function refreshAdminSnapshots(channelName?: string) {
+  for (const [name, reload] of reloadRegistry) {
+    if (!channelName || name === channelName) {
+      try { reload(); } catch { /* noop */ }
+    }
+  }
+}
+
 function subscribeTables<T>(
   channelName: string,
   tables: string[],
@@ -146,11 +169,14 @@ function subscribeTables<T>(
   let lastReloadAt = 0;
   let pendingReload = false;
 
-  /* جلب عبر الكاش: فتح اللوحة يعرض آخر لقطة معروفة فورًا، والجلب الفعلي
-     يحدث في الخلفية مرة واحدة — لا ضغط على قاعدة البيانات عند الفتح. */
+  /* جلب عبر الكاش: فتح اللوحة يعرض آخر لقطة معروفة فورًا، ثم جلب خلفي واحد.
+     ⚠️ مرور onUpdate إلزامي هنا: بدونها الـ revalidate الخلفي يحدّث الكاش
+     فقط ولا يصل التحديث الجديد للواجهة فتبقى اللوحة على لقطة قديمة. */
   const cachedLoad = async () => {
     try {
-      const data = await swrFetch<T>(cacheKey, SWR_TTL.ADMIN_SNAPSHOT, loader);
+      const data = await swrFetch<T>(cacheKey, SWR_TTL.ADMIN_SNAPSHOT, loader, (fresh) => {
+        if (!disposed) callback(fresh);
+      });
       if (!disposed) callback(data);
     } catch (error) {
       if (!disposed) onError?.(error);
@@ -195,8 +221,10 @@ function subscribeTables<T>(
   channel.subscribe((status) => {
     if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') onError?.(new Error(`Realtime channel ${channelName}: ${status}`));
   });
+  reloadRegistry.set(channelName, () => { if (!disposed) void doReload(); });
   return () => {
     disposed = true;
+    reloadRegistry.delete(channelName);
     if (debounceTimer) clearTimeout(debounceTimer);
     void client.removeChannel(channel);
   };
@@ -488,6 +516,9 @@ export async function dbApproveVerification(requestId: string, teacherId: string
   const client = requireSupabase();
   const now = new Date().toISOString();
   if (!adminEmail) throw new Error('Unauthorized admin');
+  // إبطال لقطات الكاش فورًا حتى لا تُخدم لقطة قديمة بعد نجاح الكتابة
+  swrInvalidate(ADMIN_SNAPSHOT_KEYS.verifications);
+  swrInvalidate(ADMIN_SNAPSHOT_KEYS.users);
   const { error: requestError } = await client.from('teacher_verification_requests').update({ status: 'approved', actioned_at: now, actioned_by: adminEmail, rejection_reason: null, updated_at: now }).eq('id', requestId);
   if (requestError) throw requestError;
   const profilePatch: Record<string, any> = { account_status: 'active', badge: 'verified', updated_at: now };
@@ -518,6 +549,8 @@ export async function dbRejectVerification(requestId: string, reason: string, ad
   const client = requireSupabase();
   const now = new Date().toISOString();
   if (!adminEmail) throw new Error('Unauthorized admin');
+  swrInvalidate(ADMIN_SNAPSHOT_KEYS.verifications);
+  swrInvalidate(ADMIN_SNAPSHOT_KEYS.users);
   const { data: request, error: requestReadError } = await client.from('teacher_verification_requests').select('teacher_id').eq('id', requestId).maybeSingle();
   if (requestReadError) throw requestReadError;
   const { error } = await client.from('teacher_verification_requests').update({ status: 'rejected', rejection_reason: reason, actioned_at: now, actioned_by: adminEmail, updated_at: now }).eq('id', requestId);
@@ -533,6 +566,8 @@ export async function dbRejectVerification(requestId: string, reason: string, ad
 export async function dbSuspendTeacherFromReport(teacherId: string, reportId: string) {
   const client = requireSupabase();
   const now = new Date().toISOString();
+  swrInvalidate(ADMIN_SNAPSHOT_KEYS.reports);
+  swrInvalidate(ADMIN_SNAPSHOT_KEYS.users);
   const { error: reportError } = await client.from('safety_reports').update({ status: 'under_investigation', updated_at: now }).eq('id', reportId);
   if (reportError) throw reportError;
   const { error: profileError } = await client.from('profiles').update({ account_status: 'suspended', badge: 'fraudulent', updated_at: now }).eq('id', teacherId);
@@ -542,16 +577,19 @@ export async function dbSuspendTeacherFromReport(teacherId: string, reportId: st
 }
 
 export async function dbResolveReport(reportId: string) {
+  swrInvalidate(ADMIN_SNAPSHOT_KEYS.reports);
   const { error } = await requireSupabase().from('safety_reports').update({ status: 'resolved', updated_at: new Date().toISOString() }).eq('id', reportId);
   if (error) throw error;
 }
 
 export async function dbDismissReport(reportId: string) {
+  swrInvalidate(ADMIN_SNAPSHOT_KEYS.reports);
   const { error } = await requireSupabase().from('safety_reports').delete().eq('id', reportId);
   if (error) throw error;
 }
 
 export async function dbMarkCommissionPaid(commissionId: string) {
+  swrInvalidate(ADMIN_SNAPSHOT_KEYS.commissions);
   const { error } = await requireSupabase().from('commission_tracking').update({ payment_status: 'paid', last_payment_date: new Date().toISOString().slice(0, 10), updated_at: new Date().toISOString() }).eq('id', commissionId);
   if (error) throw error;
 }
