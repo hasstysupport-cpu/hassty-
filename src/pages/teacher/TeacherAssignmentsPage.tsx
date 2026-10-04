@@ -60,7 +60,7 @@ export const TeacherAssignmentsPage: React.FC = () => {
         <input value={subject} onChange={e=>setSubject(e.target.value)} placeholder="المادة" className="rounded-2xl border border-gray-200 px-4 py-3 text-sm"/>
         <textarea value={description} onChange={e=>setDescription(e.target.value)} placeholder="وصف وتعليمات الواجب" className="md:col-span-2 min-h-28 rounded-2xl border border-gray-200 p-4 text-sm"/>
         <label className="text-xs font-bold text-gray-600">موعد التسليم<input type="datetime-local" value={dueAt} onChange={e=>setDueAt(e.target.value)} className="mt-1 w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm"/></label>
-        <label className="text-xs font-bold text-gray-600">الدرجة القصوى<input type="number" min="1" value={maxScore} onChange={e=>setMaxScore(e.target.value)} className="mt-1 w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm"/></label>
+        <label className="text-xs font-bold text-gray-600">الدرجة القصوى<input type="number" min="1" placeholder="10" value={maxScore === '0' ? '' : maxScore} onFocus={e=>e.target.select()} onChange={e=>setMaxScore(e.target.value)} className="mt-1 w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm"/></label>
       </div>
       {notice && <div className="mt-3 p-3 rounded-2xl bg-blue-50 text-blue-800 text-xs font-bold">{notice}</div>}
       <button onClick={()=>void create()} disabled={saving || !title.trim()} className="mt-4 px-5 py-3 rounded-2xl bg-[#2563EB] disabled:opacity-40 text-white text-sm font-black flex items-center gap-2"><Send className="w-4 h-4"/>{saving?'جاري الإنشاء...':'إنشاء الواجب'}</button>

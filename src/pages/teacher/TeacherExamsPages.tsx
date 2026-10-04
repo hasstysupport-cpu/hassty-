@@ -118,9 +118,9 @@ export const TeacherExamsPage: React.FC<{ onNavigate: (p: string) => void; openE
               <div><label className="text-[11px] font-black text-slate-500 block mb-1.5">وقت البداية *</label>
                 <input type="time" value={form.starts_at} onChange={(e) => setForm((p) => p ? { ...p, starts_at: e.target.value } : p)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-bold outline-none" /></div>
               <div><label className="text-[11px] font-black text-slate-500 block mb-1.5">المدة (دقيقة)</label>
-                <input type="number" min={10} value={form.duration_minutes} onChange={(e) => setForm((p) => p ? { ...p, duration_minutes: e.target.value } : p)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-bold outline-none" /></div>
+                <input type="number" min={10} placeholder="60" value={form.duration_minutes} onFocus={(e) => e.target.select()} onChange={(e) => setForm((p) => p ? { ...p, duration_minutes: e.target.value } : p)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-bold outline-none" /></div>
               <div><label className="text-[11px] font-black text-slate-500 block mb-1.5">مجموع الدرجات</label>
-                <input type="number" min={1} value={form.total_marks} onChange={(e) => setForm((p) => p ? { ...p, total_marks: e.target.value } : p)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-bold outline-none" /></div>
+                <input type="number" min={1} placeholder="100" value={form.total_marks} onFocus={(e) => e.target.select()} onChange={(e) => setForm((p) => p ? { ...p, total_marks: e.target.value } : p)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-bold outline-none" /></div>
             </div>
             <div><label className="text-[11px] font-black text-slate-500 block mb-1.5">الموقع / اللجنة</label>
               <input value={form.location} onChange={(e) => setForm((p) => p ? { ...p, location: e.target.value } : p)} placeholder="قاعة 3 — المركز الرئيسي" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-bold outline-none" /></div>
@@ -424,7 +424,7 @@ export const TeacherExamDetailPage: React.FC<{ examId: string; onNavigate: (p: s
               <div><label className="text-[11px] font-black text-slate-500 block mb-1.5">القاعة</label>
                 <input value={slotForm.room} onChange={(e) => setSlotForm((p) => p ? { ...p, room: e.target.value } : p)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-bold outline-none" /></div>
               <div><label className="text-[11px] font-black text-slate-500 block mb-1.5">السعة</label>
-                <input type="number" min={1} value={slotForm.capacity} onChange={(e) => setSlotForm((p) => p ? { ...p, capacity: e.target.value } : p)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-bold outline-none" /></div>
+                <input type="number" min={1} placeholder="35" value={slotForm.capacity === '0' ? '' : slotForm.capacity} onFocus={(e) => e.target.select()} onChange={(e) => setSlotForm((p) => p ? { ...p, capacity: e.target.value } : p)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-bold outline-none" /></div>
             </div>
           </div>
           <div className="mt-5 flex gap-2 justify-end"><Btn variant="secondary" size="sm" onClick={() => setSlotForm(null)}>إلغاء</Btn><Btn size="sm" disabled={busy} onClick={() => void addSlot()}>إضافة الفترة</Btn></div>

@@ -87,11 +87,11 @@ export const TeacherGroupsPage: React.FC = () => {
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupGrade, setNewGroupGrade] = useState(ALL_EGYPT_GRADES[0]);
   const [newGroupLocation, setNewGroupLocation] = useState('سنتر الأهرام — مدينة نصر');
-  const [newGroupMax, setNewGroupMax] = useState(35);
+  const [newGroupMax, setNewGroupMax] = useState<number | ''>('');
   
   // Pricing state
   const [newBillingType, setNewBillingType] = useState<PricingBillingType>('per_session');
-  const [newPriceAmount, setNewPriceAmount] = useState<number>(120);
+  const [newPriceAmount, setNewPriceAmount] = useState<number | ''>('');
 
   // Multi-day schedule slots
   const [newSlots, setNewSlots] = useState<GroupScheduleSlot[]>([
@@ -762,7 +762,7 @@ export const TeacherGroupsPage: React.FC = () => {
                   checked={newBillingType === 'per_session'}
                   onChange={() => {
                     setNewBillingType('per_session');
-                    setNewPriceAmount(120);
+                    if (typeof newPriceAmount === 'number' && newPriceAmount === 480) setNewPriceAmount(120);
                   }}
                   className="mt-1"
                 />
@@ -786,7 +786,7 @@ export const TeacherGroupsPage: React.FC = () => {
                   checked={newBillingType === 'monthly'}
                   onChange={() => {
                     setNewBillingType('monthly');
-                    setNewPriceAmount(480);
+                    if (typeof newPriceAmount === 'number' && newPriceAmount === 120) setNewPriceAmount(480);
                   }}
                   className="mt-1"
                 />
@@ -806,9 +806,20 @@ export const TeacherGroupsPage: React.FC = () => {
                   type="number"
                   min={10}
                   required
-                  value={newPriceAmount}
-                  onChange={(e) => setNewPriceAmount(Number(e.target.value))}
-                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs text-right font-bold focus:outline-none focus:border-blue-600"
+                  placeholder={newBillingType === 'per_session' ? 'مثلاً 120' : 'مثلاً 480'}
+                  value={newPriceAmount === '' || newPriceAmount === 0 ? '' : newPriceAmount}
+                  onFocus={(e) => {
+                    if (e.target.value === '0') {
+                      setNewPriceAmount('');
+                    } else {
+                      e.target.select();
+                    }
+                  }}
+                  onChange={(e) => {
+                    const v = e.target.value.trim();
+                    setNewPriceAmount(v === '' ? '' : Number(v));
+                  }}
+                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs text-right font-bold focus:outline-none focus:border-blue-600 placeholder:text-gray-400 placeholder:font-normal"
                 />
               </div>
 
@@ -820,9 +831,20 @@ export const TeacherGroupsPage: React.FC = () => {
                   type="number"
                   min={1}
                   max={150}
-                  value={newGroupMax}
-                  onChange={(e) => setNewGroupMax(Number(e.target.value))}
-                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs text-right font-bold focus:outline-none focus:border-blue-600"
+                  placeholder="مثلاً 35"
+                  value={newGroupMax === '' || newGroupMax === 0 ? '' : newGroupMax}
+                  onFocus={(e) => {
+                    if (e.target.value === '0') {
+                      setNewGroupMax('');
+                    } else {
+                      e.target.select();
+                    }
+                  }}
+                  onChange={(e) => {
+                    const v = e.target.value.trim();
+                    setNewGroupMax(v === '' ? '' : Number(v));
+                  }}
+                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs text-right font-bold focus:outline-none focus:border-blue-600 placeholder:text-gray-400 placeholder:font-normal"
                 />
               </div>
             </div>
@@ -835,11 +857,11 @@ export const TeacherGroupsPage: React.FC = () => {
               </div>
               <div className="flex justify-between">
                 <span>عمولة المنصة للطالب:</span>
-                <strong>{commissionPreview.feePerStudent} ج.م</strong>
+                <strong>{Number(newPriceAmount) > 0 ? `${commissionPreview.feePerStudent} ج.م` : '—'}</strong>
               </div>
               <div className="flex justify-between text-emerald-700 font-bold border-t border-gray-100 pt-1">
                 <span>صافي أرباح المدرس للطالب:</span>
-                <strong>{commissionPreview.netPerStudent} ج.م</strong>
+                <strong>{Number(newPriceAmount) > 0 ? `${commissionPreview.netPerStudent} ج.م` : '—'}</strong>
               </div>
             </div>
           </div>

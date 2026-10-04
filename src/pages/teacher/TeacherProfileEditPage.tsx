@@ -23,7 +23,7 @@ export const TeacherProfileEditPage: React.FC = () => {
   const [bio, setBio] = useState(user?.profileData?.bio || '');
   const [governorate, setGovernorate] = useState(user?.governorate || '');
   const [area, setArea] = useState(user?.area || '');
-  const [pricePerSession, setPricePerSession] = useState(user?.profileData?.pricePerSession || 0);
+  const [pricePerSession, setPricePerSession] = useState<number | ''>(user?.profileData?.pricePerSession || '');
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [verificationStatus, setVerificationStatus] = useState<'loading' | 'approved' | 'pending' | 'rejected' | 'not_submitted'>('loading');
@@ -69,7 +69,7 @@ export const TeacherProfileEditPage: React.FC = () => {
             subject,
             headline,
             bio,
-            pricePerSession,
+            pricePerSession: Number(pricePerSession) || 0,
           },
         });
       }
@@ -132,7 +132,27 @@ export const TeacherProfileEditPage: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
             <div><label className="block font-bold text-[#1F2937] mb-1">المحافظة</label><input type="text" value={governorate} onChange={(e) => setGovernorate(e.target.value)} className="w-full px-3.5 py-2.5 bg-gray-50 border border-[#E5E7EB] rounded-xl text-right" /></div>
             <div><label className="block font-bold text-[#1F2937] mb-1">المنطقة / السناتر</label><input type="text" value={area} onChange={(e) => setArea(e.target.value)} className="w-full px-3.5 py-2.5 bg-gray-50 border border-[#E5E7EB] rounded-xl text-right" /></div>
-            <div><label className="block font-bold text-[#1F2937] mb-1">سعر الحصة (ج.م)</label><input type="number" min="0" value={pricePerSession} onChange={(e) => setPricePerSession(Number(e.target.value))} className="w-full px-3.5 py-2.5 bg-gray-50 border border-[#E5E7EB] rounded-xl text-right font-mono font-bold" /></div>
+            <div>
+              <label className="block font-bold text-[#1F2937] mb-1">سعر الحصة (ج.م)</label>
+              <input
+                type="number"
+                min="0"
+                placeholder="مثلاً 120"
+                value={pricePerSession === '' || pricePerSession === 0 ? '' : pricePerSession}
+                onFocus={(e) => {
+                  if (e.target.value === '0') {
+                    setPricePerSession('');
+                  } else {
+                    e.target.select();
+                  }
+                }}
+                onChange={(e) => {
+                  const val = e.target.value.trim();
+                  setPricePerSession(val === '' ? '' : Number(val));
+                }}
+                className="w-full px-3.5 py-2.5 bg-gray-50 border border-[#E5E7EB] rounded-xl text-right font-mono font-bold focus:bg-white focus:outline-none focus:border-[#2563EB] placeholder:text-gray-400 placeholder:font-normal"
+              />
+            </div>
           </div>
         </div>
 
