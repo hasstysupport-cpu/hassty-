@@ -145,7 +145,7 @@ export const FloatingNotificationsDock: React.FC = () => {
       {open && (
         <div
           ref={panelRef}
-          className="absolute bottom-full mb-3 left-0 w-[calc(100vw-2rem)] max-w-[340px] bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-scale-up"
+          className="absolute bottom-full mb-3 right-0 w-[calc(100vw-2rem)] max-w-[340px] bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-scale-up"
         >
           {/* الترويسة */}
           <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-l from-blue-700 to-blue-600 text-white">
