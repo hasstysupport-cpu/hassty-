@@ -8,7 +8,7 @@
  */
 
 import { supabase } from './supabase';
-import { whatsappService } from './whatsappService';
+import { notifyParentAttendance } from './parentNotify';
 
 export type AttendanceStatus = 'present' | 'late' | 'absent';
 const parseTime = (value: string) => { const [hours, minutes] = String(value || '').split(':').map(Number); if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null; return hours * 60 + minutes; };
@@ -46,16 +46,21 @@ export async function recordQrAttendance(input: { groupId:string; studentId:stri
   if (existing?.[0]) { const { data, error } = await supabase.from('attendance_records').update(payload).eq('id', existing[0].id).select('*').single(); if (error) throw error; saved = data; }
   else { const { data, error } = await supabase.from('attendance_records').insert({ ...payload, created_at: now.toISOString() }).select('*').single(); if (error) throw error; saved = data; }
 
-  // Notify the linked parent automatically; notification failures never block attendance.
+  // إشعار ولي الأمر تلقائيًا (ترتيب ذكي: ربط الحساب → إعدادات الطالب → بيانات القيد)
+  // عبر واتساب + Web Push + جرس الإشعارات — فشل الإشعارات لا يمنع تسجيل الحضور أبدًا.
   try {
-    const enrollment = await getEnrolledStudent(input.groupId, input.studentId);
-    const parentPhone = enrollment?.parent_phone || enrollment?.parentPhone || '';
-    if (parentPhone) {
-      const group = await supabase.from('student_groups').select('name').eq('id', input.groupId).limit(1);
-      const status = input.status === 'present' ? 'on_time' : input.status === 'late' ? 'late' : 'absent_cutoff';
-      await whatsappService.sendAttendanceNotice({ parentPhone, studentName: input.studentName, groupName: group.data?.[0]?.name || 'المجموعة', status, offsetMinutes: Math.max(0, input.lateMinutes || 0), timeString: parts.time });
-    }
-  } catch (waError) { console.warn('[attendance] WhatsApp parent notification skipped:', waError); }
+    const group = await supabase.from('student_groups').select('name').eq('id', input.groupId).limit(1);
+    const res = await notifyParentAttendance({
+      studentId: input.studentId,
+      groupId: input.groupId,
+      groupName: group.data?.[0]?.name || 'المجموعة',
+      studentName: input.studentName,
+      status: input.status,
+      lateMinutes: Math.max(0, input.lateMinutes || 0),
+      timeString: parts.time,
+    });
+    if (res.source === 'none') console.warn('[attendance] no parent contact found for student', input.studentId);
+  } catch (waError) { console.warn('[attendance] parent notification skipped:', waError); }
   return saved;
 }
 

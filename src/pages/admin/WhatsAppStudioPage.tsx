@@ -51,7 +51,7 @@ export const WhatsAppStudioPage: React.FC = () => {
   // Interactive Buttons State
   const [footerText, setFooterText] = useState('منصة حصتي للدروس الخصوصية');
   const [otpCodeToCopy, setOtpCodeToCopy] = useState('483921');
-  const [urlLink, setUrlLink] = useState('https://hassty.com');
+  const [urlLink, setUrlLink] = useState('https://hassty.site');
   const [callNumber, setCallNumber] = useState('+201080158828');
   const [quickReplyText, setQuickReplyText] = useState('✅ تأكيد الحضور');
 
@@ -406,7 +406,7 @@ export const WhatsAppStudioPage: React.FC = () => {
                         dir="ltr"
                         value={urlLink}
                         onChange={(e) => setUrlLink(e.target.value)}
-                        placeholder="https://hassty.com"
+                        placeholder="https://hassty.site"
                         className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-mono text-left focus:outline-none focus:border-[#2563EB]"
                       />
                     </div>

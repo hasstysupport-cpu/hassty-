@@ -15,12 +15,15 @@ interface RealQRCameraScannerProps {
   onScanSuccess: (qrCode: string) => void;
   isActive: boolean;
   isPaused?: boolean;
+  /** فترة التهدئة بين المسح المتتالي بالمللي ثانية — قصيرة عشان السرعة */
+  cooldownMs?: number;
 }
 
 export const RealQRCameraScanner: React.FC<RealQRCameraScannerProps> = ({
   onScanSuccess,
   isActive,
   isPaused = false,
+  cooldownMs = 600,
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -191,7 +194,7 @@ export const RealQRCameraScanner: React.FC<RealQRCameraScannerProps> = ({
 
           const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
           const code = jsQR(imageData.data, imageData.width, imageData.height, {
-            inversionAttempts: 'dontInvert',
+            inversionAttempts: 'attemptBoth',
           });
 
           if (code && code.data && !isCooldownRef.current) {
@@ -200,10 +203,10 @@ export const RealQRCameraScanner: React.FC<RealQRCameraScannerProps> = ({
             playBeep();
             onScanSuccess(code.data);
 
-            // 1.5 second cooldown before next continuous scan
+            // تهدئة قصيرة جدًا (افتراضي 600ms) — المسح الفوري عدة طلاب وراء بعض
             setTimeout(() => {
               isCooldownRef.current = false;
-            }, 1500);
+            }, cooldownMs);
           }
         }
       }

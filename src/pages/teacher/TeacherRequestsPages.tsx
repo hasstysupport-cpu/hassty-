@@ -13,6 +13,7 @@ import { useAuth } from '../../lib/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { Btn, Card, ConfirmDialog, DataTable, EmptyState, ErrorBlock, PageHeader, StatusBadge, Tabs, fmtDateTime, useToast } from '../../components/common/ui';
 import { getCleanAvatarUrl } from '../../lib/avatarHelper';
+import { notifyParentTransfer } from '../../lib/parentNotify';
 
 /* ================================================================
    طلبات الالتحاق (booking_requests) — قبول / رفض / إسناد لمجموعة
@@ -199,6 +200,12 @@ export const TeacherTransfersPage: React.FC = () => {
       const { error } = await supabase.from('group_transfer_requests').update({ status: approve ? 'completed' : 'rejected', decided_at: new Date().toISOString(), decided_by: user.uid, updated_at: new Date().toISOString() }).eq('id', row.id);
       if (error) throw error;
       if (row.student_id) await supabase.from('notifications').insert({ user_id: row.student_id, title: approve ? 'تمت الموافقة على التحويل' : 'تم رفض طلب التحويل', message: approve ? `تم نقلك إلى ${row.to_group_name || 'المجموعة الجديدة'}.` : 'لم تتم الموافقة على طلب التحويل.', type: 'system', link: '/student/tutors' });
+      /* إشعار ولي الأمر بالتحويل: واتساب + push + جرس الإشعارات — لا يوقف العملية */
+      if (approve && row.student_id) {
+        try {
+          await notifyParentTransfer({ studentId: row.student_id, studentName: row.student_name || 'الطالب', fromGroupName: row._from_name || row.from_group_name || '', toGroupName: row.to_group_name || '', teacherName: user?.name || '' });
+        } catch (pn) { console.warn('[transfers] parent notify skipped:', pn); }
+      }
       push('success', approve ? 'تم تنفيذ التحويل بنجاح.' : 'تم رفض طلب التحويل.');
       await load();
     } catch (e: any) { push('error', e?.message || 'تعذر تنفيذ التحويل.'); } finally { setBusy(''); setConfirm(null); }

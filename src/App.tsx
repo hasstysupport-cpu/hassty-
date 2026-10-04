@@ -52,6 +52,7 @@ const WhatsAppStudioPage = lazy(() => import('./pages/admin/WhatsAppStudioPage')
 const PushPermissionBanner = lazy(() => import('./components/common/PushPermissionBanner').then(m => ({ default: m.PushPermissionBanner })));
 /* بانر إشعار توثيق المعلم الجديد لطلب التوثيق المجاني عبر جروبات الدعم الرسمية */
 const TeacherVerificationBanner = lazy(() => import('./components/teacher/TeacherVerificationBanner').then(m => ({ default: m.TeacherVerificationBanner })));
+const FloatingNotificationsDock = lazy(() => import('./components/common/FloatingNotificationsDock').then(m => ({ default: m.FloatingNotificationsDock })));
 const StudentDashboardPage = lazy(() => import('./pages/student/StudentDashboardPage').then(m => ({ default: m.StudentDashboardPage })));
 const StudentQRCardPage = lazy(() => import('./pages/student/StudentQRCardPage').then(m => ({ default: m.StudentQRCardPage })));
 const StudentProfilePage = lazy(() => import('./pages/student/StudentProfilePage').then(m => ({ default: m.StudentProfilePage })));
@@ -187,6 +188,8 @@ export default function App(){
   {isLoggedIn&&!isUnverified&&!needsProfileSetup&&<Suspense fallback={null}><PushPermissionBanner/></Suspense>}
   {/* بانر توثيق المعلم الجديد للتقديم على طلب توثيق مجاني في جروبات الدعم الرسمية */}
   {isLoggedIn&&currentRole==='teacher'&&!isUnverified&&!needsProfileSetup&&<Suspense fallback={null}><TeacherVerificationBanner teacherId={user?.uid} teacherName={user?.name}/></Suspense>}
+  {/* القايمة العايمة للإشعارات: زر عائم في كل الصفحات — تفعيل سريع + آخر الإشعارات */}
+  {isLoggedIn&&!isUnverified&&!needsProfileSetup&&<Suspense fallback={null}><FloatingNotificationsDock/></Suspense>}
   {isDashboardRoute&&isLoggedIn&&!isUnverified&&!needsProfileSetup?<div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5 pb-24 sm:pb-24 lg:pb-6 flex flex-col md:flex-row gap-5 lg:gap-6 items-start"><DashboardSidebar currentRole={currentRole} currentPath={currentPath} onNavigate={handleNavigate} onLogout={handleLogout}/><main key={currentPath} className="flex-1 w-full min-w-0 page-transition"><Suspense fallback={<PageLoader/>}>
    {/* ====== STUDENT routes ====== */}
    {currentPath==='/student/dashboard'&&<StudentDashboardPage onNavigate={handleNavigate} onSelectTutor={handleSelectTutor}/>} {currentPath==='/student/qr-card'&&<StudentQRCardPage/>} {currentPath==='/student/profile'&&<StudentProfilePage/>} {currentPath==='/student/tutors'&&<StudentTutorsPage onNavigate={handleNavigate} onSelectTutor={handleSelectTutor}/>} {currentPath==='/student/book'&&<StudentBookPage/>} {currentPath==='/student/payments'&&<StudentPaymentsPage/>} {currentPath==='/student/notifications'&&<NotificationsPage onNavigate={handleNavigate}/>} {currentPath==='/student/calendar'&&<CalendarPage/>} {currentPath==='/student/messages'&&<MessagesPage/>} {currentPath==='/student/assignments'&&<AssignmentsPage/>} {currentPath==='/student/grades'&&<GradesPage/>} {currentPath==='/student/attendance'&&<AttendanceOverviewPage/>} {currentPath==='/student/reviews'&&<StudentReviewsPage/>}

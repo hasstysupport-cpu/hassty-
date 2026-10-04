@@ -8,12 +8,14 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, CheckCircle2, Clock3, QrCode, RefreshCw, ShieldCheck, UserPlus, XCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Clock3, QrCode, RefreshCw, ShieldCheck, UserPlus, Banknote, XCircle } from 'lucide-react';
 import { useAuth } from '../../lib/AuthContext';
 import { RealQRCameraScanner } from '../../components/RealQRCameraScanner';
 import { supabase } from '../../lib/supabase';
 import { loadTeacherGroups } from '../../lib/teacherStore';
 import { findStudentByQr, getEnrolledStudent, getTiming, recordQrAttendance } from '../../lib/attendanceService';
+import { collectStudentMonth, currentMonthKey, monthLabel } from '../../lib/studentPaymentService';
+import { bestParentPhoneForEnrollment } from '../../lib/parentNotify';
 import { StudentGroup } from '../../types';
 
 const dayNames: Record<number, string> = { 0: 'Sunday', 1: 'Monday', 2: 'Tuesday', 3: 'Wednesday', 4: 'Thursday', 5: 'Friday', 6: 'Saturday' };
@@ -36,6 +38,8 @@ function getActiveGroup(groups: StudentGroup[], now = new Date()) {
   return null;
 }
 
+export type ScanMode = 'attendance' | 'enroll' | 'payment';
+
 export const TeacherScanPage: React.FC = () => {
   const { user } = useAuth();
   const teacherId = user?.uid || '';
@@ -43,7 +47,18 @@ export const TeacherScanPage: React.FC = () => {
   const [selectedGroupId, setSelectedGroupId] = useState('');
   const [manualCode, setManualCode] = useState('');
   const [scannerOpen, setScannerOpen] = useState(true);
-  const [mode, setMode] = useState<'attendance' | 'enroll'>('attendance');
+  const [mode, setMode] = useState<ScanMode>(() => {
+    // الأولوية: ?mode=payment في الرابط (دخول مباشر)، ثم علامة sessionStorage من صفحة المدفوعات
+    try {
+      const qp = new URLSearchParams(window.location.search).get('mode');
+      if (qp === 'payment') return 'payment';
+      if (sessionStorage.getItem('hassty_scan_mode') === 'payment') {
+        sessionStorage.removeItem('hassty_scan_mode');
+        return 'payment';
+      }
+    } catch { /* noop */ }
+    return 'attendance';
+  });
   const [now, setNow] = useState(new Date());
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{kind:'success'|'warning'|'error'|'info';title:string;body:string}|null>(null);
@@ -72,7 +87,7 @@ export const TeacherScanPage: React.FC = () => {
   const processCode = useCallback(async (code:string) => {
     const qr=code.trim();
     if(!qr||busy)return;
-    if(!selectedGroup){setMessage({kind:'error',title:'لا توجد مجموعة',body:'اختر مجموعة مرتبطة بحساب المدرس.'});return;}
+    if(mode!=='payment'&&!selectedGroup){setMessage({kind:'error',title:'لا توجد مجموعة',body:'اختر مجموعة مرتبطة بحساب المدرس.'});return;}
     setBusy(true); setMessage(null);
     try {
       const student=await findStudentByQr(qr);
@@ -82,12 +97,32 @@ export const TeacherScanPage: React.FC = () => {
         const existing=await getEnrolledStudent(selectedGroup.id,student.id);
         if(existing){setMessage({kind:'info',title:'الطالب مسجل بالفعل',body:`${student.full_name||'الطالب'} موجود بالفعل في ${selectedGroup.name}.`});return;}
         if(!supabase)throw new Error('قاعدة البيانات غير متاحة.');
+        // رقم ولي الأمر: من ربط الحساب أو إعدادات الطالب — مش نسيبها فاضية
+        const parentPhone=await bestParentPhoneForEnrollment(student.id).catch(()=>'');
         const {error}=await supabase.from('group_enrollments').insert({
-          group_id:selectedGroup.id, student_id:student.id, student_name:student.full_name||'طالب', student_phone:student.phone||'', parent_phone:'', qr_code:student.qr_code||qr,
+          group_id:selectedGroup.id, student_id:student.id, student_name:student.full_name||'طالب', student_phone:student.phone||'', parent_phone:parentPhone, qr_code:student.qr_code||qr,
           avatar_url:student.avatar_url||'', grade:student.grade||selectedGroup.grade||'', status:'active', enrolled_at:new Date().toISOString(), attendance_rate:0, total_sessions:0, attended_sessions:0, payment_status:'pending'
         });
         if(error)throw error;
-        setMessage({kind:'success',title:'تم قيد الطالب',body:`${student.full_name||'الطالب'} تمت إضافته إلى ${selectedGroup.name}.`});
+        setMessage({kind:'success',title:'تم قيد الطالب',body:`${student.full_name||'الطالب'} تمت إضافته إلى ${selectedGroup.name}.${parentPhone?` رقم ولي الأمر (${parentPhone}) اتسجل مع القيد وسيصل إشعار الحضور والغياب تلقائيًا.`:' ⚠️ لم يُعثر على رقم ولي أمر — الطالب يضيفه من إعدادات حسابه.'}`});
+        return;
+      }
+
+      if(mode==='payment'){
+        // وضع تحصيل الاشتراك الشهري بالمسح — سجل حقيقي + إشعار ولي أمر
+        const result=await collectStudentMonth({
+          teacherId,
+          student:{ id:student.id, full_name:student.full_name||'', qr_code:student.qr_code||'' },
+          groupId:selectedGroupId||undefined,
+          method:'qr_scan',
+        });
+        const src=result.notified.source;
+        const srcLabel=src==='linked_account'?'حساب ولي الأمر المربوط':src==='student_settings'?'رقم ولي الأمر من إعدادات الطالب':src==='enrollment'?'رقم ولي الأمر من بيانات القيد':'';
+        if(result.alreadyPaid){
+          setMessage({kind:'info',title:'الشهر مدفوع بالفعل ✅',body:`${result.studentName} مدفوع له اشتراك ${monthLabel(result.monthKey)} (عملية ${result.invoiceNumber}). لم يتم تحصيل مبلغ مكرر${srcLabel?` — تأكيد أُرسل لـ ${srcLabel}`:''}.`});
+        } else {
+          setMessage({kind:'success',title:'تم تحصيل الشهر بنجاح 💰',body:`${result.studentName} — ${monthLabel(result.monthKey)} بقيمة ${result.amount.toLocaleString('ar-EG')} ج.م من ${result.groupName}.\nرقم العملية: ${result.invoiceNumber}.\nاتسجل في سجل الطلاب وهتوصل إشعارات لولي الأمر${srcLabel?` (${srcLabel})`:''}${result.notified.whatsapp?' — واتساب ✅':' ⚠️ واتساب غير مؤكد'}.`});
+        }
         return;
       }
 
@@ -136,7 +171,8 @@ export const TeacherScanPage: React.FC = () => {
   return <div className="space-y-5 text-right max-w-5xl mx-auto">
     <section className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-7 shadow-sm">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4"><div><div className="inline-flex items-center gap-2 text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-full"><QrCode className="w-4 h-4"/>مسح حضور QR حقيقي</div><h2 className="text-xl sm:text-2xl font-black text-slate-900 mt-2">تسجيل حضور الطلاب بالوقت الفعلي</h2><p className="text-xs text-slate-500 mt-1">الحالة تُحسب تلقائيًا من موعد المجموعة ووقت المسح — مع ربط السجل بالحصة الفعلية إن وُجدت.</p></div><div className="flex items-center gap-2 text-xs font-bold text-slate-600 bg-slate-50 px-3 py-2 rounded-2xl border border-slate-200"><Clock3 className="w-4 h-4 text-blue-600"/>{now.toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}</div></div>
-      <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-3"><select value={selectedGroupId} onChange={e=>setSelectedGroupId(e.target.value)} className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold"><option value="">اختر المجموعة</option>{groups.map(g=><option key={g.id} value={g.id}>{g.name} — {g.schedule}</option>)}</select><div className="flex gap-2"><button type="button" onClick={()=>{setMode('attendance');setMessage(null)}} className={`flex-1 rounded-2xl border-2 px-3 py-3 text-sm font-black ${mode==='attendance'?'border-emerald-500 bg-emerald-50 text-emerald-800':'border-slate-200 bg-slate-50 text-slate-600'}`}><CheckCircle2 className="w-4 h-4 inline ml-1"/>حضور</button><button type="button" onClick={()=>{setMode('enroll');setMessage(null)}} className={`flex-1 rounded-2xl border-2 px-3 py-3 text-sm font-black ${mode==='enroll'?'border-blue-500 bg-blue-50 text-blue-800':'border-slate-200 bg-slate-50 text-slate-600'}`}><UserPlus className="w-4 h-4 inline ml-1"/>قيد طالب</button></div></div>
+      <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-3"><select value={selectedGroupId} onChange={e=>setSelectedGroupId(e.target.value)} className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold"><option value="">اختر المجموعة</option>{groups.map(g=><option key={g.id} value={g.id}>{g.name} — {g.schedule}</option>)}</select><div className="flex gap-2"><button type="button" onClick={()=>{setMode('attendance');setMessage(null)}} className={`flex-1 rounded-2xl border-2 px-3 py-3 text-sm font-black ${mode==='attendance'?'border-emerald-500 bg-emerald-50 text-emerald-800':'border-slate-200 bg-slate-50 text-slate-600'}`}><CheckCircle2 className="w-4 h-4 inline ml-1"/>حضور</button><button type="button" onClick={()=>{setMode('enroll');setMessage(null)}} className={`flex-1 rounded-2xl border-2 px-3 py-3 text-sm font-black ${mode==='enroll'?'border-blue-500 bg-blue-50 text-blue-800':'border-slate-200 bg-slate-50 text-slate-600'}`}><UserPlus className="w-4 h-4 inline ml-1"/>قيد طالب</button><button type="button" onClick={()=>{setMode('payment');setMessage(null)}} className={`flex-1 rounded-2xl border-2 px-3 py-3 text-sm font-black ${mode==='payment'?'border-amber-500 bg-amber-50 text-amber-800':'border-slate-200 bg-slate-50 text-slate-600'}`}><Banknote className="w-4 h-4 inline ml-1"/>تحصيل شهر</button></div></div>
+      {mode==='payment'&&<div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[11px] font-bold text-amber-900 flex items-start gap-2"><Banknote className="w-4 h-4 shrink-0 mt-0.5"/><span>امسح QR الطالب لتحصيل اشتراك الشهر الحالي ({monthLabel(currentMonthKey())}) — القيمة من اشتراك المجموعة، وتُسجل فورًا في سجل الطلاب وصفحات مدفوعات الطالب وولي الأمر مع إشعار واتساب + إشعارات فورية.</span></div>}
       <div className={`mt-4 rounded-2xl border px-4 py-3 flex items-center gap-3 ${banner.label.includes('الموعد')?'bg-emerald-50 border-emerald-200 text-emerald-900':banner.label.includes('تأخير')?'bg-amber-50 border-amber-200 text-amber-900':banner.label.includes('غياب')||banner.label.includes('انتهت')?'bg-red-50 border-red-200 text-red-900':'bg-slate-50 border-slate-200 text-slate-700'}`}><BannerIcon className="w-5 h-5"/><div><div className="font-black text-sm">{banner.label}</div><div className="text-[11px] opacity-80">{activeSlot?`موعد المجموعة: ${activeSlot.dayArabic} ${activeSlot.startTime} → ${activeSlot.endTime}`:'الحالة تتحدث تلقائيًا كل 5 ثوانٍ'}</div></div></div>
     </section>
     <section className="bg-white border border-gray-200 rounded-3xl p-5 shadow-sm"><RealQRCameraScanner isActive={scannerOpen} isPaused={busy} onScanSuccess={processCode}/><div className="max-w-md mx-auto mt-4 flex gap-2"><input value={manualCode} onChange={e=>setManualCode(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')void processCode(manualCode)}} placeholder="أدخل كود QR يدويًا" className="flex-1 rounded-2xl border border-slate-300 px-4 py-3 text-sm font-mono text-left focus:outline-none focus:border-blue-500" dir="ltr"/><button type="button" disabled={busy} onClick={()=>void processCode(manualCode)} className="px-5 rounded-2xl bg-blue-600 text-white text-sm font-black disabled:opacity-50">{busy?'جاري...':'مسح'}</button></div><div className="mt-3 flex justify-center"><button type="button" onClick={()=>setScannerOpen(v=>!v)} className="text-xs font-bold text-slate-500 hover:text-blue-700">{scannerOpen?'إيقاف الكاميرا':'تشغيل الكاميرا'}</button></div></section>

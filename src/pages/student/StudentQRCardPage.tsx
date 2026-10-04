@@ -16,8 +16,16 @@ import { StudentProfile } from '../../types';
 export const StudentQRCardPage: React.FC = () => {
   const { user } = useAuth();
 
+  /* كود QR الحقيقي من قاعدة البيانات (profiles.qr_code بصيغة HASSTY-XXXXXXXXXX) —
+     هو نفس الكود الذي يبحث عنه ماسح المدرس في profiles.qr_code،
+     فالمسح يعمل فورًا من الكارت المطبوع أو الشاشة. */
+  const realQrCode: string =
+    (user?.profileData as any)?.qrCode ||
+    (user?.uid ? `HASSTY-${user.uid.replace(/-/g, '').slice(0, 10).toUpperCase()}` : 'HASSTY-2026HST01');
+  const idNumber = realQrCode.replace('HASSTY-', '') || '2026HST01';
+
   const student: StudentProfile = {
-    id: user?.id || 'std-current',
+    id: user?.uid || 'std-current',
     name: user?.name || 'الطالب',
     phone: user?.phone || '010XXXXXXXX',
     governorate: user?.governorate || 'القاهرة',
@@ -25,9 +33,9 @@ export const StudentQRCardPage: React.FC = () => {
     area: user?.area || '',
     stage: 'المرحلة الثانوية',
     grade: user?.profileData?.grade || 'الصف الثالث الثانوي',
-    studentIdNumber: user?.id?.substring(0, 8).toUpperCase() || 'HST2026',
-    qrCode: user?.id?.substring(0, 10).toUpperCase() || 'HST2026',
-    qrCodeValue: `HASSTY-STUDENT-${user?.id || '2026'}-${user?.name || 'STUDENT'}`,
+    studentIdNumber: idNumber,
+    qrCode: realQrCode,
+    qrCodeValue: realQrCode,
     parentPhone: user?.profileData?.parentPhone || '',
     emergencyParentPhone: user?.profileData?.parentPhone || '',
     joinedTutorIds: [],

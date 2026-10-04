@@ -114,12 +114,14 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onNavigate, onSignupSucc
     setSuccessMessage('');
   };
 
-  /* ============ step 2 validation ============ */
+  /* step 2 validation ============ */
+  const [parentPhone, setParentPhone] = useState('');
   const validateData = (): string | null => {
     if (fullName.trim().length < 3) return 'أدخل اسمك الكامل (3 أحرف على الأقل).';
     if (!/^01[0125][0-9]{8}$/.test(phone.trim())) return 'أدخل رقم هاتف مصري صحيح (مثال: 01012345678).';
     if (!governorate || !city) return 'اختر المحافظة والمدينة/المنطقة.';
     if (role === 'student' && !grade) return 'اختر الصف الدراسي.';
+    if (role === 'student' && parentPhone.trim() && !/^01[0125][0-9]{8}$/.test(parentPhone.trim())) return 'رقم ولي الأمر غير صحيح (مثال: 01012345678) — أو اتركه فارغًا.';
     if (role === 'teacher' && !subject) return 'اختر المادة الدراسية.';
     return null;
   };
@@ -148,6 +150,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onNavigate, onSignupSucc
         governorate,
         city,
         grade: role === 'student' ? grade : undefined,
+        parentPhone: role === 'student' && parentPhone.trim() ? parentPhone.trim() : undefined,
         subject: role === 'teacher' ? subject : undefined,
         experienceYears: role === 'teacher' ? experienceYears : undefined,
         studentJoinCode: role === 'parent' && studentJoinCode.trim() ? studentJoinCode.trim() : undefined,
@@ -384,12 +387,27 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onNavigate, onSignupSucc
             </div>
 
             {role === 'student' && (
-              <div className="relative">
-                <GraduationCap className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
-                <ChevronDown className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400 pointer-events-none" />
-                <select value={grade} onChange={(e) => setGrade(e.target.value)} className="auth-input w-full p-3.5 pr-11 pl-11 text-sm appearance-none cursor-pointer">
-                  {GRADES.map((g) => <option key={g} value={g}>{g}</option>)}
-                </select>
+              <div className="space-y-3">
+                <div className="relative">
+                  <GraduationCap className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                  <ChevronDown className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400 pointer-events-none" />
+                  <select value={grade} onChange={(e) => setGrade(e.target.value)} className="auth-input w-full p-3.5 pr-11 pl-11 text-sm appearance-none cursor-pointer">
+                    {GRADES.map((g) => <option key={g} value={g}>{g}</option>)}
+                  </select>
+                </div>
+                <div className="relative">
+                  <Phone className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                  <input
+                    dir="ltr"
+                    inputMode="tel"
+                    value={parentPhone}
+                    onChange={(e) => setParentPhone(e.target.value.replace(/[^0-9]/g, ''))}
+                    placeholder="رقم ولي الأمر (اختياري) — 010XXXXXXXX"
+                    className="auth-input w-full p-3.5 pr-11 pl-4 text-sm text-left"
+                    maxLength={11}
+                  />
+                  <p className="text-[10.5px] text-slate-500 font-semibold mt-1.5 px-1 leading-relaxed">لو كتبت رقم ولي الأمر، هيوصله إشعارات واتساب فورية بالحضور والغياب والمستحقات المالية — وتقدر تضيفه لاحقًا من الإعدادات.</p>
+                </div>
               </div>
             )}
 

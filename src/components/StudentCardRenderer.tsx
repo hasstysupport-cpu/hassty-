@@ -3,7 +3,7 @@
  * جميع الحقوق محفوظة لدي Tikzoom © | MCV_M
  * المبرمج: محمود على محمود مدكور
  * بصمة حقوق الملكية: هذا الموقع بجميع ملفاته وأكواده وتصاميمه ملك خاص للمالك Mahmoudmadkour وجميع الأملاك له فقط،
- * ويُمنع النسخ أو النقل أو إعادة استخدام أي جزء منه دون إذن كتابي مسبق من المالك.
+ * ويُمنع النسخ أو النقل أو النشر أو إعادة استخدام أي جزء منه دون إذن كتابي مسبق من المالك.
  * Copyright (c) Mahmoudmadkour — All Rights Reserved.
  */
 
@@ -11,20 +11,18 @@ import React, { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import JsBarcode from 'jsbarcode';
 import {
-  User,
-  Phone,
-  Calendar,
-  MapPin,
-  Users,
-  CheckCircle2,
-  Globe,
-  Sparkles,
   QrCode as QrIcon,
   ShieldCheck,
   Building2,
   GraduationCap,
   AlertCircle,
-  Award
+  ScanLine,
+  Globe,
+  Phone,
+  MapPin,
+  Users,
+  CalendarDays,
+  BadgeCheck,
 } from 'lucide-react';
 import { StudentProfile, StudentCardCustomization } from '../types';
 
@@ -37,75 +35,93 @@ export interface StudentCardRendererProps {
   id?: string;
 }
 
+/* لوحات الألوان — obsidian هو التصميم الحصري الافتراضي (أسود أوبسيديان + ذهبي) */
 export const THEME_PALETTES = {
+  obsidian: {
+    id: 'obsidian',
+    name: 'أوبسيديان ذهبي (الحصري الفاخر)',
+    bgGradient: 'from-[#0C0C12] via-[#15151F] to-[#08080C]',
+    solidColor: '#15151F',
+    accent: '#E3C878',
+    accentDeep: '#A98B3F',
+    accentLight: '#F7ECD2',
+    badgeBg: 'rgba(227, 200, 120, 0.14)',
+    borderAccent: 'rgba(227, 200, 120, 0.45)',
+  },
   emerald: {
     id: 'emerald',
-    name: 'حِصّتي زمردي (الأصلي المعتمد)',
-    bgGradient: 'from-[#005E51] via-[#004D40] to-[#00382E]',
-    solidColor: '#005E51',
-    accentLight: '#E0F2F1',
-    textHighlight: '#80CBC4',
-    badgeBg: 'rgba(255, 255, 255, 0.20)',
-    borderAccent: 'rgba(255, 255, 255, 0.30)',
+    name: 'زمردي ملكي',
+    bgGradient: 'from-[#02251F] via-[#004D40] to-[#01251E]',
+    solidColor: '#004D40',
+    accent: '#7FE0C3',
+    accentDeep: '#00695C',
+    accentLight: '#D7F5EC',
+    badgeBg: 'rgba(127, 224, 195, 0.14)',
+    borderAccent: 'rgba(127, 224, 195, 0.45)',
   },
   blue: {
     id: 'blue',
-    name: 'أزرق ملكي فاخر (Royal Blue)',
-    bgGradient: 'from-[#1E40AF] via-[#1D4ED8] to-[#172554]',
+    name: 'أزرق ملكي',
+    bgGradient: 'from-[#0B1B4D] via-[#1D4ED8] to-[#0A1436]',
     solidColor: '#1D4ED8',
-    accentLight: '#EFF6FF',
-    textHighlight: '#93C5FD',
-    badgeBg: 'rgba(255, 255, 255, 0.20)',
-    borderAccent: 'rgba(255, 255, 255, 0.30)',
+    accent: '#9DC1FF',
+    accentDeep: '#1E40AF',
+    accentLight: '#E0EBFF',
+    badgeBg: 'rgba(157, 193, 255, 0.14)',
+    borderAccent: 'rgba(157, 193, 255, 0.45)',
   },
   purple: {
     id: 'purple',
-    name: 'بنفسجي إمبراطوري (Imperial Purple)',
-    bgGradient: 'from-[#6B21A8] via-[#7E22CE] to-[#3B0764]',
+    name: 'بنفسجي إمبراطوري',
+    bgGradient: 'from-[#2A0A4A] via-[#7E22CE] to-[#1C0634]',
     solidColor: '#7E22CE',
-    accentLight: '#FAF5FF',
-    textHighlight: '#D8B4FE',
-    badgeBg: 'rgba(255, 255, 255, 0.20)',
-    borderAccent: 'rgba(255, 255, 255, 0.30)',
+    accent: '#E2C4FF',
+    accentDeep: '#6B21A8',
+    accentLight: '#F3E8FF',
+    badgeBg: 'rgba(226, 196, 255, 0.14)',
+    borderAccent: 'rgba(226, 196, 255, 0.45)',
   },
   gold: {
     id: 'gold',
-    name: 'أسود وذهبي VIP (Luxury Gold)',
-    bgGradient: 'from-[#18181B] via-[#27272A] to-[#09090B]',
-    solidColor: '#18181B',
-    accentLight: '#FEF08A',
-    textHighlight: '#FACC15',
-    badgeBg: 'rgba(250, 204, 21, 0.18)',
-    borderAccent: 'rgba(250, 204, 21, 0.40)',
+    name: 'ذهبي VIP',
+    bgGradient: 'from-[#14110A] via-[#2A2213] to-[#0B0906]',
+    solidColor: '#2A2213',
+    accent: '#F5D06F',
+    accentDeep: '#8A6D1F',
+    accentLight: '#FBF0D2',
+    badgeBg: 'rgba(245, 208, 111, 0.15)',
+    borderAccent: 'rgba(245, 208, 111, 0.5)',
   },
   crimson: {
     id: 'crimson',
-    name: 'عنابي ياقوتي (Crimson Ruby)',
-    bgGradient: 'from-[#9F1239] via-[#BE123C] to-[#4C0519]',
-    solidColor: '#BE123C',
-    accentLight: '#FFE4E6',
-    textHighlight: '#FDA4AF',
-    badgeBg: 'rgba(255, 255, 255, 0.20)',
-    borderAccent: 'rgba(255, 255, 255, 0.30)',
+    name: 'عنابي ياقوتي',
+    bgGradient: 'from-[#3D0517] via-[#9F1239] to-[#260310]',
+    solidColor: '#9F1239',
+    accent: '#FFB4C4',
+    accentDeep: '#881337',
+    accentLight: '#FFE4EA',
+    badgeBg: 'rgba(255, 180, 196, 0.14)',
+    borderAccent: 'rgba(255, 180, 196, 0.45)',
   },
   slate: {
     id: 'slate',
-    name: 'كربوني داكن (Carbon Modern)',
-    bgGradient: 'from-[#334155] via-[#1E293B] to-[#0F172A]',
+    name: 'كربوني بلاتيني',
+    bgGradient: 'from-[#101828] via-[#1E293B] to-[#0B1120]',
     solidColor: '#1E293B',
-    accentLight: '#F1F5F9',
-    textHighlight: '#94A3B8',
-    badgeBg: 'rgba(255, 255, 255, 0.18)',
-    borderAccent: 'rgba(255, 255, 255, 0.25)',
+    accent: '#C7D6EA',
+    accentDeep: '#334155',
+    accentLight: '#EEF3F9',
+    badgeBg: 'rgba(199, 214, 234, 0.14)',
+    borderAccent: 'rgba(199, 214, 234, 0.4)',
   },
-};
+} as const;
 
 export const DEFAULT_CARD_CUSTOMIZATION: StudentCardCustomization = {
-  themeColor: 'emerald',
+  themeColor: 'obsidian',
   centerName: 'HASSTY',
   academicYear: 'عام دراسي 2026 - 2027',
   cardTitle: 'كارت طالب',
-  footerText: 'POWERED BY HASSTY',
+  footerText: 'منصة حِصّتي التعليمية',
   disclaimerText: 'هذا الكارت خاص بالطالب، يرجى عدم إعارته للآخرين',
   showPhone: true,
   showCity: true,
@@ -115,9 +131,11 @@ export const DEFAULT_CARD_CUSTOMIZATION: StudentCardCustomization = {
   showQR: true,
   showAvatar: false,
   groupNameText: 'فردي',
-  issueDateText: '2026 / 08 / 18',
+  issueDateText: '',
   cardOrientation: 'horizontal',
 };
+
+const todayEgypt = () => new Date().toLocaleDateString('ar-EG', { year: 'numeric', month: '2-digit', day: '2-digit' });
 
 export const StudentCardRenderer: React.FC<StudentCardRendererProps> = ({
   student,
@@ -153,7 +171,7 @@ export const StudentCardRenderer: React.FC<StudentCardRendererProps> = ({
 
     calculateScale();
     window.addEventListener('resize', calculateScale);
-    
+
     let observer: ResizeObserver | null = null;
     if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
       observer = new ResizeObserver(() => calculateScale());
@@ -168,8 +186,14 @@ export const StudentCardRenderer: React.FC<StudentCardRendererProps> = ({
 
   const activeScale = scale !== undefined ? scale : autoScale;
 
-  const activeTheme = THEME_PALETTES[config.themeColor] || THEME_PALETTES.emerald;
-  const barcodeValue = (student.studentIdNumber || student.qrCode || '2026HST09812').replace(/[^0-9A-Za-z]/g, '').slice(0, 14) || '2026HST09812';
+  const activeTheme = (THEME_PALETTES as any)[config.themeColor] || (THEME_PALETTES as any).obsidian;
+  const accent = (activeTheme as any).accent || '#E3C878';
+  const accentDeep = (activeTheme as any).accentDeep || '#A98B3F';
+  const accentLight = (activeTheme as any).accentLight || '#F7ECD2';
+
+  /* الكود الحقيقي الموحد (profiles.qr_code — نفس ما يقرأه ماسح المدرس) */
+  const cardCode = student.qrCode || student.qrCodeValue || '';
+  const barcodeValue = (student.studentIdNumber || cardCode.replace(/[^0-9A-Za-z-]/g, '') || '2026HST01').replace(/-/g, '').slice(0, 14) || '2026HST01';
 
   // Generate crisp SVG Barcode
   useEffect(() => {
@@ -177,56 +201,51 @@ export const StudentCardRenderer: React.FC<StudentCardRendererProps> = ({
       try {
         JsBarcode(barcodeRef.current, barcodeValue, {
           format: 'CODE128',
-          width: 1.8,
-          height: 48,
+          width: 1.7,
+          height: 40,
           displayValue: false,
           margin: 0,
           background: 'transparent',
-          lineColor: '#09090b',
+          lineColor: accentDeep,
         });
       } catch {
         try {
-          JsBarcode(barcodeRef.current, '2026HST09812', {
+          JsBarcode(barcodeRef.current, '2026HST01', {
             format: 'CODE128',
-            width: 1.8,
-            height: 48,
+            width: 1.7,
+            height: 40,
             displayValue: false,
             margin: 0,
             background: 'transparent',
-            lineColor: '#09090b',
+            lineColor: accentDeep,
           });
         } catch (e) {
           console.error('Barcode render error:', e);
         }
       }
     }
-  }, [barcodeValue, config.showBarcode, showBackSide]);
+  }, [barcodeValue, config.showBarcode, showBackSide, accentDeep]);
 
-  // Generate mini QR code
+  // Generate the PROMINENT QR — دقة عالية + تصحيح أخطاء H ليقرأ فورًا حتى من شاشة مضيئة
   useEffect(() => {
-    QRCode.toDataURL(student.qrCode || 'HASSTY-2026HST09812', {
-      width: 256,
+    QRCode.toDataURL(cardCode || 'HASSTY-2026HST01', {
+      width: 512,
       margin: 1,
-      color: {
-        dark: '#004D40',
-        light: '#FFFFFF',
-      },
-      errorCorrectionLevel: 'M',
+      color: { dark: '#0B0B10', light: '#FFFFFF' },
+      errorCorrectionLevel: 'H',
     })
       .then((url) => setQrDataUrl(url))
       .catch((err) => console.error('QR generation error:', err));
-  }, [student.qrCode]);
+  }, [cardCode]);
 
-  // Spaced out barcode text: "2 0 2 6 H S T 0 9 8 1 2"
-  const formattedBarcodeDigits = barcodeValue.split('').join(' ');
+  const issueDateText = config.issueDateText || todayEgypt();
+  const spacedCode = cardCode.replace(/-/g, ' ');
 
   return (
     <div
       ref={containerRef}
       className={`w-full max-w-[640px] flex items-center justify-center overflow-visible mx-auto ${className}`}
-      style={{
-        height: `${Math.round(380 * activeScale)}px`,
-      }}
+      style={{ height: `${Math.round(380 * activeScale)}px` }}
     >
       <div
         id={id}
@@ -240,270 +259,191 @@ export const StudentCardRenderer: React.FC<StudentCardRendererProps> = ({
           transformOrigin: 'center center',
         }}
       >
-        {/* Outer PVC Card Wrapper with subtle 3D border and glossy finish */}
+        {/* الغلاف الخارجي PVC مع إطار ذهبي رفيع */}
         <div
-          className="w-full h-full rounded-[24px] overflow-hidden shadow-2xl relative border border-slate-700/20 bg-white"
+          className="w-full h-full rounded-[26px] overflow-hidden relative"
           style={{
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.08)',
+            background: activeTheme.bgGradient.includes('from-') ? undefined : activeTheme.solidColor,
+            boxShadow: `0 30px 60px -18px rgba(0,0,0,0.55), 0 0 0 1px ${activeTheme.borderAccent}`,
             fontFamily: "'IBM Plex Sans Arabic', 'Cairo', system-ui, sans-serif",
             direction: 'ltr',
           }}
         >
-          {/* Realistic Card Glare Overlay */}
+          {/* الخلفية المتدرجة الفاخرة */}
+          <div className={`absolute inset-0 bg-gradient-to-bl ${activeTheme.bgGradient}`} />
+
+          {/* نقشة قطرية خفيفة (فخامة) */}
+          <svg className="absolute inset-0 w-full h-full opacity-[0.05] pointer-events-none" aria-hidden>
+            <defs>
+              <pattern id={`hst-diag-${config.themeColor}`} width="14" height="14" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+                <line x1="0" y1="0" x2="0" y2="14" stroke="#FFFFFF" strokeWidth="1" />
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill={`url(#hst-diag-${config.themeColor})`} />
+          </svg>
+
+          {/* إطار داخلي ذهبي رفيع */}
+          <div className="absolute inset-[10px] rounded-[18px] pointer-events-none" style={{ border: `1.5px solid ${activeTheme.borderAccent}`, opacity: 0.75 }} />
+
+          {/* بريق هولوغرافي واقعي */}
           <div
-            className="absolute inset-0 pointer-events-none z-40 opacity-25 mix-blend-overlay"
-            style={{
-              background: 'linear-gradient(135deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.05) 50%, rgba(0,0,0,0.1) 100%)',
-            }}
+            className="absolute inset-0 pointer-events-none z-40 opacity-30 mix-blend-overlay"
+            style={{ background: 'linear-gradient(125deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.04) 38%, rgba(0,0,0,0.12) 72%, rgba(255,255,255,0.18) 100%)' }}
           />
 
           {!showBackSide ? (
-            /* ========================================================================= */
-            /* FRONT SIDE (PERFECT SPLIT: LEFT WHITE + RIGHT EMERALD WAVE)               */
-            /* ========================================================================= */
-            <div className="w-full h-full flex flex-row relative" style={{ direction: 'ltr' }}>
-              
-              {/* --------------------------------------------------------------------- */}
-              {/* LEFT SIDE: White Section (~42% Width = 268px)                         */}
-              {/* --------------------------------------------------------------------- */}
-              <div
-                className="w-[268px] h-full bg-white p-5 pr-4 flex flex-col justify-between items-stretch text-right relative z-10 shrink-0"
-                style={{ direction: 'rtl' }}
-              >
-                
-                {/* 1. Header: كارت طالب + عام دراسي */}
-                <div className="space-y-1 pt-1 z-10">
-                  <h1 className="text-2xl font-black text-gray-950 tracking-tight leading-none">
-                    {config.cardTitle || 'كارت طالب'}
-                  </h1>
-                  <p className="text-[11px] font-bold text-gray-400">
-                    {config.academicYear || 'عام دراسي 2026 - 2027'}
-                  </p>
+            /* ================================================================ */
+            /* الوجه الأمامي: يسار QR بارز + يمين بيانات الطالب الفاخرة          */
+            /* ================================================================ */
+            <div className="w-full h-full flex flex-row relative z-10">
+
+              {/* ---------------- الجانب الأيسر: QR بارز في لوح أبيض ---------------- */}
+              <div className="w-[252px] h-full p-4 pl-5 flex flex-col items-center justify-between shrink-0" style={{ direction: 'rtl' }}>
+
+                {/* شارة رسمية أعلى اللوح */}
+                <div className="w-full flex items-center justify-center gap-1.5 pt-1">
+                  <ShieldCheck className="w-3.5 h-3.5" style={{ color: accent }} />
+                  <span className="text-[10px] font-black tracking-wide" style={{ color: accent }}>
+                    كارت رسمي معتمد
+                  </span>
                 </div>
 
-                {/* 2. Real Barcode & Spaced Code Numbers */}
+                {/* لوح الـ QR البارز — إطار مزدوج ذهبي */}
+                {config.showQR ? (
+                  <div className="relative rounded-[20px] p-[7px]" style={{ background: `linear-gradient(140deg, ${accent}, ${accentDeep} 55%, ${accent})`, boxShadow: '0 14px 30px -10px rgba(0,0,0,0.65)' }}>
+                    <div className="rounded-[15px] bg-white p-[9px]">
+                      {qrDataUrl ? (
+                        <img src={qrDataUrl} alt="QR كود الطالب الفريد" className="w-[150px] h-[150px] object-contain block" />
+                      ) : (
+                        <div className="w-[150px] h-[150px] flex items-center justify-center"><QrIcon className="w-16 h-16 text-slate-300" /></div>
+                      )}
+                    </div>
+                    {/* مؤشرات المسح في الأركان */}
+                    <span className="absolute -top-1.5 -right-1.5 w-3 h-3 rounded-full border-2" style={{ borderColor: accent, background: '#0C0C12' }} />
+                    <span className="absolute -bottom-1.5 -left-1.5 w-3 h-3 rounded-full border-2" style={{ borderColor: accent, background: '#0C0C12' }} />
+                  </div>
+                ) : <div className="h-[170px]" />}
+
+                {/* تلميح المسح + الكود الفريد */}
+                <div className="text-center space-y-1">
+                  <div className="flex items-center justify-center gap-1 text-[9.5px] font-bold" style={{ color: accentLight }}>
+                    <ScanLine className="w-3 h-3" />
+                    <span>امسح الكود — حضور فوري في ثوانٍ</span>
+                  </div>
+                  <div className="font-mono font-black text-[12.5px] tracking-[0.18em]" style={{ color: accent }} dir="ltr">
+                    {cardCode || 'HASSTY-XXXXXXXXXX'}
+                  </div>
+                </div>
+
+                {/* الباركود الصغير أسفل اللوح */}
                 {config.showBarcode && (
-                  <div className="w-full flex flex-col items-center justify-center my-auto px-1 z-10">
-                    <div className="w-full flex justify-center items-center py-0.5">
-                      <svg ref={barcodeRef} className="max-w-[215px] h-[52px] w-full" />
-                    </div>
-                    <div className="text-center mt-1">
-                      <span className="text-[15px] font-black text-gray-900 font-mono tracking-[0.24em] inline-block">
-                        {formattedBarcodeDigits}
-                      </span>
-                    </div>
+                  <div className="w-full flex flex-col items-center gap-0.5 pb-1">
+                    <svg ref={barcodeRef} className="w-[190px] h-[34px]" />
+                    <span className="text-[8.5px] font-mono tracking-[0.3em]" style={{ color: accentLight, opacity: 0.85 }} dir="ltr">
+                      {barcodeValue.split('').join(' ')}
+                    </span>
                   </div>
                 )}
-
-                {/* 3. Left Footer: Hassty Platform Brand & Mini QR Code */}
-                <div className="w-full flex items-center justify-between pt-2 border-t border-gray-100/90 z-10">
-                  
-                  {/* Brand & URL */}
-                  <div className="space-y-0.5 text-right">
-                    <p className="text-[11px] font-black tracking-wider text-gray-700 uppercase">
-                      {config.footerText || 'POWERED BY HASSTY'}
-                    </p>
-                    <p className="text-[9.5px] font-bold text-gray-400">
-                      www.hassty.com
-                    </p>
-                  </div>
-
-                  {/* QR Code */}
-                  {config.showQR && (
-                    <div className="shrink-0 flex items-center justify-center">
-                      <div className="w-13 h-13 bg-white p-0.5 rounded-lg border border-teal-800/30 shadow-2xs flex items-center justify-center overflow-hidden">
-                        {qrDataUrl ? (
-                          <img src={qrDataUrl} alt="QR Code" className="w-full h-full object-contain" />
-                        ) : (
-                          <QrIcon className="w-8 h-8 text-teal-700" />
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                </div>
-
               </div>
 
-              {/* --------------------------------------------------------------------- */}
-              {/* SVG ORGANIC CURVED WAVE SEPARATOR (from X=268 to X=640)              */}
-              {/* --------------------------------------------------------------------- */}
-              <div className="absolute inset-0 pointer-events-none z-20">
-                <svg
-                  viewBox="0 0 640 380"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="w-full h-full"
-                  preserveAspectRatio="none"
-                >
-                  {/* Organic wave shape spanning the right portion */}
-                  <path
-                    d="M 268,0 C 248,95 305,185 260,275 C 242,315 255,360 268,380 L 640,380 L 640,0 Z"
-                    fill={`url(#hasstyGradient-${config.themeColor})`}
-                  />
-                  <defs>
-                    <linearGradient id={`hasstyGradient-${config.themeColor}`} x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor={activeTheme.solidColor} />
-                      <stop offset="60%" stopColor={activeTheme.solidColor} />
-                      <stop offset="100%" stopColor="#00332A" />
-                    </linearGradient>
-                  </defs>
-                </svg>
-              </div>
+              {/* فاصل عمودي ذهبي متدرج */}
+              <div className="w-[2px] h-[calc(100%-56px)] self-center rounded-full" style={{ background: `linear-gradient(180deg, transparent, ${accent}, transparent)`, opacity: 0.55 }} />
 
-              {/* --------------------------------------------------------------------- */}
-              {/* RIGHT SIDE: Luxury Colored Wave Section (~58% Width = 372px)          */}
-              {/* --------------------------------------------------------------------- */}
-              <div
-                className={`w-[372px] h-full bg-gradient-to-bl ${activeTheme.bgGradient} text-white p-6 pl-7 flex flex-col justify-between relative z-30 ml-auto text-right shrink-0`}
-                style={{ direction: 'rtl' }}
-              >
-                
-                {/* Background ambient lighting and Graduation Cap Watermark */}
-                <div className="absolute top-0 right-0 w-44 h-44 bg-white/10 rounded-full blur-2xl pointer-events-none" />
-                <div className="absolute bottom-0 left-0 w-36 h-36 bg-black/20 rounded-full blur-xl pointer-events-none" />
-                <div className="absolute -left-4 -bottom-4 opacity-10 pointer-events-none">
-                  <GraduationCap className="w-48 h-48 text-white" />
+              {/* ---------------- الجانب الأيمن: هوية الطالب والمنصة ---------------- */}
+              <div className="flex-1 h-full p-5 pr-6 flex flex-col justify-between relative" style={{ direction: 'rtl' }}>
+
+                {/* توهجات خلفية */}
+                <div className="absolute top-0 left-0 w-40 h-40 rounded-full blur-3xl pointer-events-none" style={{ background: `${accent}14` }} />
+                <div className="absolute -bottom-8 -right-8 opacity-[0.07] pointer-events-none">
+                  <GraduationCap className="w-44 h-44 text-white" />
                 </div>
 
-                {/* 1. TOP HEADER: HASSTY / BRANDING */}
-                <div className="flex flex-col items-start z-10 pb-0.5 text-right">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-2xl font-black tracking-wide text-white leading-tight">
-                      {config.centerName || 'HASSTY'}
-                    </h2>
-                    <GraduationCap className="w-5 h-5 text-teal-300 opacity-90 inline-block" />
+                {/* الترويسة: علامة المنصة + شارة التحقق */}
+                <div className="flex items-center justify-between relative z-10">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: `linear-gradient(140deg, ${accent}, ${accentDeep})`, boxShadow: '0 6px 14px -4px rgba(0,0,0,0.5)' }}>
+                      <GraduationCap className="w-5.5 h-5.5 text-[#0C0C12]" />
+                    </div>
+                    <div className="space-y-0">
+                      <h2 className="text-xl font-black text-white leading-none tracking-tight">{config.centerName || 'HASSTY'}</h2>
+                      <p className="text-[9.5px] font-bold" style={{ color: accent }}>منصة حِصّتي التعليمية</p>
+                    </div>
                   </div>
-                  <span className="text-[11.5px] font-semibold text-teal-100/90 block">
-                    إدارة الحضور والتعليم الذكي
-                  </span>
+                  <div className="flex items-center gap-1 px-2.5 py-1 rounded-full border text-[9px] font-black" style={{ borderColor: activeTheme.borderAccent, background: activeTheme.badgeBg, color: accent }}>
+                    <BadgeCheck className="w-3 h-3" />
+                    <span>موثّق 2026/2027</span>
+                  </div>
                 </div>
 
-                {/* 2. STUDENT DATA ROWS */}
-                <div className="space-y-2 z-10 my-auto py-0.5">
-                  
-                  {/* Field 1: اسم الطالب */}
-                  <div className="space-y-0.5 text-right">
-                    <span className="text-teal-200/90 text-xs font-bold block">
-                      اسم الطالب:
-                    </span>
-                    <h3 className="text-2xl font-black text-white leading-tight drop-shadow-xs truncate max-w-[290px]">
-                      {student.name || 'زياد أحمد عبد الله'}
-                    </h3>
+                {/* بيانات الطالب */}
+                <div className="space-y-[7px] my-1 relative z-10">
+                  <div className="space-y-0.5">
+                    <span className="text-[10px] font-black tracking-wide" style={{ color: accent }}>اسم الطالب</span>
+                    <h3 className="text-[25px] font-black text-white leading-tight drop-shadow-sm truncate max-w-[320px]">{student.name || 'اسم الطالب'}</h3>
                   </div>
 
-                  {/* Field 2: المجموعة */}
-                  {config.showGroup && (
-                    <div className="flex items-center justify-between text-[13px] font-bold">
-                      <span className="text-teal-200/90 font-bold text-xs">
-                        المجموعة:
-                      </span>
-                      <span className="text-white font-black text-[14px]">
-                        {config.groupNameText || student.groupName || 'فردي'}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Field 3: رقم الهاتف */}
-                  {config.showPhone && (
-                    <div className="flex items-center justify-between text-[13px] font-bold">
-                      <span className="text-teal-200/90 font-bold text-xs">
-                        رقم الهاتف:
-                      </span>
-                      <span className="font-mono font-black text-white text-[14.5px] tracking-wider" style={{ direction: 'ltr' }}>
-                        {student.phone || '01012345678'}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Field 4: تاريخ الإصدار */}
-                  {config.showIssueDate && (
-                    <div className="flex items-center justify-between text-[12.5px] font-bold">
-                      <span className="text-teal-200/90 font-bold text-xs">
-                        تاريخ الإصدار:
-                      </span>
-                      <span className="font-mono font-black text-white/95 text-[13px]" style={{ direction: 'ltr' }}>
-                        {config.issueDateText || '2026 / 08 / 18'}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Field 5: المدينة / المحافظة */}
-                  {config.showCity && (
-                    <div className="flex items-center justify-between text-[12.5px] font-bold">
-                      <span className="text-teal-200/90 font-bold text-xs">
-                        المدينة:
-                      </span>
-                      <span className="font-bold text-white/95 truncate max-w-[180px] text-[13px]">
-                        {student.governorate || 'القاهرة'} {student.area ? `– ${student.area}` : '– حي السفارات'}
-                      </span>
-                    </div>
-                  )}
-
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-[6px] pt-1">
+                    <CardField icon={<GraduationCap className="w-3 h-3" />} label="الصف" value={student.grade || '—'} accent={accent} />
+                    {config.showGroup && <CardField icon={<Users className="w-3 h-3" />} label="المجموعة" value={config.groupNameText || student.groupName || 'فردي'} accent={accent} />}
+                    {config.showPhone && <CardField icon={<Phone className="w-3 h-3" />} label="الهاتف" value={student.phone || '—'} accent={accent} mono />}
+                    {config.showCity && <CardField icon={<MapPin className="w-3 h-3" />} label="المحافظة" value={`${student.governorate || 'القاهرة'}${student.area ? ` – ${student.area}` : ''}`} accent={accent} />}
+                    {config.showIssueDate && <CardField icon={<CalendarDays className="w-3 h-3" />} label="إصدار الكارت" value={issueDateText} accent={accent} mono />}
+                    <CardField icon={<Globe className="w-3 h-3" />} label="المنصة" value="hassty.site" accent={accent} mono />
+                  </div>
                 </div>
 
-                {/* 3. BOTTOM DISCLAIMER */}
-                <div className="pt-1.5 flex items-center justify-start text-[10px] text-teal-100/80 z-10">
-                  <span className="truncate max-w-[280px]">
+                {/* الشريط السفلي: المنصة + إخلاء المسؤولية */}
+                <div className="relative z-10 rounded-2xl px-3.5 py-2 flex items-center justify-between" style={{ background: 'rgba(255,255,255,0.045)', border: `1px solid ${activeTheme.borderAccent}` }}>
+                  <span className="text-[9.5px] font-bold truncate max-w-[300px]" style={{ color: accentLight, opacity: 0.9 }}>
                     {config.disclaimerText || 'هذا الكارت خاص بالطالب، يرجى عدم إعارته للآخرين'}
                   </span>
-                </div>
-
-              </div>
-
-            </div>
-          ) : (
-            /* ========================================================================= */
-            /* BACK SIDE: Official Regulations & Emergency Contacts                      */
-            /* ========================================================================= */
-            <div className="w-full h-full bg-slate-900 text-white p-6 flex flex-col justify-between text-right relative overflow-hidden">
-              
-              {/* Header */}
-              <div className="flex items-center justify-between pb-3 border-b border-white/10">
-                <div className="flex items-center gap-2">
-                  <Building2 className="w-5 h-5 text-teal-400" />
-                  <span className="font-black text-sm text-white">
-                    تعليمات وشروط استخدام بطاقة الطالب — منصة حِصّتي
+                  <span className="text-[10px] font-black tracking-widest shrink-0" style={{ color: accent }} dir="ltr">
+                    hassty.site
                   </span>
                 </div>
-                <span className="text-[10px] text-teal-300 font-mono bg-teal-950 px-2 py-0.5 rounded border border-teal-800">
-                  ID: {student.studentIdNumber || '2026HST09812'}
+              </div>
+            </div>
+          ) : (
+            /* ================================================================ */
+            /* الوجه الخلفي: التعليمات + طوارئ ولي الأمر + هوية المنصة           */
+            /* ================================================================ */
+            <div className="w-full h-full relative z-10 text-white p-6 flex flex-col justify-between" style={{ direction: 'rtl' }}>
+
+              <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: activeTheme.borderAccent }}>
+                <div className="flex items-center gap-2">
+                  <Building2 className="w-5 h-5" style={{ color: accent }} />
+                  <span className="font-black text-sm text-white">تعليمات استخدام كارت الطالب — منصة حِصّتي</span>
+                </div>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded border" style={{ color: accent, borderColor: activeTheme.borderAccent, background: activeTheme.badgeBg }} dir="ltr">
+                  ID: {cardCode || '—'}
                 </span>
               </div>
 
-              {/* Rules List */}
-              <div className="space-y-2 text-[11px] text-gray-300 my-auto py-1">
-                <div className="flex items-start gap-2">
-                  <span className="w-4 h-4 rounded-full bg-teal-500/20 text-teal-300 font-bold flex items-center justify-center shrink-0 mt-0.5 text-[9px]">
-                    1
-                  </span>
-                  <p>يجب إبراز هذا الكارت عند بوابة السنتر أو قاعة الحصة لتسجيل الحضور الإلكتروني الفوري.</p>
-                </div>
-
-                <div className="flex items-start gap-2">
-                  <span className="w-4 h-4 rounded-full bg-teal-500/20 text-teal-300 font-bold flex items-center justify-center shrink-0 mt-0.5 text-[9px]">
-                    2
-                  </span>
-                  <p>بمجرد مسح الكود، يتم إرسال إشعار فوري لولي الأمر عبر واتساب لتأكيد وقت الحضور والغياب.</p>
-                </div>
-
-                <div className="flex items-start gap-2">
-                  <span className="w-4 h-4 rounded-full bg-teal-500/20 text-teal-300 font-bold flex items-center justify-center shrink-0 mt-0.5 text-[9px]">
-                    3
-                  </span>
-                  <p>في حال فقدان الكارت يرجى إبلاغ إدارة السنتر فوراً لإعادة إصداره وإلغاء الكود السابق.</p>
-                </div>
+              <div className="space-y-2.5 text-[11px] text-gray-300 my-auto py-1">
+                {[
+                  'يجب إبراز هذا الكارت عند بوابة السنتر أو قاعة الحصة لتسجيل الحضور الإلكتروني الفوري — المسح يستغرق أقل من ثانيتين.',
+                  'بمجرد مسح الكود يُسجل الحضور في سجل المدرس ويصل إشعار فوري لولي الأمر (واتساب + إشعارات المنصة) بتأكيد الحضور أو الغياب.',
+                  'كود QR الفريد خاص بك وحدك ولا يعمل مع أي طالب آخر — في حال فقدان الكارت أعد إصداره فورًا من صفحة الكارت داخل المنصة.',
+                  'يمكن للمدرس تحصيل الاشتراك الشهري بمسح نفس الكود، ويصل إيصال الدفع لولي الأمر تلقائيًا.',
+                ].map((rule, idx) => (
+                  <div key={idx} className="flex items-start gap-2">
+                    <span className="w-4 h-4 rounded-full font-bold flex items-center justify-center shrink-0 mt-0.5 text-[9px]" style={{ background: activeTheme.badgeBg, color: accent, border: `1px solid ${activeTheme.borderAccent}` }}>
+                      {idx + 1}
+                    </span>
+                    <p className="leading-relaxed">{rule}</p>
+                  </div>
+                ))}
               </div>
 
-              {/* Footer Contact & Emergency Bar */}
-              <div className="pt-3 border-t border-white/10 flex items-center justify-between text-[10px] text-gray-400">
+              <div className="pt-3 border-t flex items-center justify-between text-[10px] text-gray-400" style={{ borderColor: activeTheme.borderAccent }}>
                 <div className="flex items-center gap-1.5">
                   <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
-                  <span>هاتف طوارئ ولي الأمر: {student.emergencyParentPhone || student.parentPhone || '01000000000'}</span>
+                  <span>هاتف طوارئ ولي الأمر: {student.emergencyParentPhone || student.parentPhone || 'غير مسجل — أضفه من الإعدادات'}</span>
                 </div>
-                <span className="font-bold text-teal-400">HASSTY Smart Attendance</span>
+                <span className="font-black flex items-center gap-1" style={{ color: accent }}>
+                  <Globe className="w-3 h-3" /> hassty.site
+                </span>
               </div>
-
             </div>
           )}
         </div>
@@ -511,3 +451,16 @@ export const StudentCardRenderer: React.FC<StudentCardRendererProps> = ({
     </div>
   );
 };
+
+/* حقل بيانات صغير موحد */
+const CardField = ({ icon, label, value, accent, mono = false }: { icon: React.ReactNode; label: string; value: string; accent: string; mono?: boolean }) => (
+  <div className="space-y-0">
+    <span className="text-[9px] font-bold flex items-center gap-1" style={{ color: accent, opacity: 0.85 }}>
+      {icon}
+      <span>{label}</span>
+    </span>
+    <span className={`block text-[12.5px] font-black text-white truncate ${mono ? 'font-mono tracking-wide' : ''}`} style={mono ? { direction: 'ltr', textAlign: 'right' } : undefined}>
+      {value}
+    </span>
+  </div>
+);

@@ -41,7 +41,7 @@ export async function downloadStudentQRImage(student: StudentProfile, filename?:
     width: 440,
     margin: 2,
     color: {
-      dark: '#1E3A8A',
+      dark: '#0B0B10',
       light: '#FFFFFF'
     },
     errorCorrectionLevel: 'H'
@@ -164,7 +164,7 @@ export async function downloadFullStudentCardImage(student: StudentProfile, file
     width: 380,
     margin: 2,
     color: {
-      dark: '#1E3A8A',
+      dark: '#0B0B10',
       light: '#FFFFFF'
     },
     errorCorrectionLevel: 'H'
