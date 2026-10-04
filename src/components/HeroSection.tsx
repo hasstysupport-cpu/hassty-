@@ -108,14 +108,14 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onSearch, onOpenQRSimu
               </div>
             </div>
 
-            {/* Bold Headline — بدون تأخير دخول (كان يؤخر أول رسم للنص = LCP) */}
+            {/* Bold Headline — يحتوي على اسم المنصة لتعزيز ظهور منصة حصتي في صدارة البحث */}
             <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black text-[#1E3A8A] leading-[1.3] tracking-tight mb-3 anim-up" style={{ animationDelay: '0ms', animationDuration: '0.45s' }}>
-              اعثر على أفضل{' '}
+              منصة حِصّتي — اعثر على أفضل{' '}
               <span className="hs-grad relative inline-block font-black">
                 المدرسين الخصوصيين
                 <span className="absolute bottom-1 right-0 left-0 h-2.5 bg-gradient-to-l from-blue-200/60 to-violet-200/60 -z-10 rounded-full"></span>
               </span>{' '}
-              القريبين منك
+              في منطقتك
             </h1>
 
             {/* Subheadline — بدون تأخير دخول (كان أطول عنصر نصي مؤجل = عنصر LCP) */}

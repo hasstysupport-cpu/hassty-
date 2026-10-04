@@ -20,7 +20,7 @@ interface RevealStageProps {
 export const RevealStage: React.FC<RevealStageProps> = ({ isActive, settings }) => {
   if (!isActive) return null;
 
-  const platformUrl = settings?.canonical_url || 'https://hassty.vercel.app/';
+  const platformUrl = settings?.canonical_url || 'https://hassty.site/';
 
   return (
     <motion.div

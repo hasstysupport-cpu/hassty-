@@ -178,11 +178,22 @@ const ROUTES = [
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const jsonldFor = (r) => {
-  // صفحات بتوفر JSON-LD كامل خاص بيها (مثل /qr-attendance): نحقن الـ @graph كامل مع Breadcrumb وWebPage
+  const websiteEntity = {
+    '@type': 'WebSite',
+    '@id': `${BASE}/#website`,
+    url: `${BASE}/`,
+    name: 'منصة حصتي',
+    alternateName: ['حصتي', 'Hassty', 'Hassty Egypt'],
+    description: 'ابحث عن المدرسين الخصوصيين واحجز حصصك مباشرة في مصر',
+    inLanguage: 'ar-EG',
+  };
+
+  // صفحات بتوفر JSON-LD كامل خاص بيها (مثل /qr-attendance): نحقن الـ @graph كامل مع WebSite وBreadcrumb وWebPage
   if (r.pageGraph) {
     return JSON.stringify({
       '@context': 'https://schema.org',
       '@graph': [
+        websiteEntity,
         {
           '@type': 'BreadcrumbList',
           itemListElement: [
@@ -206,6 +217,7 @@ const jsonldFor = (r) => {
   return JSON.stringify({
     '@context': 'https://schema.org',
     '@graph': [
+      websiteEntity,
       {
         '@type': 'BreadcrumbList',
         itemListElement: [

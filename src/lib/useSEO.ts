@@ -25,8 +25,8 @@ interface SeoProps {
   breadcrumbs?: string[];
 }
 
-export const DEFAULT_TITLE = 'منصة حصتي | أفضل منصة لحجز المدرسين الخصوصيين وحضور الـ QR في مصر';
-export const DEFAULT_DESC = 'منصة حصتي (Hassty) هي المنصة التعليمية الأولى في مصر لحجز أفضل المدرسين الخصوصيين المعتمدين لمختلف المراحل الدراسية واللغات مع نظام متابعة الحضور التلقائي بكود QR وإشعارات فورية عبر الواتساب.';
+export const DEFAULT_TITLE = 'منصة حصتي — الموقع الرسمي لحجز المدرسين الخصوصيين وحضور الـ QR في مصر';
+export const DEFAULT_DESC = 'الموقع الرسمي لمنصة حِصّتي التعليمية (Hassty) في مصر: احجز أفضل المدرسين الخصوصيين المعتمدين، نظام حضور ذكي بكود QR، إشعارات فورية لأولياء الأمور، ومتابعة الدرجات والمدفوعات.';
 export const BASE_URL = 'https://hassty.site';
 const DEFAULT_ROBOTS = 'index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1';
 
@@ -87,8 +87,17 @@ export function useSEO({ title, description, keywords, canonicalPath, ogType = '
   const jsonLdId = 'page-specific-jsonld';
 
   useEffect(() => {
-    // 1. Document Title
-    const formattedTitle = title ? `${title} | منصة حصتي` : DEFAULT_TITLE;
+    // 1. Document Title — الأولوية لاسم البراند في البداية للصفحة الرئيسية وتفادي التكرار
+    let formattedTitle = DEFAULT_TITLE;
+    if (title) {
+      if (title.includes('منصة حصتي') || title.includes('حصتي')) {
+        formattedTitle = title;
+      } else if (canonicalPath === '/' || !canonicalPath) {
+        formattedTitle = `منصة حصتي — ${title}`;
+      } else {
+        formattedTitle = `${title} | منصة حصتي`;
+      }
+    }
     document.title = formattedTitle;
 
     // 2. Description + Keywords

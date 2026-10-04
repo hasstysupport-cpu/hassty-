@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://hassty.site/</loc>
+    <lastmod>2026-10-02</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://hassty.site/" />
+    <xhtml:link rel="alternate" hreflang="ar-EG" href="https://hassty.site/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hassty.site/" />
+  </url>
+  <url>
+    <loc>https://hassty.site/search</loc>
+    <lastmod>2026-10-02</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.95</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://hassty.site/search" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hassty.site/search" />
+  </url>
+  <url>
+    <loc>https://hassty.site/qr-attendance</loc>
+    <lastmod>2026-10-02</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.90</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://hassty.site/qr-attendance" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hassty.site/qr-attendance" />
+  </url>
+  <url>
+    <loc>https://hassty.site/for-teachers</loc>
+    <lastmod>2026-10-02</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://hassty.site/for-teachers" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hassty.site/for-teachers" />
+  </url>
+  <url>
+    <loc>https://hassty.site/about</loc>
+    <lastmod>2026-10-02</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.75</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://hassty.site/about" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hassty.site/about" />
+  </url>
+  <url>
+    <loc>https://hassty.site/contact</loc>
+    <lastmod>2026-10-02</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.70</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://hassty.site/contact" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hassty.site/contact" />
+  </url>
+  <url>
+    <loc>https://hassty.site/team</loc>
+    <lastmod>2026-10-02</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.65</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://hassty.site/team" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hassty.site/team" />
+  </url>
+  <url>
+    <loc>https://hassty.site/signup</loc>
+    <lastmod>2026-10-02</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.60</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://hassty.site/signup" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hassty.site/signup" />
+  </url>
+  <url>
+    <loc>https://hassty.site/login</loc>
+    <lastmod>2026-10-02</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.55</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://hassty.site/login" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hassty.site/login" />
+  </url>
+  <url>
+    <loc>https://hassty.site/assistant/signup</loc>
+    <lastmod>2026-10-02</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.50</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://hassty.site/assistant/signup" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hassty.site/assistant/signup" />
+  </url>
+  <url>
+    <loc>https://hassty.site/legal/terms</loc>
+    <lastmod>2026-10-02</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.35</priority>
+  </url>
+  <url>
+    <loc>https://hassty.site/legal/privacy</loc>
+    <lastmod>2026-10-02</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.35</priority>
+  </url>
+  <url>
+    <loc>https://hassty.site/legal/teacher</loc>
+    <lastmod>2026-10-02</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.35</priority>
+  </url>
+  <url>
+    <loc>https://hassty.site/legal/cookies</loc>
+    <lastmod>2026-10-02</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.30</priority>
+  </url>
+  <url>
+    <loc>https://hassty.site/legal/acceptable</loc>
+    <lastmod>2026-10-02</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.30</priority>
+  </url>
+  <url>
+    <loc>https://hassty.site/legal/refund</loc>
+    <lastmod>2026-10-02</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.30</priority>
+  </url>
+  <url>
+    <loc>https://hassty.site/legal/rights</loc>
+    <lastmod>2026-10-02</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.30</priority>
+  </url>
+</urlset>
