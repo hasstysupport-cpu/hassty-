@@ -91,7 +91,7 @@ export const TeacherScanPage: React.FC = () => {
     setBusy(true); setMessage(null);
     try {
       const student=await findStudentByQr(qr);
-      if(!student){setMessage({kind:'error',title:'QR غير معروف',body:'لم يتم العثور على حساب طالب حقيقي بهذا الكود. لا يتم إنشاء بيانات تجريبية.'});return;}
+      if(!student){setMessage({kind:'error',title:'QR غير معروف',body:`لم يتم العثور على حساب طالب حقيقي بالكود «${qr}». تأكد أن الطالب سجّل حسابه وأن الكارت مطبوع من أحدث إصدار (كارت الطالب داخل حساب الطالب) — أو جرّب البحث برقم هاتفه. لا يتم إنشاء بيانات تجريبية.`});return;}
 
       if(mode==='enroll'){
         const existing=await getEnrolledStudent(selectedGroup.id,student.id);

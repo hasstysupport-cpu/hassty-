@@ -21,6 +21,7 @@
 
 import { supabase } from './supabase';
 import { notifyParentPayment } from './parentNotify';
+import { findStudentByQr } from './attendanceService';
 
 export interface EnrolledStudentRow {
   enrollment_id: string;
@@ -279,21 +280,8 @@ export async function collectStudentMonth(input: CollectMonthInput): Promise<Col
 /** العثور على طالب من QR + التحقق أنه مقيد بمجموعات المدرس (لوضع التحصيل بالمسح) */
 export async function findCollectableStudent(teacherId: string, qrCode: string) {
   if (!supabase) return { student: null, enrollment: null };
-  // findStudentByQr من attendanceService معاد الاستخدام هنا منطقيًا — لكن لتجنب دورة استيراد نفذ البحث مباشرة
-  const clean = qrCode.trim().toUpperCase();
-  if (!clean) return { student: null, enrollment: null };
-  const values = clean.startsWith('HASSTY-') || clean.startsWith('STU-') ? [clean] : [clean, `HASSTY-${clean}`];
-  let student: any = null;
-  for (const code of values) {
-    const { data } = await supabase
-      .from('profiles')
-      .select('id, full_name, phone, avatar_url, qr_code, grade, role, account_status')
-      .eq('qr_code', code)
-      .eq('role', 'student')
-      .neq('account_status', 'suspended')
-      .limit(1);
-    if (data?.[0]) { student = data[0]; break; }
-  }
+  // البحث الموحد: RPC الأمنية find_student_by_qr + الاحتياطي المباشر — يعمل للمدرس رغم RLS
+  const student = await findStudentByQr(qrCode);
   if (!student) return { student: null, enrollment: null };
 
   const { data: enrollment } = await supabase

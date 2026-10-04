@@ -112,9 +112,16 @@ export async function saveNewStudent(teacherId: string, student: Omit<TeacherStu
 
   let studentId = student.id && isUuid(student.id) ? student.id : '';
 
-  // If studentId not provided, search by qrCode or phone
+  // If studentId not provided, search by qrCode or phone (RPC الأمنية تدعم الكود والهاتف وتعمل رغم RLS)
   if (!studentId) {
-    if (student.qrCode) {
+    const identifier = student.qrCode || student.phone || '';
+    if (identifier) {
+      try {
+        const { data: rpcData } = await supabase.rpc('find_student_by_qr', { p_code: identifier });
+        if (rpcData?.[0]?.id) studentId = rpcData[0].id;
+      } catch { /* البحث المباشر كاحتياط */ }
+    }
+    if (!studentId && student.qrCode) {
       const { data: byQr } = await supabase.from('profiles').select('id').eq('qr_code', student.qrCode.trim().toUpperCase()).limit(1);
       if (byQr?.[0]?.id) studentId = byQr[0].id;
     }
@@ -124,24 +131,9 @@ export async function saveNewStudent(teacherId: string, student: Omit<TeacherStu
     }
   }
 
-  // If still not found, create a student profile record
+  // If still not found: المخطط يمنع إنشاء بروفايل بدون حساب حقيقي (profiles مرتبط بـ auth.users)
   if (!studentId) {
-    studentId = crypto.randomUUID();
-    const qrCode = student.qrCode || `HASSTY-STU-${Math.floor(100000 + Math.random() * 900000)}`;
-    const phone = student.phone || `010${Math.floor(10000000 + Math.random() * 90000000)}`;
-    await supabase.from('profiles').upsert({
-      id: studentId,
-      full_name: student.name,
-      phone,
-      role: 'student',
-      grade: student.grade || 'الصف الثالث الثانوي',
-      qr_code: qrCode,
-      avatar_url: student.avatarUrl || '',
-      account_status: 'active',
-      badge: 'none',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    });
+    throw new Error('لا يوجد حساب طالب حقيقي بهذه البيانات. اطلب من الطالب إنشاء حساب أولًا من صفحة التسجيل، ثم أضفه بكود QR من كارت الطالب أو رقم هاتفه.');
   }
 
   if (student.groupName === 'بدون مجموعة') {

@@ -13,8 +13,25 @@ import { notifyParentAttendance } from './parentNotify';
 export type AttendanceStatus = 'present' | 'late' | 'absent';
 const parseTime = (value: string) => { const [hours, minutes] = String(value || '').split(':').map(Number); if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null; return hours * 60 + minutes; };
 
+/** تطبيع كود QR: إزالة المحارف الخفية + استخراج الكود لو الـ QR فيه رابط أو نص إضافي */
+export function normalizeQrInput(raw: string): string {
+  let s = String(raw || '');
+  s = s.replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069]/g, '');
+  s = s.trim().toUpperCase();
+  const embedded = s.match(/HASSTY-[A-Z0-9]+/);
+  if (embedded) return embedded[0];
+  return s.replace(/\s+/g, '');
+}
+
 export async function findStudentByQr(qrCode: string) {
-  if (!supabase) return null; const clean = qrCode.trim().toUpperCase(); if (!clean) return null;
+  if (!supabase) return null;
+  const clean = normalizeQrInput(qrCode); if (!clean) return null;
+  // 1) البحث عبر الـ RPC الأمنية — يعمل للمدرس وولي الأمر رغم RLS (مطابقة كود دقيقة + fallback الكروت القديمة)
+  try {
+    const { data: rpcData, error: rpcError } = await supabase.rpc('find_student_by_qr', { p_code: qrCode });
+    if (!rpcError && rpcData?.[0]) return rpcData[0] as any;
+  } catch { /* نكمل بالبحث المباشر */ }
+  // 2) احتياطي: بحث مباشر (يعمل للأدمن ولطلاب مجموعات المدرس بفضل سياسة profiles_select_enrolled_students)
   const values = clean.startsWith('HASSTY-') || clean.startsWith('STU-') ? [clean] : [clean, `HASSTY-${clean}`];
   for (const code of values) { const { data, error } = await supabase.from('profiles').select('id,full_name,phone,avatar_url,qr_code,grade,role,account_status').eq('qr_code', code).eq('role', 'student').neq('account_status', 'suspended').limit(1); if (!error && data?.[0]) return data[0]; }
   return null;
