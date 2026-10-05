@@ -194,7 +194,7 @@ export async function notifyParentPayment(input: ParentPaymentNotifyInput): Prom
         date: new Date().toLocaleDateString('ar-EG'),
         link: input.link,
       }, contacts.parentUserId || undefined, contacts.parentPhone);
-      whatsapp = res?.success === true;
+      whatsapp = res?.success === true && (res as any)?.whatsapp?.ok === true;
     } catch (err) { console.warn('[parentNotify] payment whatsapp failed:', (err as any)?.message); }
   }
 
@@ -244,8 +244,9 @@ export async function notifyParentAttendance(input: ParentAttendanceNotifyInput)
         status: statusKey as 'on_time' | 'late' | 'absent_cutoff',
         offsetMinutes: Math.max(0, input.lateMinutes || 0),
         timeString: input.timeString,
+        recipientUserId: contacts.parentUserId || undefined,
       });
-      whatsapp = res?.success === true;
+      whatsapp = res?.success === true && (res as any)?.whatsapp?.ok === true;
     } catch (err) { console.warn('[parentNotify] attendance whatsapp failed:', (err as any)?.message); }
   }
 

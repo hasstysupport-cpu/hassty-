@@ -66,10 +66,10 @@ export const whatsappService = {
   async sendLocation(params: { number: string; latitude: number; longitude: number; name?: string; address?: string }) { return sendKind('location', params); },
   async sendReaction(_params: { number: string; messageKey: { remoteJid: string; fromMe: boolean; id: string }; emoji: string }) { return { success: false, error: 'التفاعلات المباشرة غير مفعلة حاليًا في طبقة GREEN API.' }; },
   async notifyEvent(event: string, data: any = {}, recipientUserId?: string, phone?: string) { return post('/api/whatsapp/notify', { event, data, recipientUserId, phone }); },
-  async sendAttendanceNotice(params: { parentPhone: string; studentName: string; groupName: string; status: 'on_time' | 'late' | 'absent_cutoff'; offsetMinutes: number; timeString: string }) {
+  async sendAttendanceNotice(params: { parentPhone: string; studentName: string; groupName: string; status: 'on_time' | 'late' | 'absent_cutoff'; offsetMinutes: number; timeString: string; recipientUserId?: string }) {
     const status = params.status === 'on_time' ? 'present' : params.status === 'late' ? 'late' : 'absent';
     const statusLabel = params.status === 'on_time' ? 'حاضر في الموعد' : params.status === 'late' ? 'حاضر متأخر' : 'غائب';
-    return this.notifyEvent('attendance', { studentName: params.studentName, groupName: params.groupName, status, statusLabel, lateMinutes: params.offsetMinutes, time: params.timeString }, undefined, params.parentPhone);
+    return this.notifyEvent('attendance', { studentName: params.studentName, groupName: params.groupName, status, statusLabel, lateMinutes: params.offsetMinutes, time: params.timeString }, params.recipientUserId, params.parentPhone);
   },
   async sendPaymentReceipt(params: { parentPhone: string; studentName: string; groupName: string; amount: number; invoiceNumber: string; billingType: 'per_session' | 'monthly'; fileUrl?: string; fileName?: string }) {
     return this.notifyEvent('payment', { ...params, typeLabel: params.billingType === 'per_session' ? 'حصة دراسية' : 'اشتراك شهري' }, undefined, params.parentPhone);

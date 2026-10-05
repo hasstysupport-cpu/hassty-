@@ -197,7 +197,7 @@ export const TeacherStudentsPage: React.FC<TeacherStudentsPageProps> = ({ onNavi
             >
               <option value="all">جميع المجموعات</option>
               {availableGroups.map((grp) => (
-                <option key={grp} value={grp}>{grp}</option>
+                <option key={grp.name} value={grp.name}>{grp.name}</option>
               ))}
             </select>
           )}

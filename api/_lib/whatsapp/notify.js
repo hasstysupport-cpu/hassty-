@@ -8,7 +8,7 @@
  */
 
 import { jsonErr, jsonOk, readJsonBody } from '../config.js';
-import { findProfile, findProfileByPhone, internalOrUser, sendFile, sendText } from '../green.js';
+import { describeWhatsAppError, findProfile, findProfileByPhone, internalOrUser, sendFile, sendText } from '../green.js';
 import { sendPushToUser } from '../push.js';
 
 const templates = {
@@ -69,17 +69,35 @@ export default async function handler(req, res) {
 
     const message = templates[event](data.role || access.profile?.role || '', data.name || access.profile?.full_name || '', data);
 
-    /* 1) واتساب (إن وُجد رقم) */
+    /* 1) واتساب (إن وُجد رقم) — فشله لا يوقف بقية القنوات أبدًا */
     let sent = null;
-    if (phone) sent = await sendText(phone, message);
+    let whatsapp = phone
+      ? { ok: false, error: 'لم يُحاول الإرسال.' }
+      : { ok: false, skipped: true, error: 'لا يوجد رقم واتساب للمستلم.' };
+    if (phone) {
+      try {
+        sent = await sendText(phone, message);
+        whatsapp = { ok: true };
+      } catch (waErr) {
+        console.error('[whatsapp/notify] send failed:', waErr?.message);
+        whatsapp = { ok: false, error: describeWhatsAppError(waErr) };
+      }
+    }
 
     let invoice = null;
     if (event === 'teacher_invoice' || (event === 'payment' && data.fileUrl)) {
       const fileUrl = data.fileUrl;
-      if (fileUrl && phone) invoice = await sendFile(phone, fileUrl, data.fileName || `hassty-${data.invoiceNumber || 'invoice'}.pdf`, 'فاتورة منصة حِصّتي 🧾');
+      if (fileUrl && phone) {
+        try {
+          invoice = await sendFile(phone, fileUrl, data.fileName || `hassty-${data.invoiceNumber || 'invoice'}.pdf`, 'فاتورة منصة حِصّتي 🧾');
+        } catch (invErr) {
+          console.error('[whatsapp/notify] invoice file failed:', invErr?.message);
+          whatsapp = whatsapp.ok ? { ok: false, error: describeWhatsAppError(invErr) } : whatsapp;
+        }
+      }
     }
 
-    /* 2) إشعارات المتصفح (Web Push) — نفس الإشعار لأجهزة المستخدم حتى لو مقفّل الموقع */
+    /* 2) إشعارات المتصفح (Web Push) — تعمل دائمًا حتى لو فشل الواتساب */
     let push = { sent: 0, total: 0 };
     if (pushUserId) {
       try {
@@ -90,7 +108,7 @@ export default async function handler(req, res) {
       }
     }
 
-    return jsonOk(res, { success: true, sent, invoice, push });
+    return jsonOk(res, { success: true, sent, whatsapp, invoice, push });
   } catch (err) {
     console.error('[whatsapp/notify]', err);
     return jsonErr(res, err?.message || 'فشل إرسال إشعار واتساب.', err?.status || 500);

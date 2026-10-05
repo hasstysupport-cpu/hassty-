@@ -8,7 +8,7 @@
  */
 
 import { readJsonBody, jsonOk, jsonErr } from '../config.js';
-import { internalOrUser, sendText, sendFile, sendLocation, sendInteractive, chatId } from '../green.js';
+import { describeWhatsAppError, internalOrUser, sendText, sendFile, sendLocation, sendInteractive, chatId } from '../green.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return jsonErr(res, 'طريقة الطلب غير مسموحة.', 405);
@@ -39,6 +39,10 @@ export default async function handler(req, res) {
     return jsonOk(res, { success: true, data, chatId: chatId(number) });
   } catch (err) {
     console.error('[whatsapp/send]', err);
-    return jsonErr(res, err?.message || 'فشل إرسال رسالة واتساب.', err?.status || 500);
+    const friendly = describeWhatsAppError(err);
+    const e = new Error(friendly);
+    e.status = err?.status || 500;
+    e.quotaExceeded = err?.status === 466 || /quota/i.test(String(err?.data?.invokeStatus?.description || err?.message || ''));
+    return jsonErr(res, friendly, e.status, { quotaExceeded: e.quotaExceeded });
   }
 }

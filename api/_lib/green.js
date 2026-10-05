@@ -106,6 +106,22 @@ export async function getGreenState() {
   return greenRequest('getStateInstance', {}, 'GET');
 }
 
+/* تحويل أخطاء Green API إلى رسائل عربية مفهومة — خاصة حصة الباقة المجانية (466) */
+export function describeWhatsAppError(err) {
+  const status = err?.status || 0;
+  const raw = String(
+    err?.data?.invokeStatus?.description || err?.data?.description || err?.data?.message || err?.message || ''
+  );
+  if (status === 466 || /quota/i.test(raw)) {
+    return 'حصة أرقام الباقة المجانية في Green API انتهت — يمكن الإرسال حاليًا فقط إلى الأرقام المسجلة في الباقة. قم بترقية الباقة من console.green-api.com لتفعيل كل الأرقام.';
+  }
+  if (status === 401) return 'مفاتيح Green API غير صحيحة (توكن أو معرّف مثيل).';
+  if (status === 402 || /blocked|tariff/i.test(raw)) return 'حساب Green API موقوف أو يحتاج تفعيل باقة مدفوعة.';
+  if (status === 404) return 'مثيل Green API غير موجود — تحقق من GREEN_API_INSTANCE_ID.';
+  if (/not authorized|stateinstance/i.test(raw) && status !== 200) return 'واتساب غير مصرّح على Green API — امسح رمز QR من لوحة التحكم مرة أخرى.';
+  return raw || 'فشل إرسال رسالة واتساب.';
+}
+
 export function validWebhookToken(req) {
   if (!GREEN_API_WEBHOOK_TOKEN) return false;
   const auth = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');

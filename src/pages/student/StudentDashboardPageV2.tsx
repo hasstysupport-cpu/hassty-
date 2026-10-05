@@ -94,7 +94,7 @@ export const StudentDashboardPageV2: React.FC<Props> = ({ onNavigate, onSelectTu
   };
 
   useEffect(()=>{ void loadDashboard(); },[uid]);
-  useEffect(()=>{ if(!uid) return subscribeToStudentPendingRequests(uid,setPendingRequests); },[uid]);
+  useEffect(()=>{ if(!uid) { setPendingRequests([]); return; } return subscribeToStudentPendingRequests(uid,setPendingRequests); },[uid]);
 
   const attendanceRate = useMemo(()=>{
     if(!attendance.length) return 0;
