@@ -14,6 +14,7 @@ import { RealQRCameraScanner } from '../../components/RealQRCameraScanner';
 import { supabase } from '../../lib/supabase';
 import { loadTeacherGroups } from '../../lib/teacherStore';
 import { findStudentByQr, getEnrolledStudent, getTiming, recordQrAttendance } from '../../lib/attendanceService';
+import { gradesMatch, gradeMismatchText } from '../../lib/gradeMatch';
 import { collectStudentMonth, currentMonthKey, monthLabel } from '../../lib/studentPaymentService';
 import { bestParentPhoneForEnrollment } from '../../lib/parentNotify';
 import { StudentGroup } from '../../types';
@@ -97,6 +98,13 @@ export const TeacherScanPage: React.FC = () => {
         const existing=await getEnrolledStudent(selectedGroup.id,student.id);
         if(existing){setMessage({kind:'info',title:'الطالب مسجل بالفعل',body:`${student.full_name||'الطالب'} موجود بالفعل في ${selectedGroup.name}.`});return;}
         if(!supabase)throw new Error('قاعدة البيانات غير متاحة.');
+        // مطابقة المرحلة إلزامية: مرحلة الطالب يجب أن تطابق مرحلة المجموعة (منع اللغبطة)
+        if(!String(student.grade||'').trim()){
+          setMessage({kind:'error',title:'مرحلة الطالب غير محددة',body:`${student.full_name||'الطالب'} لم يحدد صفه الدراسي في حسابه. اطلب منه تحديث المرحلة من إعدادات حسابه أولًا، ثم أعد القيد في مجموعة مرحلته.`});return;
+        }
+        if(selectedGroup.grade && !gradesMatch(student.grade, selectedGroup.grade)){
+          setMessage({kind:'error',title:'المرحلة غير مطابقة للمجموعة',body:`${student.full_name||'الطالب'} — ${gradeMismatchText(student.grade, selectedGroup.grade)}`});return;
+        }
         // رقم ولي الأمر: من ربط الحساب أو إعدادات الطالب — مش نسيبها فاضية
         const parentPhone=await bestParentPhoneForEnrollment(student.id).catch(()=>'');
         const {error}=await supabase.from('group_enrollments').insert({
@@ -134,7 +142,20 @@ export const TeacherScanPage: React.FC = () => {
       if(timing.state==='ended'){setMessage({kind:'warning',title:'الحصة انتهت',body:'لا يمكن تسجيل حضور بعد انتهاء الحصة.'});return;}
 
       const enrollment=await getEnrolledStudent(selectedGroup.id,student.id);
-      if(!enrollment){setMessage({kind:'error',title:'الطالب غير مقيد',body:'قيد الطالب في المجموعة أولًا باستخدام وضع «قيد طالب».'});return;}
+      if(!enrollment){
+        // توضيح اللغبطة: نعرض المجموعات المقيد بها الطالب فعليًا (إن وجدت)
+        let hisGroups='';
+        try{
+          const {data:his}=await supabase!.from('group_enrollments').select('group:student_groups(name,grade)').eq('student_id',student.id).eq('status','active');
+          const names=(his||[]).map((h:any)=>h.group?.name).filter(Boolean);
+          if(names.length) hisGroups=` الطالب مقيد حاليًا في: ${names.join('، ')}.`;
+        }catch{/* تجاهل */}
+        setMessage({kind:'error',title:'الطالب غير مقيد في هذه المجموعة',body:`${student.full_name||'الطالب'} ليس من طلاب «${selectedGroup.name}»${hisGroups||' — قيّده أولًا باستخدام وضع «قيد طالب» في مجموعة مرحلته نفسها.'}`});return;
+      }
+      // دفاع ثانٍ: حتى لو القيد قديم بمجموعة مخالفة للمرحلة، الحضور لن يُسجل إلا بمطابقة المرحلة
+      if(selectedGroup.grade && student.grade && !gradesMatch(student.grade, selectedGroup.grade)){
+        setMessage({kind:'error',title:'تعارض في المرحلة',body:`مرحلة الطالب «${student.grade}» لا تطابق مرحلة المجموعة «${selectedGroup.grade}» — صحح القيد أولًا.`});return;
+      }
 
       const status=timing.state==='on_time'?'present':timing.state==='late'?'late':'absent';
       let sessionId: string | undefined;
@@ -171,7 +192,7 @@ export const TeacherScanPage: React.FC = () => {
   return <div className="space-y-5 text-right max-w-5xl mx-auto">
     <section className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-7 shadow-sm">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4"><div><div className="inline-flex items-center gap-2 text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-full"><QrCode className="w-4 h-4"/>مسح حضور QR حقيقي</div><h2 className="text-xl sm:text-2xl font-black text-slate-900 mt-2">تسجيل حضور الطلاب بالوقت الفعلي</h2><p className="text-xs text-slate-500 mt-1">الحالة تُحسب تلقائيًا من موعد المجموعة ووقت المسح — مع ربط السجل بالحصة الفعلية إن وُجدت.</p></div><div className="flex items-center gap-2 text-xs font-bold text-slate-600 bg-slate-50 px-3 py-2 rounded-2xl border border-slate-200"><Clock3 className="w-4 h-4 text-blue-600"/>{now.toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}</div></div>
-      <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-3"><select value={selectedGroupId} onChange={e=>setSelectedGroupId(e.target.value)} className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold"><option value="">اختر المجموعة</option>{groups.map(g=><option key={g.id} value={g.id}>{g.name} — {g.schedule}</option>)}</select><div className="flex gap-2"><button type="button" onClick={()=>{setMode('attendance');setMessage(null)}} className={`flex-1 rounded-2xl border-2 px-3 py-3 text-sm font-black ${mode==='attendance'?'border-emerald-500 bg-emerald-50 text-emerald-800':'border-slate-200 bg-slate-50 text-slate-600'}`}><CheckCircle2 className="w-4 h-4 inline ml-1"/>حضور</button><button type="button" onClick={()=>{setMode('enroll');setMessage(null)}} className={`flex-1 rounded-2xl border-2 px-3 py-3 text-sm font-black ${mode==='enroll'?'border-blue-500 bg-blue-50 text-blue-800':'border-slate-200 bg-slate-50 text-slate-600'}`}><UserPlus className="w-4 h-4 inline ml-1"/>قيد طالب</button><button type="button" onClick={()=>{setMode('payment');setMessage(null)}} className={`flex-1 rounded-2xl border-2 px-3 py-3 text-sm font-black ${mode==='payment'?'border-amber-500 bg-amber-50 text-amber-800':'border-slate-200 bg-slate-50 text-slate-600'}`}><Banknote className="w-4 h-4 inline ml-1"/>تحصيل شهر</button></div></div>
+      <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-3"><select value={selectedGroupId} onChange={e=>setSelectedGroupId(e.target.value)} className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold"><option value="">اختر المجموعة</option>{groups.map(g=><option key={g.id} value={g.id}>{g.name} — {g.grade||'عام'} — {g.schedule}</option>)}</select><div className="flex gap-2"><button type="button" onClick={()=>{setMode('attendance');setMessage(null)}} className={`flex-1 rounded-2xl border-2 px-3 py-3 text-sm font-black ${mode==='attendance'?'border-emerald-500 bg-emerald-50 text-emerald-800':'border-slate-200 bg-slate-50 text-slate-600'}`}><CheckCircle2 className="w-4 h-4 inline ml-1"/>حضور</button><button type="button" onClick={()=>{setMode('enroll');setMessage(null)}} className={`flex-1 rounded-2xl border-2 px-3 py-3 text-sm font-black ${mode==='enroll'?'border-blue-500 bg-blue-50 text-blue-800':'border-slate-200 bg-slate-50 text-slate-600'}`}><UserPlus className="w-4 h-4 inline ml-1"/>قيد طالب</button><button type="button" onClick={()=>{setMode('payment');setMessage(null)}} className={`flex-1 rounded-2xl border-2 px-3 py-3 text-sm font-black ${mode==='payment'?'border-amber-500 bg-amber-50 text-amber-800':'border-slate-200 bg-slate-50 text-slate-600'}`}><Banknote className="w-4 h-4 inline ml-1"/>تحصيل شهر</button></div></div>
       {mode==='payment'&&<div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[11px] font-bold text-amber-900 flex items-start gap-2"><Banknote className="w-4 h-4 shrink-0 mt-0.5"/><span>امسح QR الطالب لتحصيل اشتراك الشهر الحالي ({monthLabel(currentMonthKey())}) — القيمة من اشتراك المجموعة، وتُسجل فورًا في سجل الطلاب وصفحات مدفوعات الطالب وولي الأمر مع إشعار واتساب + إشعارات فورية.</span></div>}
       <div className={`mt-4 rounded-2xl border px-4 py-3 flex items-center gap-3 ${banner.label.includes('الموعد')?'bg-emerald-50 border-emerald-200 text-emerald-900':banner.label.includes('تأخير')?'bg-amber-50 border-amber-200 text-amber-900':banner.label.includes('غياب')||banner.label.includes('انتهت')?'bg-red-50 border-red-200 text-red-900':'bg-slate-50 border-slate-200 text-slate-700'}`}><BannerIcon className="w-5 h-5"/><div><div className="font-black text-sm">{banner.label}</div><div className="text-[11px] opacity-80">{activeSlot?`موعد المجموعة: ${activeSlot.dayArabic} ${activeSlot.startTime} → ${activeSlot.endTime}`:'الحالة تتحدث تلقائيًا كل 5 ثوانٍ'}</div></div></div>
     </section>

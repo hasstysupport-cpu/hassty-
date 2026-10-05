@@ -14,6 +14,7 @@ import { supabase } from '../../lib/supabase';
 import { Btn, Card, ConfirmDialog, DataTable, EmptyState, ErrorBlock, PageHeader, StatusBadge, Tabs, fmtDateTime, useToast } from '../../components/common/ui';
 import { getCleanAvatarUrl } from '../../lib/avatarHelper';
 import { notifyParentTransfer } from '../../lib/parentNotify';
+import { gradesMatch, gradeMismatchText } from '../../lib/gradeMatch';
 
 /* ================================================================
    طلبات الالتحاق (booking_requests) — قبول / رفض / إسناد لمجموعة
@@ -66,6 +67,9 @@ export const TeacherEnrollmentRequestsPage: React.FC<{ onNavigate?: (p: string) 
         const group = groups.find((g) => g.id === groupId);
         const seats = Number(group?.max_students || 0) - Number(group?.current_count || 0);
         if (seats <= 0) throw new Error('المجموعة المختارة ممتلئة.');
+        // مطابقة المرحلة إلزامية — منع إسناد طالب لمجموعة مرحلته مخالفة
+        const reqGrade = req.student_grade || req.grade || '';
+        if (reqGrade && group?.grade && !gradesMatch(reqGrade, group.grade)) throw new Error(gradeMismatchText(reqGrade, group.grade));
         const { error: enrollError } = await supabase.from('group_enrollments').upsert({
           group_id: groupId, student_id: req.student_id, student_name: req.student_name, student_phone: req.student_phone,
           parent_phone: req.parent_phone || null, grade: req.student_grade || req.grade || null, qr_code: null, status: 'active', payment_status: 'pending',
@@ -106,7 +110,7 @@ export const TeacherEnrollmentRequestsPage: React.FC<{ onNavigate?: (p: string) 
         { key: 'status', header: 'الحالة', render: (r) => <StatusBadge status={r.status} /> },
         { key: 'actions', header: 'إجراءات', render: (r) => r.status === 'pending' ? (
           <div className="flex items-center gap-1.5">
-            <Btn size="sm" variant="success" disabled={busy === r.id} onClick={() => groups.length ? setAssign({ request: r, groupId: groups[0].id }) : push('error', 'أنشئ مجموعة أولًا لإسناد الطالب.')}>
+            <Btn size="sm" variant="success" disabled={busy === r.id} onClick={() => setAssign({ request: r, groupId: '' })}>
               <UserCheck className="w-3.5 h-3.5" />قبول
             </Btn>
             <Btn size="sm" variant="danger" disabled={busy === r.id} onClick={() => void decide(r, false)}>
@@ -120,26 +124,37 @@ export const TeacherEnrollmentRequestsPage: React.FC<{ onNavigate?: (p: string) 
         <div className="text-[11px] text-slate-500">{r.subject || '—'} • {r.day || '—'} {r.time || ''}</div>
         <div className="font-mono text-[11px] text-blue-700" dir="ltr">{r.student_phone || '—'}</div>
         {r.status === 'pending' && <div className="flex gap-2 pt-1">
-          <Btn size="sm" variant="success" className="flex-1" onClick={() => groups.length ? setAssign({ request: r, groupId: groups[0].id }) : push('error', 'أنشئ مجموعة أولًا.')}>قبول</Btn>
+          <Btn size="sm" variant="success" className="flex-1" onClick={() => setAssign({ request: r, groupId: '' })}>قبول</Btn>
           <Btn size="sm" variant="danger" className="flex-1" onClick={() => void decide(r, false)}>رفض</Btn>
         </div>}
       </div>} />
     {/* Group assignment dialog */}
-    {assign && (
+    {assign && (() => {
+      // مجموعات مطابقة لمرحلة الطالب فقط — منع اللغبطة من المصدر
+      const reqGrade = assign.request.student_grade || assign.request.grade || '';
+      const matching = groups.filter((g) => gradesMatch(reqGrade, g.grade));
+      const active = matching.find((g) => g.id === assign.groupId) ? assign.groupId : '';
+      return (
       <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm" dir="rtl">
         <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-md w-full p-6">
           <h3 className="text-sm font-black text-slate-900">إسناد {assign.request.student_name} إلى مجموعة</h3>
-          <p className="mt-1 text-xs text-slate-500 leading-6">اختر المجموعة المناسبة. سيتم تسجيل الطالب تلقائيًا وتحديث عدد المقاعد.</p>
-          <select value={assign.groupId} onChange={(e) => setAssign((p) => p ? { ...p, groupId: e.target.value } : p)} className="mt-4 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-bold outline-none focus:ring-2 focus:ring-blue-100">
-            {groups.map((g) => <option key={g.id} value={g.id}>{g.name} — {g.subject || 'عام'} ({g.current_count}/{g.max_students} مقعد)</option>)}
-          </select>
+          <p className="mt-1 text-xs text-slate-500 leading-6">مرحلة الطالب: <b className="text-slate-700">{reqGrade || 'غير محددة'}</b> — تظهر فقط المجموعات المطابقة لنفس المرحلة (أو العامة بدون مرحلة محددة).</p>
+          {matching.length ? (
+            <select value={active} onChange={(e) => setAssign((p) => p ? { ...p, groupId: e.target.value } : p)} className="mt-4 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-bold outline-none focus:ring-2 focus:ring-blue-100">
+              <option value="">اختر مجموعة مناسبة لمرحلة الطالب...</option>
+              {matching.map((g) => <option key={g.id} value={g.id}>{g.name} — {g.subject || 'عام'} — {g.grade || 'عام'} ({g.current_count}/{g.max_students} مقعد)</option>)}
+            </select>
+          ) : (
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs font-bold text-amber-900 leading-6">لا توجد مجموعة بنفس مرحلة الطالب ({reqGrade || 'غير محددة'}). أنشئ مجموعة جديدة بمرحلته أولًا من صفحة المجموعات، ثم اقبل الطلب.</div>
+          )}
           <div className="mt-5 flex gap-2 justify-end">
             <Btn variant="secondary" size="sm" onClick={() => setAssign(null)}>إلغاء</Btn>
-            <Btn variant="success" size="sm" disabled={!!busy} onClick={() => void decide(assign.request, true, assign.groupId)}>تأكيد القبول والإسناد</Btn>
+            <Btn variant="success" size="sm" disabled={!!busy || !active} onClick={() => void decide(assign.request, true, active)}>تأكيد القبول والإسناد</Btn>
           </div>
         </div>
       </div>
-    )}
+      );
+    })()}
   </div>;
 };
 

@@ -28,6 +28,7 @@ import { Badge } from '../../components/common/Badge';
 import { Modal } from '../../components/common/Modal';
 import { useAuth } from '../../lib/AuthContext';
 import { loadTeacherStudents, saveNewStudent, removeStudent, loadTeacherGroups } from '../../lib/teacherStore';
+import { gradesMatch, gradeMismatchText } from '../../lib/gradeMatch';
 
 interface TeacherStudentsPageProps {
   onNavigate?: (path: string) => void;
@@ -41,7 +42,7 @@ export const TeacherStudentsPage: React.FC<TeacherStudentsPageProps> = ({ onNavi
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGroup, setSelectedGroup] = useState('all');
-  const [availableGroups, setAvailableGroups] = useState<string[]>([]);
+  const [availableGroups, setAvailableGroups] = useState<{ name: string; grade: string }[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newStudentCode, setNewStudentCode] = useState('');
   const [newStudentName, setNewStudentName] = useState('');
@@ -59,7 +60,7 @@ export const TeacherStudentsPage: React.FC<TeacherStudentsPageProps> = ({ onNavi
       ]);
       setStudents(list);
       if (groups.length > 0) {
-        setAvailableGroups(groups.map((g) => g.name));
+        setAvailableGroups(groups.map((g) => ({ name: g.name, grade: g.grade || '' })));
         if (!newStudentGroup || newStudentGroup === 'المجموعة العامة') {
           setNewStudentGroup(groups[0].name);
         }
@@ -95,6 +96,12 @@ export const TeacherStudentsPage: React.FC<TeacherStudentsPageProps> = ({ onNavi
   const handleAddStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newStudentName) return;
+    // مطابقة المرحلة إلزامية: المجموعة المختارة يجب أن تكون من نفس مرحلة الطالب
+    const chosen = availableGroups.find((g) => g.name === newStudentGroup);
+    if (chosen && chosen.grade && !gradesMatch(newStudentGrade, chosen.grade)) {
+      alert(`لا يمكن قيد الطالب: ${gradeMismatchText(newStudentGrade, chosen.grade)}`);
+      return;
+    }
 
     const added = await saveNewStudent(teacherId, {
       name: newStudentName,
@@ -368,18 +375,25 @@ export const TeacherStudentsPage: React.FC<TeacherStudentsPageProps> = ({ onNavi
 
             <div>
               <label className="block text-xs font-bold text-[#1F2937] mb-1">
-                المجموعة
+                المجموعة (مرحلتها تطابق مرحلة الطالب)
               </label>
               {availableGroups.length > 0 ? (
-                <select
-                  value={newStudentGroup}
-                  onChange={(e) => setNewStudentGroup(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-[#E5E7EB] rounded-xl text-xs text-right focus:bg-white focus:outline-none focus:border-[#2563EB]"
-                >
-                  {availableGroups.map((g) => (
-                    <option key={g} value={g}>{g}</option>
-                  ))}
-                </select>
+                availableGroups.some((g) => gradesMatch(newStudentGrade, g.grade)) ? (
+                  <select
+                    value={availableGroups.some((g) => g.name === newStudentGroup && gradesMatch(newStudentGrade, g.grade)) ? newStudentGroup : ''}
+                    onChange={(e) => setNewStudentGroup(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-[#E5E7EB] rounded-xl text-xs text-right focus:bg-white focus:outline-none focus:border-[#2563EB]"
+                  >
+                    <option value="">اختر مجموعة من مرحلة الطالب...</option>
+                    {availableGroups.filter((g) => gradesMatch(newStudentGrade, g.grade)).map((g) => (
+                      <option key={g.name} value={g.name}>{g.name} — {g.grade || 'عام'}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="w-full px-3.5 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] font-bold text-amber-800 leading-6">
+                    لا توجد مجموعة بنفس مرحلة الطالب ({newStudentGrade}) — أنشئ مجموعة بهذه المرحلة من صفحة المجموعات أولًا.
+                  </div>
+                )
               ) : (
                 <input
                   type="text"
@@ -396,7 +410,7 @@ export const TeacherStudentsPage: React.FC<TeacherStudentsPageProps> = ({ onNavi
               className="w-full py-3 bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
-              <span>تأكيد إضافة الطالب</span>
+              <span>تأكيد إضافة الطالب في مجموعة مرحلته</span>
             </button>
           </form>
         )}

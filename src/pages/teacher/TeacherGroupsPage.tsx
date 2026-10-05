@@ -42,6 +42,7 @@ import {
   getStoredGroups,
   getStoredStudents
 } from '../../lib/teacherStore';
+import { gradesMatch, gradeMismatchText } from '../../lib/gradeMatch';
 
 const ALL_EGYPT_GRADES = [
   'الصف الأول الإعدادي',
@@ -230,7 +231,7 @@ export const TeacherGroupsPage: React.FC = () => {
     setTimeout(() => setActionFeedback(null), 3500);
   };
 
-  // Transfer student to another group
+  // Transfer student to another group — نقل حقيقي: خروج من القيد القديم + قيد جديد بنفس المرحلة
   const handleExecuteTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!studentToTransfer || !targetTransferGroupId) return;
@@ -238,8 +239,26 @@ export const TeacherGroupsPage: React.FC = () => {
     const targetGroup = groups.find((g) => g.id === targetTransferGroupId);
     if (!targetGroup) return;
 
+    // منع اللغبطة: مرحلة المجموعة الهدف يجب أن تطابق مرحلة الطالب
+    if (targetGroup.grade && studentToTransfer.grade && !gradesMatch(studentToTransfer.grade, targetGroup.grade)) {
+      setActionFeedback(`تعذر النقل: ${gradeMismatchText(studentToTransfer.grade, targetGroup.grade)}`);
+      setTimeout(() => setActionFeedback(null), 7000);
+      return;
+    }
+
+    try {
+      // 1) حذف القيد القديم نهائيًا (الطالب ينتقل ولا يبقى في مجموعتين)
+      await removeStudent(teacherId, studentToTransfer.id);
+      // 2) قيد جديد في المجموعة الهدف
+      await saveNewStudent(teacherId, { ...studentToTransfer, groupName: targetGroup.name, status: 'active' });
+    } catch (trErr: any) {
+      setActionFeedback(`تعذر نقل الطالب: ${String(trErr?.message || trErr).slice(0, 90)}`);
+      setTimeout(() => setActionFeedback(null), 7000);
+      void loadData();
+      return;
+    }
+
     const updatedStudent = { ...studentToTransfer, groupName: targetGroup.name };
-    await saveNewStudent(teacherId, updatedStudent);
 
     setAllStudents((prev) =>
       prev.map((s) => (s.id === studentToTransfer.id ? updatedStudent : s))
@@ -505,12 +524,13 @@ export const TeacherGroupsPage: React.FC = () => {
                     onChange={(e) => setTargetTransferGroupId(e.target.value)}
                     className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl text-xs text-right focus:outline-none focus:border-blue-500 cursor-pointer"
                   >
-                    <option value="">-- اختر مجموعة --</option>
+                    <option value="">-- اختر مجموعة من مرحلة الطالب --</option>
                     {groups
                       .filter((g) => g.id !== selectedGroupRoster.id)
+                      .filter((g) => gradesMatch(studentToTransfer.grade, g.grade))
                       .map((g) => (
                         <option key={g.id} value={g.id}>
-                          {g.name} ({g.schedule})
+                          {g.name} — {g.grade || 'عام'} ({g.schedule})
                         </option>
                       ))}
                   </select>
@@ -526,18 +546,18 @@ export const TeacherGroupsPage: React.FC = () => {
               </form>
             ) : null}
 
-            {/* List of students */}
+            {/* List of students — طلاب هذه المجموعة فقط (مطابقة دقيقة لاسم المجموعة من سجلات القيد) */}
             <div className="max-h-80 overflow-y-auto divide-y divide-gray-100 pr-1">
               {allStudents.filter(
                 (s) =>
-                  s.groupName.includes(selectedGroupRoster.name.split(' - ')[0]) ||
-                  s.groupName === selectedGroupRoster.name
+                  (selectedGroupRoster.studentIds || []).includes(s.id) ||
+                  (s.groupName || '').trim() === selectedGroupRoster.name.trim()
               ).length > 0 ? (
                 allStudents
                   .filter(
                     (s) =>
-                      s.groupName.includes(selectedGroupRoster.name.split(' - ')[0]) ||
-                      s.groupName === selectedGroupRoster.name
+                      (selectedGroupRoster.studentIds || []).includes(s.id) ||
+                      (s.groupName || '').trim() === selectedGroupRoster.name.trim()
                   )
                   .map((std) => (
                     <div key={std.id} className="py-3 flex items-center justify-between gap-3 text-xs">

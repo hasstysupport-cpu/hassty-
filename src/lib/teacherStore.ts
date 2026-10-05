@@ -164,6 +164,15 @@ export async function saveNewStudent(teacherId: string, student: Omit<TeacherStu
     group = { id: newGroup.id, name: newGroup.name, current_count: 0 };
   }
 
+  // حارس نهائي: مطابقة مرحلة الطالب مع مرحلة المجموعة إلزامية (منع اللغبطة في القيد)
+  const { data: gRow } = await supabase.from('student_groups').select('grade').eq('id', group.id).limit(1).maybeSingle();
+  if (gRow?.grade && student.grade && student.groupName !== 'بدون مجموعة') {
+    const norm = (v: string) => String(v || '').replace(/\s+/g, '').replace(/الصف/g, '').trim();
+    if (norm(student.grade) !== norm(String(gRow.grade))) {
+      throw new Error(`مرحلة الطالب «${student.grade}» لا تطابق مرحلة المجموعة «${gRow.grade}» — اختر مجموعة من مرحلة الطالب نفسها.`);
+    }
+  }
+
   const { error } = await supabase.from('group_enrollments').upsert({
     group_id: group.id,
     student_id: studentId,
