@@ -14,6 +14,7 @@ import { getCleanAvatarUrl } from '../../lib/avatarHelper';
 import { subscribeToStudentPendingRequests, respondToParentLinkRequest, ParentLinkRequest } from '../../lib/parentStudentService';
 import { supabase } from '../../lib/supabase';
 import { StatCard } from '../../components/common/ui';
+import { StudentSmartSchedule } from '../../components/student/StudentSmartSchedule';
 
 interface Props { onNavigate: (path: string) => void; onSelectTutor: (tutorId: string) => void; }
 
@@ -127,6 +128,9 @@ export const StudentDashboardPageV2: React.FC<Props> = ({ onNavigate, onSelectTu
     </section>
 
     <section className="grid grid-cols-2 lg:grid-cols-4 gap-3"><StatCard delay={60} label="المدرسين" value={tutors.length} tone="blue" icon={<Users className="w-3.5 h-3.5"/>}/><StatCard delay={130} label="الحصص القادمة" value={upcoming.length} tone="violet" icon={<Calendar className="w-3.5 h-3.5"/>}/><StatCard delay={200} label="نسبة الحضور" value={`${attendanceRate}%`} tone="emerald" icon={<CheckCircle2 className="w-3.5 h-3.5"/>}/><StatCard delay={270} label="الحجوزات" value={lessons.length} tone="amber" icon={<WalletCards className="w-3.5 h-3.5"/>}/></section>
+
+    {/* ذكاء المواعيد: مواعيدي المتاحة + اقتراحات تغيير موعد المجموعة */}
+    <StudentSmartSchedule />
 
     <div className="grid grid-cols-1 xl:grid-cols-3 gap-4"><section className="anim-up xl:col-span-2 card-lux rounded-2xl bg-white border border-slate-200 p-4" style={{animationDelay:'340ms'}}><div className="flex items-center justify-between mb-3"><h2 className="text-sm font-black text-slate-900 flex items-center gap-2"><Calendar className="w-4 h-4 text-[color:var(--role-color)]"/>الحصص والحجوزات</h2><button onClick={()=>void loadDashboard()} className="text-[11px] font-bold text-slate-500 flex items-center gap-1 cursor-pointer hover:text-[color:var(--role-color)]"><RefreshCw className={`w-3.5 h-3.5 ${refreshing?'animate-spin':''}`}/>تحديث</button></div>{loading?<Empty text="جاري تحميل جدولك..."/>:upcoming.length===0?<Empty text="لا توجد حصص أو حجوزات حالية. ابدأ بحجز مدرس." action={()=>onNavigate('/student/book')}/>:<div className="space-y-2.5">{upcoming.slice(0,8).map((l,i)=><div key={l.id} className="row-in rounded-xl border border-slate-200 p-3.5 flex flex-col sm:flex-row gap-2.5 justify-between hover:shadow-lg hover:shadow-slate-200/70 hover:border-[color:var(--role-soft-border)] hover:-translate-y-0.5" style={{animationDelay:`${Math.min(i*45,360)}ms`}}><div><div className="flex items-center gap-2"><h3 className="text-[13px] font-black text-slate-900">{l.subject}</h3><span className={`text-[10px] rounded-full px-2 py-0.5 font-bold ${l.status==='approved'?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-700'}`}>{l.status==='approved'?'مؤكد':'قيد المراجعة'}</span></div><p className="text-[11px] text-slate-500 mt-1">{l.tutorName} • {l.groupName||''}</p></div><div className="text-[11px] text-slate-600 flex flex-wrap gap-3 items-center"><span className="flex items-center gap-1"><Clock3 className="w-3.5 h-3.5"/>{l.day||'حسب الجدول'} {l.time}</span>{l.location&&<span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5"/>{l.location}</span>}</div></div>)}</div>}</section>
 

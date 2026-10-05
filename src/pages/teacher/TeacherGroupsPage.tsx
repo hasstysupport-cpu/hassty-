@@ -25,7 +25,8 @@ import {
   Sparkles,
   ArrowRightLeft,
   Percent,
-  Check
+  Check,
+  Brain
 } from 'lucide-react';
 import { StudentGroup, GroupScheduleSlot, PricingBillingType, TeacherStudentItem } from '../../types';
 import { Badge } from '../../components/common/Badge';
@@ -43,6 +44,7 @@ import {
   getStoredStudents
 } from '../../lib/teacherStore';
 import { gradesMatch, gradeMismatchText } from '../../lib/gradeMatch';
+import { ScheduleIntelligencePanel } from '../../components/teacher/ScheduleIntelligencePanel';
 
 const ALL_EGYPT_GRADES = [
   'الصف الأول الإعدادي',
@@ -79,6 +81,8 @@ export const TeacherGroupsPage: React.FC = () => {
   // Create group modal state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [cancellingSessionGroup, setCancellingSessionGroup] = useState<StudentGroup | null>(null);
+  // ذكاء المواعيد — لوحة التحليل لكل مجموعة
+  const [intelGroupId, setIntelGroupId] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState('ظرف شخصي طارئ');
   const [cancelNoticeHours, setCancelNoticeHours] = useState(5);
   const [cancelSuccessMsg, setCancelSuccessMsg] = useState('');
@@ -464,6 +468,14 @@ export const TeacherGroupsPage: React.FC = () => {
 
               {/* Action Buttons */}
               <div className="pt-2 border-t border-gray-100 flex items-center gap-2">
+                <button
+                  onClick={() => setIntelGroupId(group.id)}
+                  className="flex-1 py-2.5 bg-gradient-to-l from-[#EFF6FF] to-[#F5F3FF] hover:from-blue-100 hover:to-violet-100 text-[#2563EB] text-xs font-bold rounded-xl transition-colors cursor-pointer text-center flex items-center justify-center gap-1.5 border border-blue-100"
+                  title="تحليل توافق مواعيد الطلاب واقتراح أفضل موعد"
+                >
+                  <Brain className="w-3.5 h-3.5" />
+                  <span>ذكاء المواعيد</span>
+                </button>
                 <button
                   onClick={() => setSelectedGroupRoster(group)}
                   className="flex-1 py-2.5 bg-[#EFF6FF] hover:bg-blue-100 text-[#2563EB] text-xs font-bold rounded-xl transition-colors cursor-pointer text-center flex items-center justify-center gap-1.5"
@@ -965,6 +977,9 @@ export const TeacherGroupsPage: React.FC = () => {
           </form>
         )}
       </Modal>
+
+      {/* ذكاء المواعيد — تحليل التوافق واقتراح أفضل موعد مع حماية الاستقرار */}
+      <ScheduleIntelligencePanel groupId={intelGroupId} onClose={() => setIntelGroupId(null)} />
     </div>
   );
 };

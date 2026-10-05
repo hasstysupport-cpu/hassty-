@@ -10,7 +10,7 @@
 import { supabase } from './supabase';
 import { showLocalNotification } from './pushService';
 
-export type NotificationType = 'system' | 'booking' | 'attendance' | 'payment' | 'support' | 'verification' | 'announcement';
+export type NotificationType = 'system' | 'booking' | 'attendance' | 'payment' | 'support' | 'verification' | 'announcement' | 'schedule';
 
 export interface AppNotification {
   id: string;
