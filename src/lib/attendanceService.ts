@@ -8,7 +8,6 @@
  */
 
 import { supabase } from './supabase';
-import { notifyParentAttendance } from './parentNotify';
 
 export type AttendanceStatus = 'present' | 'late' | 'absent';
 const parseTime = (value: string) => { const [hours, minutes] = String(value || '').split(':').map(Number); if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null; return hours * 60 + minutes; };
@@ -63,21 +62,10 @@ export async function recordQrAttendance(input: { groupId:string; studentId:stri
   if (existing?.[0]) { const { data, error } = await supabase.from('attendance_records').update(payload).eq('id', existing[0].id).select('*').single(); if (error) throw error; saved = data; }
   else { const { data, error } = await supabase.from('attendance_records').insert({ ...payload, created_at: now.toISOString() }).select('*').single(); if (error) throw error; saved = data; }
 
-  // إشعار ولي الأمر تلقائيًا (ترتيب ذكي: ربط الحساب → إعدادات الطالب → بيانات القيد)
-  // عبر واتساب + Web Push + جرس الإشعارات — فشل الإشعارات لا يمنع تسجيل الحضور أبدًا.
-  try {
-    const group = await supabase.from('student_groups').select('name').eq('id', input.groupId).limit(1);
-    const res = await notifyParentAttendance({
-      studentId: input.studentId,
-      groupId: input.groupId,
-      groupName: group.data?.[0]?.name || 'المجموعة',
-      studentName: input.studentName,
-      status: input.status,
-      lateMinutes: Math.max(0, input.lateMinutes || 0),
-      timeString: parts.time,
-    });
-    if (res.source === 'none') console.warn('[attendance] no parent contact found for student', input.studentId);
-  } catch (waError) { console.warn('[attendance] parent notification skipped:', waError); }
+  // إشعار ولي الأمر أصبح تلقائيًا 100% من الخادم (trigger: dispatch_parent_whatsapp)
+  // عند أي INSERT أو تعديل حالة حضور — واتساب + Web Push + الجرس الداخلي
+  // (notify_attendance_change) يعملون فورًا حتى لو المتصفح اتقفل أو الحضور
+  // اتسجل من أي مسار آخر. الإرسال هنا كان سيتسبب في رسائل مزدوجة — لذلك أُزيل.
   return saved;
 }
 
