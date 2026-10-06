@@ -358,7 +358,8 @@ export const TeacherDisputesPage: React.FC = () => {
     if (!supabase || busy) return;
     setBusy(row.id);
     try {
-      const { error } = await supabase.from('attendance_disputes').update({ status: approve ? 'approved' : 'rejected', updated_at: new Date().toISOString() }).eq('id', row.id);
+      /* القاعدة تقبل فقط: pending/reviewed/resolved/rejected — «approved» كان يفشل دائمًا بقيود الـCHECK */
+      const { error } = await supabase.from('attendance_disputes').update({ status: approve ? 'resolved' : 'rejected', updated_at: new Date().toISOString() }).eq('id', row.id);
       if (error) throw error;
       if (approve && row.attendance_id) await supabase.from('attendance_records').update({ status: 'present', updated_at: new Date().toISOString() }).eq('id', row.attendance_id);
       if (row.student_id) await supabase.from('notifications').insert({ user_id: row.student_id, title: approve ? 'تم قبول النزاع وتصحيح الحضور' : 'تم رفض نزاع الحضور', message: approve ? 'تم تصحيح حالة الحضور إلى «حاضر» بعد مراجعة النزاع.' : 'بعد المراجعة لم يتم قبول نزاع الحضور.', type: 'attendance', link: '/student/attendance' });

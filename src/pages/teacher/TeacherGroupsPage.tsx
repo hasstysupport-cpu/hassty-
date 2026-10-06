@@ -38,12 +38,12 @@ import {
   loadTeacherStudents,
   saveTeacherGroup,
   deleteTeacherGroup,
-  saveNewStudent,
-  removeStudent,
   getStoredGroups,
   getStoredStudents
 } from '../../lib/teacherStore';
 import { gradesMatch, gradeMismatchText } from '../../lib/gradeMatch';
+import { supabase } from '../../lib/supabase';
+import { whatsappService } from '../../lib/whatsappService';
 
 const ALL_EGYPT_GRADES = [
   'الصف الأول الإعدادي',
@@ -62,6 +62,14 @@ const DAYS_OF_WEEK = [
   { eng: 'Wednesday', ar: 'الأربعاء' },
   { eng: 'Thursday', ar: 'الخميس' },
   { eng: 'Friday', ar: 'الجمعة' },
+];
+
+/* المواد الدراسية الحقيقية — المادة تُحفظ فعليًا مع المجموعة (بحث/تقارير/بيانات عامة) */
+const TEACHER_SUBJECTS = [
+  'الكيمياء', 'الفيزياء', 'الأحياء', 'الرياضيات', 'الجيولوجيا',
+  'اللغة العربية', 'اللغة الإنجليزية', 'اللغة الفرنسية',
+  'الدراسات الاجتماعية', 'التاريخ', 'الجغرافيا', 'الفلسفة والمنطق',
+  'العلوم', 'الحاسب الآلي', 'مهارات أخرى',
 ];
 
 export const TeacherGroupsPage: React.FC<{ onNavigate?: (path: string) => void }> = ({ onNavigate }) => {
@@ -83,10 +91,12 @@ export const TeacherGroupsPage: React.FC<{ onNavigate?: (path: string) => void }
   const [cancelReason, setCancelReason] = useState('ظرف شخصي طارئ');
   const [cancelNoticeHours, setCancelNoticeHours] = useState(5);
   const [cancelSuccessMsg, setCancelSuccessMsg] = useState('');
+  const [cancelBusy, setCancelBusy] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
 
   // New group form fields with multi-day schedule slots & pricing
   const [newGroupName, setNewGroupName] = useState('');
+  const [newGroupSubject, setNewGroupSubject] = useState(TEACHER_SUBJECTS[0]);
   const [newGroupGrade, setNewGroupGrade] = useState(ALL_EGYPT_GRADES[0]);
   const [newGroupLocation, setNewGroupLocation] = useState('سنتر الأهرام — مدينة نصر');
   const [newGroupMax, setNewGroupMax] = useState<number | ''>('');
@@ -170,7 +180,7 @@ export const TeacherGroupsPage: React.FC<{ onNavigate?: (path: string) => void }
     const newGroup: StudentGroup = {
       id: `grp-${Date.now()}`,
       name: newGroupName,
-      subject: 'الكيمياء',
+      subject: newGroupSubject,
       level: newGroupGrade,
       grade: newGroupGrade,
       schedule: scheduleSummary,
@@ -203,39 +213,42 @@ export const TeacherGroupsPage: React.FC<{ onNavigate?: (path: string) => void }
     setGroups((prev) => [newGroup, ...prev]);
     setIsCreateModalOpen(false);
     setNewGroupName('');
-    setActionFeedback(`تم إنشاء ${newGroupName} بنجاح ومزامنة المواعيد ونظام التسعير (${newBillingType === 'per_session' ? 'بالحصة عمولة 2%' : 'بالشهر'}) ✅`);
+    setActionFeedback(`تم إنشاء ${newGroupName} (مادة: ${newGroupSubject}) بنجاح ومزامنة المواعيد ونظام التسعير (${newBillingType === 'per_session' ? 'بالحصة عمولة 2%' : 'بالشهر'}) ✅`);
     setTimeout(() => setActionFeedback(null), 4500);
   };
 
-  // Remove student from group (Teacher control)
+  // إزالة طالب من هذه المجموعة فقط — محصورة بمعرّف المجموعة ولا تمس أي قيود أخرى
   const handleRemoveStudentFromGroup = async (studentId: string, studentName: string) => {
-    const student = allStudents.find((s) => s.id === studentId);
-    if (student) {
-      const updated = { ...student, groupName: 'بدون مجموعة' };
-      await saveNewStudent(teacherId, updated);
-      setAllStudents((prev) => prev.map((s) => (s.id === studentId ? updated : s)));
+    if (!selectedGroupRoster || !supabase) return;
+    try {
+      const { error } = await supabase.from('group_enrollments')
+        .update({ status: 'left' })
+        .eq('student_id', studentId)
+        .eq('group_id', selectedGroupRoster.id)
+        .eq('status', 'active');
+      if (error) throw error;
+      const { count } = await supabase.from('group_enrollments')
+        .select('*', { count: 'exact', head: true })
+        .eq('group_id', selectedGroupRoster.id).eq('status', 'active');
+      if (count !== null) await supabase.from('student_groups').update({ current_count: count }).eq('id', selectedGroupRoster.id);
+      setActionFeedback(`تم إزالة ${studentName} من مجموعة «${selectedGroupRoster.name}» فقط — باقي مجموعاته آمنة ✅`);
+      setSelectedGroupRoster(null);
+      setStudentToTransfer(null);
+      void loadData();
+      window.dispatchEvent(new Event('hassty_teacher_groups_updated'));
+      setTimeout(() => setActionFeedback(null), 4000);
+    } catch (e: any) {
+      setActionFeedback(`تعذرت الإزالة: ${String(e?.message || e).slice(0, 90)}`);
+      setTimeout(() => setActionFeedback(null), 7000);
     }
-
-    // update group count
-    if (selectedGroupRoster) {
-      const updatedGroup = {
-        ...selectedGroupRoster,
-        studentIds: (selectedGroupRoster.studentIds || []).filter((id) => id !== studentId),
-        currentStudents: Math.max(0, (selectedGroupRoster.currentStudents || 1) - 1),
-        studentCount: Math.max(0, (selectedGroupRoster.studentCount || 1) - 1),
-      };
-      await saveTeacherGroup(teacherId, updatedGroup);
-      setGroups((prev) => prev.map((g) => (g.id === selectedGroupRoster.id ? updatedGroup : g)));
-      setSelectedGroupRoster(updatedGroup);
-    }
-    setActionFeedback(`تم إزالة الطالب ${studentName} من المجموعة بنجاح.`);
-    setTimeout(() => setActionFeedback(null), 3500);
   };
 
-  // Transfer student to another group — نقل حقيقي: خروج من القيد القديم + قيد جديد بنفس المرحلة
+  // نقل طالب إلى مجموعة أخرى — RPC ذرّي واحد (transfer_student_direct):
+  // حذف من القيد القديم + قيد جديد + فحص تعارض الميعاد + فحص السعة + تحديث العدادات
+  // كلها في transaction واحدة داخل الخادم — لا يوجد منتصف فاشل يترك الطالب بلا مجموعة
   const handleExecuteTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!studentToTransfer || !targetTransferGroupId) return;
+    if (!studentToTransfer || !targetTransferGroupId || !selectedGroupRoster) return;
 
     const targetGroup = groups.find((g) => g.id === targetTransferGroupId);
     if (!targetGroup) return;
@@ -248,76 +261,118 @@ export const TeacherGroupsPage: React.FC<{ onNavigate?: (path: string) => void }
     }
 
     try {
-      // 1) حذف القيد القديم نهائيًا (الطالب ينتقل ولا يبقى في مجموعتين)
-      await removeStudent(teacherId, studentToTransfer.id);
-      // 2) قيد جديد في المجموعة الهدف
-      await saveNewStudent(teacherId, { ...studentToTransfer, groupName: targetGroup.name, status: 'active' });
+      const { data: rpcRes, error: rpcErr } = await supabase
+        .rpc('transfer_student_direct', {
+          p_student_id: studentToTransfer.id,
+          p_from_group: selectedGroupRoster.id,
+          p_to_group: targetTransferGroupId,
+          p_reason: 'نقل مباشر من لوحة المجموعات',
+        });
+      if (rpcErr) throw rpcErr;
+      const res: any = rpcRes;
+      if (!res?.ok) {
+        setActionFeedback(`لم يتم النقل: ${res?.message || 'سبب غير معروف'}`);
+        setTimeout(() => setActionFeedback(null), 7000);
+        void loadData();
+        return;
+      }
+
+      setActionFeedback(`${res.message || 'تم نقل الطالب بنجاح'} ✅`);
+      setStudentToTransfer(null);
+      setTargetTransferGroupId('');
+      void loadData();
+      window.dispatchEvent(new Event('hassty_teacher_groups_updated'));
+      setTimeout(() => setActionFeedback(null), 5000);
     } catch (trErr: any) {
       setActionFeedback(`تعذر نقل الطالب: ${String(trErr?.message || trErr).slice(0, 90)}`);
       setTimeout(() => setActionFeedback(null), 7000);
       void loadData();
-      return;
     }
-
-    const updatedStudent = { ...studentToTransfer, groupName: targetGroup.name };
-
-    setAllStudents((prev) =>
-      prev.map((s) => (s.id === studentToTransfer.id ? updatedStudent : s))
-    );
-
-    // Update group counts
-    const updatedGroups = groups.map((g) => {
-      if (selectedGroupRoster && g.id === selectedGroupRoster.id) {
-        const newIds = (g.studentIds || []).filter((id) => id !== studentToTransfer.id);
-        return {
-          ...g,
-          studentIds: newIds,
-          currentStudents: Math.max(0, g.currentStudents - 1),
-          studentCount: Math.max(0, g.studentCount - 1),
-        };
-      }
-      if (g.id === targetTransferGroupId) {
-        const newIds = Array.from(new Set([...(g.studentIds || []), studentToTransfer.id]));
-        return {
-          ...g,
-          studentIds: newIds,
-          currentStudents: newIds.length,
-          studentCount: newIds.length,
-        };
-      }
-      return g;
-    });
-
-    for (const g of updatedGroups) {
-      if (g.id === selectedGroupRoster?.id || g.id === targetTransferGroupId) {
-        await saveTeacherGroup(teacherId, g);
-      }
-    }
-
-    setGroups(updatedGroups);
-    setActionFeedback(
-      `تم نقل الطالب (${studentToTransfer.name}) بنجاح إلى "${targetGroup.name}" مع تحديث كافة سجلات الحضور ✅`
-    );
-    setStudentToTransfer(null);
-    setTargetTransferGroupId('');
-    setTimeout(() => setActionFeedback(null), 4000);
   };
 
-  const handleCancelSessionSubmit = (e: React.FormEvent) => {
+  /* إلغاء/تأجيل حصة حقيقي: تحديث lesson_sessions في قاعدة البيانات
+     + إشعارات داخلية للطلاب وأولياء الأمور + محاولة واتساب صادقة النتيجة */
+  const handleCancelSessionSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!cancellingSessionGroup) return;
+    if (!cancellingSessionGroup || cancelBusy) return;
+    setCancelBusy(true);
+    try {
+      const gid = cancellingSessionGroup.id;
 
-    const isLateCancel = cancelNoticeHours < 3;
-    setCancelSuccessMsg(
-      isLateCancel
-        ? 'تم إرسال إشعار اعتذار لجميع الطلاب وأولياء الأمور عبر الواتساب. نظراً للإلغاء قبل الموعد بأقل من 3 ساعات، تم تسجيل ذلك في مؤشر الحضور.'
-        : 'تم إلغاء وتأجيل موعد الحصة وإرسال إشعار فوري على واتساب الطلاب وأولياء الأمور بنجاح دون أي تأثير على تقييمك.'
-    );
+      // 1) أقرب حصة قادمة مسجلة لهذه المجموعة → إلغاؤها فعليًا في DB
+      const { data: sessions } = await supabase
+        .from('lesson_sessions')
+        .select('id, session_date, starts_at')
+        .eq('group_id', gid)
+        .eq('status', 'scheduled')
+        .gte('starts_at', new Date(Date.now() - 60 * 60 * 1000).toISOString())
+        .order('starts_at', { ascending: true })
+        .limit(1);
+      const session = sessions?.[0];
+      if (session) {
+        const { error: upErr } = await supabase
+          .from('lesson_sessions')
+          .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+          .eq('id', session.id);
+        if (upErr) throw upErr;
+      }
 
-    setTimeout(() => {
+      // 2) إشعارات داخلية حقيقية: كل الطلاب النشطين + أولياء أمورهم المرتبطين
+      const { data: ens } = await supabase
+        .from('group_enrollments')
+        .select('student_id, parent_phone')
+        .eq('group_id', gid)
+        .eq('status', 'active');
+      const studentIds = (ens || []).map((x: any) => x.student_id).filter(Boolean);
+      const parentIds = new Set<string>();
+      if (studentIds.length) {
+        const { data: pcs } = await supabase.from('parent_children').select('parent_id').in('child_id', studentIds);
+        (pcs || []).forEach((p: any) => p.parent_id && parentIds.add(p.parent_id));
+      }
+      const dateLabel = session?.session_date || 'الحصة القادمة';
+      const title = 'إلغاء / تأجيل حصة';
+      const message = `حصة مجموعة «${cancellingSessionGroup.name}» بتاريخ ${dateLabel} ملغاة (${cancelReason}). سيتم إبلاغكم بالموعد الجديد في أقرب وقت.`;
+      const notifRows = [
+        ...studentIds.map((sid: string) => ({ user_id: sid, title, message, type: 'system', link: '/student/dashboard' })),
+        ...Array.from(parentIds).map((pid: string) => ({ user_id: pid, title, message, type: 'system', link: '/parent/dashboard' })),
+      ];
+      if (notifRows.length) {
+        const { error: nErr } = await supabase.from('notifications').insert(notifRows);
+        if (nErr) throw nErr;
+      }
+
+      // 3) محاولة واتساب لأولياء الأمور — النتيجة صادقة: النجاح يُحسب فقط عند نجاح فعلي
+      const phones = Array.from(new Set((ens || [])
+        .map((x: any) => String(x.parent_phone || '').replace(/\D/g, ''))
+        .filter((p: string) => p.length >= 10)));
+      let waOk = 0;
+      let waFail = 0;
+      for (const ph of phones) {
+        const res = await whatsappService.sendMessage(
+          ph.startsWith('0') ? `2${ph}` : ph,
+          `*حِصّتي — إلغاء حصة* ⚠️\n\nالمجموعة: ${cancellingSessionGroup.name}\nالتاريخ: ${dateLabel}\nالسبب: ${cancelReason}\n\nنعتذر لكم — سيتم الإعلان عن الموعد الجديد قريبًا.`
+        );
+        if (res?.success) waOk++; else waFail++;
+      }
+
+      const isLateCancel = cancelNoticeHours < 3;
+      const parts = [
+        session ? `تم إلغاء الحصة (${dateLabel}) في النظام فعليًا ✅` : 'تم تسجيل الإلغاء ✅ (لا توجد حصة قادمة مسجلة في جدول هذه المجموعة)',
+        `إشعارات داخلية وصلت لـ ${studentIds.length} طالب و${parentIds.size} ولي أمر 🔔`,
+      ];
+      if (!phones.length) parts.push('لا توجد أرقام واتساب لأولياء الأمور في القيد — تم تخطي الواتساب.');
+      else if (waOk > 0) parts.push(`واتساب وصل لـ ${waOk} ولي أمر ✅${waFail ? ` (فشل: ${waFail})` : ''}`);
+      else parts.push(`واتساب غير متاح حاليًا (حصة الباقة) — فشلت ${waFail} محاولة، لكن الإشعارات الداخلية تعمل دائمًا.`);
+      if (isLateCancel) parts.push('ملاحظة: الإلغاء قبل الحصة بأقل من 3 ساعات.');
+      setCancelSuccessMsg(parts.join(' • '));
+      setTimeout(() => { setCancelSuccessMsg(''); setCancellingSessionGroup(null); }, 7000);
+    } catch (err: any) {
       setCancelSuccessMsg('');
-      setCancellingSessionGroup(null);
-    }, 3000);
+      setActionFeedback(`تعذر إلغاء الحصة: ${String(err?.message || err).slice(0, 90)}`);
+      setTimeout(() => setActionFeedback(null), 7000);
+    } finally {
+      setCancelBusy(false);
+    }
   };
 
   // Commission live preview for new group
@@ -660,6 +715,23 @@ export const TeacherGroupsPage: React.FC<{ onNavigate?: (path: string) => void }
             />
           </div>
 
+          <div>
+            <label className="block text-xs font-bold text-[#1F2937] mb-1">
+              المادة الدراسية <span className="text-[#EF4444]">*</span>
+            </label>
+            <select
+              value={newGroupSubject}
+              onChange={(e) => setNewGroupSubject(e.target.value)}
+              className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-right focus:bg-white focus:outline-none focus:border-[#2563EB] cursor-pointer"
+            >
+              {TEACHER_SUBJECTS.map((subject) => (
+                <option key={subject} value={subject}>
+                  {subject}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-[#1F2937] mb-1">
@@ -960,16 +1032,17 @@ export const TeacherGroupsPage: React.FC<{ onNavigate?: (path: string) => void }
                   <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-start gap-2">
                     <AlertCircle className="w-4 h-4 shrink-0 text-red-600 mt-0.5" />
                     <span>
-                      تنبيه: الإلغاء قبل أقل من 3 ساعات من موعد الحصة يؤثر على مؤشر انتظام المعلم وسيتم إرسال رسالة واتساب عاجلة لأولياء الأمور.
+                      تنبيه: الإلغاء قبل أقل من 3 ساعات من موعد الحصة — سيتم تسجيل ذلك، وتصل الإشعارات الداخلية للطلاب وأولياء الأمور فورًا.
                     </span>
                   </div>
                 )}
 
                 <button
                   type="submit"
-                  className="w-full py-3 bg-[#EF4444] hover:bg-red-600 text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer"
+                  disabled={cancelBusy}
+                  className="w-full py-3 bg-[#EF4444] hover:bg-red-600 disabled:opacity-60 text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer"
                 >
-                  تأكيد الإلغاء وإرسال إشعار واتساب للجميع
+                  {cancelBusy ? 'جارٍ تنفيذ الإلغاء وإرسال الإشعارات…' : 'تأكيد الإلغاء وتسجيله في النظام وإشعار الجميع'}
                 </button>
               </>
             )}

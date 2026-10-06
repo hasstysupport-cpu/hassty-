@@ -138,17 +138,22 @@ export const ScheduleIntelligencePanel: React.FC<Props> = ({ groupId, onClose })
         .eq('group_id', groupId)
         .eq('status', 'active');
       const text = `📢 موعد مجموعة "${intel?.group.name}" مقترح للتغيير:\nمن: ${slotLabel(pending.old_slots[0] || {} as any)}\nإلى: ${slotLabel(pending.proposed_slots[0] || {} as any)}\nالسبب: ${pending.reason}\nرد بموافقتك داخل منصة حِصّتي من فضلك.`;
+      /* عدّ صادق: sendMessage لا يرمي — يرجع {success} — فحص النتيجة إجباري */
       let sent = 0;
+      let failed = 0;
       for (const r of (rows || []) as any[]) {
         const phone = String(r.student_phone || '').replace(/\D/g, '');
         if (phone.length >= 10) {
-          try {
-            await whatsappService.sendMessage(phone.startsWith('0') ? `2${phone}` : phone, text);
-            sent++;
-          } catch { /* استمرار لبقية الطلاب */ }
+          const res = await whatsappService.sendMessage(phone.startsWith('0') ? `2${phone}` : phone, text);
+          if (res?.success === true) sent++; else failed++;
         }
       }
-      setMsg({ kind: sent > 0 ? 'ok' : 'warn', text: sent > 0 ? `تم إرسال ${sent} رسالة واتساب للطلاب` : 'لا أرقام صالحة للإرسال أو خدمة واتساب غير متصلة' });
+      setMsg({
+        kind: sent > 0 ? 'ok' : 'warn',
+        text: sent > 0
+          ? `تم إرسال ${sent} رسالة واتساب للطلاب${failed ? ` — فشل: ${failed}` : ''}`
+          : `لم يصل أي واتساب${failed ? ` (فشلت ${failed} محاولة — غالبًا حصة الباقة المجانية)` : ' — لا توجد أرقام صالحة للإرسال'}`,
+      });
     } finally { setBusy(null); }
   };
 

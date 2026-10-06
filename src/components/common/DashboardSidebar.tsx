@@ -22,25 +22,27 @@ export const ROLE_SECTIONS: Record<'student' | 'parent' | 'teacher' | 'assistant
   teacher: [
     { title: 'الرئيسية', links: [
       { name: 'لوحة التحكم', path: '/teacher/dashboard', icon: LayoutDashboard },
+      { name: 'التقويم', path: '/teacher/calendar', icon: Calendar },
       { name: 'الإشعارات', path: '/teacher/notifications', icon: BellRing, counterKey: 'notifications' },
       { name: 'الرسائل', path: '/teacher/messages', icon: MessageCircle },
-      { name: 'التقويم', path: '/teacher/calendar', icon: Calendar },
     ]},
-    { title: 'إدارة الطلاب', links: [
+    { title: 'الطلاب', links: [
       { name: 'الطلاب', path: '/teacher/students', icon: Users },
       { name: 'المجموعات', path: '/teacher/groups', icon: Layers },
-      { name: 'الحصص والدروس', path: '/teacher/sessions', icon: BookOpen },
       { name: 'طلبات الالتحاق', path: '/teacher/enrollment-requests', icon: UserPlus, counterKey: 'enrollment', highlight: true },
       { name: 'طلبات التحويل', path: '/teacher/transfers', icon: ArrowLeftRight, counterKey: 'transfers' },
-      { name: 'حصص التعويض', path: '/teacher/makeup', icon: GraduationCap, counterKey: 'makeup' },
-      { name: 'إدارة الحضور', path: '/teacher/attendance', icon: UserCheck },
-      { name: 'نزاعات الحضور', path: '/teacher/attendance/disputes', icon: ClipboardList, counterKey: 'disputes' },
-      { name: 'ماسح QR', path: '/teacher/scan', icon: ScanLine, highlight: true },
-      { name: 'الواجبات', path: '/teacher/assignments', icon: BookOpen },
-      { name: 'تسليمات الطلاب', path: '/teacher/assignment-submissions', icon: ClipboardCheck, counterKey: 'submissions' },
       { name: 'ملاحظات الطلاب', path: '/teacher/student-notes', icon: NotebookPen },
     ]},
-    { title: 'الامتحانات والتقييم', links: [
+    { title: 'الحصص والحضور', links: [
+      { name: 'الحصص والدروس', path: '/teacher/sessions', icon: BookOpen },
+      { name: 'إدارة الحضور', path: '/teacher/attendance', icon: UserCheck },
+      { name: 'ماسح QR', path: '/teacher/scan', icon: ScanLine, highlight: true },
+      { name: 'حصص التعويض', path: '/teacher/makeup', icon: GraduationCap, counterKey: 'makeup' },
+      { name: 'نزاعات الحضور', path: '/teacher/attendance/disputes', icon: ClipboardList, counterKey: 'disputes' },
+    ]},
+    { title: 'الدراسة', links: [
+      { name: 'الواجبات', path: '/teacher/assignments', icon: BookOpen },
+      { name: 'تسليمات الطلاب', path: '/teacher/assignment-submissions', icon: ClipboardCheck, counterKey: 'submissions' },
       { name: 'الامتحانات', path: '/teacher/exams', icon: FileSpreadsheet },
       { name: 'سجل الدرجات', path: '/teacher/gradebook', icon: GraduationCap },
     ]},
@@ -48,7 +50,7 @@ export const ROLE_SECTIONS: Record<'student' | 'parent' | 'teacher' | 'assistant
       { name: 'المساعدون', path: '/teacher/assistants', icon: UsersRound },
       { name: 'البحث عن مساعدين', path: '/teacher/assistants/search', icon: UserRoundSearch, highlight: true },
     ]},
-    { title: 'المال والحسابات', links: [
+    { title: 'المالية', links: [
       { name: 'المدفوعات والأرباح', path: '/teacher/payments', icon: Receipt },
     ]},
     { title: 'الملف', links: [

@@ -20,6 +20,7 @@ const templates = {
   payment: (d) => `*حِصّتي — تأكيد الدفع* 🧾✅\n\nالطالب: *${d.studentName || 'طالب'}*\n${d.groupName ? `المجموعة: *${d.groupName}*\n` : ''}المبلغ: *${Number(d.amount || 0).toLocaleString('ar-EG')} ج.م*\nرقم العملية: *${d.invoiceNumber || d.transactionId || '—'}*\nالتاريخ: *${d.date || new Date().toLocaleDateString('ar-EG')}*`,
   teacher_invoice: (d) => `*حِصّتي — فاتورة مستحقات المدرس* 💰🧾\n\nالمدرس: *${d.teacherName || 'المدرس'}*\nالفترة: *${d.period || 'الفترة الحالية'}*\nإجمالي الإيراد: *${Number(d.gross || 0).toLocaleString('ar-EG')} ج.م*\nالعمولة: *${Number(d.commission || 0).toLocaleString('ar-EG')} ج.م*\nالصافي المستحق: *${Number(d.net || 0).toLocaleString('ar-EG')} ج.م*\nرقم الفاتورة: *${d.invoiceNumber || '—'}*`,
   support: (d) => `*حِصّتي — تحديث طلب الدعم* 🎧\n\nرقم الطلب: *${d.ticketNumber || '—'}*\nالحالة: *${d.status || 'جديد'}*\n\n${d.message || 'تم تحديث طلب الدعم الخاص بك.'}`,
+  session_cancelled: (d) => `*حِصّتي — إلغاء حصة* ⚠️\n\nالمجموعة: *${d.groupName || 'المجموعة'}*\nالتاريخ: *${d.date || 'الحصة القادمة'}*\nالسبب: *${d.reason || 'ظرف طارئ'}*\n\nنعتذر لكم — سيتم الإعلان عن الموعد الجديد قريبًا.`,
 };
 
 async function recipientFromBody(body) {
@@ -43,6 +44,7 @@ const pushTemplates = {
   payment: (d) => ({ title: 'تأكيد الدفع 🧾', body: `${plain(d.studentName) || ''} — ${Number(d.amount || 0).toLocaleString('ar-EG')} ج.م (عملية ${plain(d.invoiceNumber || d.transactionId) || '—'})`.trim(), link: d.link || '/parent/payments' }),
   teacher_invoice: (d) => ({ title: 'فاتورة مستحقاتك 💰', body: `الصافي المستحق: ${Number(d.net || 0).toLocaleString('ar-EG')} ج.م — فاتورة ${plain(d.invoiceNumber) || ''}`.trim(), link: d.link || '/teacher/payments' }),
   support: (d) => ({ title: 'تحديث طلب الدعم 🎧', body: plain(d.message) || `حالة الطلب ${plain(d.status) || 'تم تحديثها'}.`, link: d.link || '/student/notifications' }),
+  session_cancelled: (d) => ({ title: 'إلغاء حصة ⚠️', body: `${plain(d.groupName) || 'المجموعة'} — ${plain(d.date) || 'الحصة القادمة'} (${plain(d.reason) || 'ظرف طارئ'})`, link: d.link || '/student/dashboard' }),
 };
 
 export default async function handler(req, res) {

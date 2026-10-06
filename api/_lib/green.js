@@ -39,7 +39,23 @@ function endpoint(method) {
   return `${GREEN_API_URL}/waInstance${encodeURIComponent(GREEN_API_INSTANCE_ID)}/${method}/${encodeURIComponent(GREEN_API_TOKEN)}`;
 }
 
+/* قاطع دائرة حصة الباقة (HTTP 466):
+   أول رفض quota يوقف محاولات الإرسال 15 دقيقة — يمنع فيضان أخطاء Vercel
+   (كانت آلاف 466 في 7 أيام) ويجعل الرد على الواجهة سريعًا وصادقًا. */
+let quotaBlockedUntil = 0;
+export function whatsappQuotaBlocked() {
+  return Date.now() < quotaBlockedUntil;
+}
+const QUOTA_COOLDOWN_MS = 15 * 60 * 1000;
+
 export async function greenRequest(method, body, httpMethod = 'POST') {
+  /* التهدئة تخص عمليات الإرسال فقط (POST) — لا تمنع قراءة الحالة (GET) */
+  if (httpMethod === 'POST' && whatsappQuotaBlocked()) {
+    const err = new Error('Monthly quota exceeded (466) — الإرسال متوقف مؤقتًا في فترة تهدئة 15 دقيقة بعد آخر رفض، أو حتى ترقية الباقة');
+    err.status = 466;
+    err.data = { quotaBlocked: true, skipped: true };
+    throw err;
+  }
   const response = await fetch(endpoint(method), {
     method: httpMethod,
     headers: { 'Content-Type': 'application/json' },
@@ -51,6 +67,9 @@ export async function greenRequest(method, body, httpMethod = 'POST') {
   try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
   if (!response.ok) {
     const message = data?.message || data?.error || `GREEN API HTTP ${response.status}`;
+    if (response.status === 466 || /quota/i.test(String(message))) {
+      quotaBlockedUntil = Date.now() + QUOTA_COOLDOWN_MS;
+    }
     const err = new Error(message);
     err.status = response.status;
     err.data = data;

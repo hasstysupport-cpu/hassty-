@@ -103,18 +103,20 @@ export const TeacherStudentsPage: React.FC<TeacherStudentsPageProps> = ({ onNavi
       return;
     }
 
+    /* بيانات صادقة: لا قيم تجريبية إطلاقًا — الحقول الناقصة تبقى فارغة،
+       والإحصاءات تبدأ صفرية، والحالة «قيد المراجعة» — أول تسجيل حضور هو اللي يبني الواقع */
     const added = await saveNewStudent(teacherId, {
       name: newStudentName,
-      avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
+      avatarUrl: '',
       grade: newStudentGrade,
-      phone: newStudentPhone || '010XXXXXXXX',
-      parentPhone: newStudentParentPhone || '012XXXXXXXX',
+      phone: newStudentPhone || '',
+      parentPhone: newStudentParentPhone || '',
       qrCode: newStudentCode || `HST-2026-${Math.floor(1000 + Math.random() * 9000)}`,
       groupName: newStudentGroup || 'المجموعة العامة',
-      attendanceRate: 100,
-      totalSessions: 1,
-      attendedSessions: 1,
-      paymentStatus: 'paid',
+      attendanceRate: 0,
+      totalSessions: 0,
+      attendedSessions: 0,
+      paymentStatus: 'pending',
       joinedDate: new Date().toISOString().split('T')[0],
       status: 'active',
     });
@@ -131,9 +133,11 @@ export const TeacherStudentsPage: React.FC<TeacherStudentsPageProps> = ({ onNavi
     }, 1200);
   };
 
-  const handleDeleteStudent = async (studentId: string) => {
-    await removeStudent(teacherId, studentId);
-    setStudents((prev) => prev.filter((s) => s.id !== studentId));
+  /* إزالة محصورة: من مجموعة هذا الصف فقط — لا تمس بقية مجموعات المدرس */
+  const handleDeleteStudent = async (studentId: string, groupName?: string) => {
+    const group = groupName ? availableGroups.find((g) => g.name === groupName) : null;
+    await removeStudent(teacherId, studentId, group?.id);
+    setStudents((prev) => prev.filter((s) => !(s.id === studentId && (!groupName || s.groupName === groupName))));
   };
 
   return (
@@ -257,9 +261,9 @@ export const TeacherStudentsPage: React.FC<TeacherStudentsPageProps> = ({ onNavi
                     <td className="py-3.5 px-4 text-center">
                       <button
                         type="button"
-                        onClick={() => handleDeleteStudent(std.id)}
+                        onClick={() => handleDeleteStudent(std.id, std.groupName)}
                         className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="حذف الطالب"
+                        title={`إزالة الطالب من مجموعة ${std.groupName || 'هذه'} فقط`}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>

@@ -68,10 +68,10 @@ export const ForTeachersPage: React.FC<ForTeachersPageProps> = ({ onNavigate }) 
               <ArrowLeft className="w-4 h-4" />
             </button>
             <button
-              onClick={() => onNavigate('/teacher/dashboard')}
+              onClick={() => onNavigate('/login')}
               className="px-6 py-3.5 bg-gray-50 hover:bg-gray-100 text-[#1E3A8A] font-bold text-sm rounded-xl border border-[#E5E7EB] transition-all cursor-pointer"
             >
-              معاينة لوحة تحكم المعلم
+              دخول لوحة المعلم
             </button>
           </div>
         </div>

@@ -140,6 +140,11 @@ export async function saveNewStudent(teacherId: string, student: Omit<TeacherStu
     const groups = await loadTeacherGroups(teacherId);
     if (groups.length) {
       await supabase.from('group_enrollments').delete().eq('student_id', studentId).in('group_id', groups.map(g => g.id));
+      // إعادة حساب العدادات بعد الإخراج من كل المجموعات
+      await Promise.all(groups.map(async (g) => {
+        const { count } = await supabase.from('group_enrollments').select('*', { count: 'exact', head: true }).eq('group_id', g.id).eq('status', 'active');
+        if (count !== null) await supabase.from('student_groups').update({ current_count: count }).eq('id', g.id);
+      }));
     }
     return { ...student, id: studentId, status: 'active' } as TeacherStudentItem;
   }
@@ -184,9 +189,11 @@ export async function saveNewStudent(teacherId: string, student: Omit<TeacherStu
     grade: student.grade || '',
     status: 'active',
     enrolled_at: new Date().toISOString(),
-    attendance_rate: student.attendanceRate || 100,
-    total_sessions: student.totalSessions || 1,
-    attended_sessions: student.attendedSessions || 1,
+    /* بيانات صادقة: لا بيانات تجريبية — الطالب الجديد يبدأ بصفر حصص وحضور
+       و«قيد المراجعة» في الدفع، وأول تسجيل حضور هو الذي يبني الإحصاءات */
+    attendance_rate: student.attendanceRate ?? 0,
+    total_sessions: student.totalSessions ?? 0,
+    attended_sessions: student.attendedSessions ?? 0,
     payment_status: student.paymentStatus || 'pending',
   }, { onConflict: 'group_id,student_id' });
   if (error) throw error;
@@ -200,10 +207,45 @@ export async function saveNewStudent(teacherId: string, student: Omit<TeacherStu
   return { ...student, id: studentId, status: student.status || 'active' } as TeacherStudentItem;
 }
 
-export async function removeStudent(teacherId: string, studentId: string) {
+/**
+ * إزالة طالب من القيد.
+ * - مع groupId: إزالة محصورة من هذه المجموعة فقط (آمن — لا يمس باقي مجموعات المدرس)
+ * - بدون groupId: إزالة من كل مجموعات المدرس (للحذف الكامل من سجل المدرس فقط)
+ * في الحالتين: إعادة حساب current_count لكل مجموعة متأثرة.
+ */
+export async function removeStudent(teacherId: string, studentId: string, groupId?: string) {
   if (!supabase || !isUuid(teacherId) || !isUuid(studentId)) throw new Error('بيانات الطالب غير صالحة.');
-  const groups = await loadTeacherGroups(teacherId);
-  if (!groups.length) return;
-  const { error } = await supabase.from('group_enrollments').delete().eq('student_id', studentId).in('group_id', groups.map(g => g.id));
-  if (error) throw error;
+
+  let affectedGroupIds: string[] = [];
+
+  if (groupId && isUuid(groupId)) {
+    // إزالة محصورة: هذه المجموعة فقط
+    const { error } = await supabase.from('group_enrollments')
+      .delete()
+      .eq('student_id', studentId)
+      .eq('group_id', groupId);
+    if (error) throw error;
+    affectedGroupIds = [groupId];
+  } else {
+    const groups = await loadTeacherGroups(teacherId);
+    if (!groups.length) return;
+    affectedGroupIds = groups.map(g => g.id);
+    const { error } = await supabase.from('group_enrollments')
+      .delete()
+      .eq('student_id', studentId)
+      .in('group_id', affectedGroupIds);
+    if (error) throw error;
+  }
+
+  // إعادة حساب العدادات الفعلية لكل مجموعة متأثرة (حتى لا تبقى الأعداد قديمة)
+  await Promise.all(affectedGroupIds.map(async (gid) => {
+    const { count } = await supabase
+      .from('group_enrollments')
+      .select('*', { count: 'exact', head: true })
+      .eq('group_id', gid)
+      .eq('status', 'active');
+    if (count !== null) {
+      await supabase.from('student_groups').update({ current_count: count }).eq('id', gid);
+    }
+  }));
 }
