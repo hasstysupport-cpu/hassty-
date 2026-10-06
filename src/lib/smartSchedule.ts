@@ -199,6 +199,61 @@ export const fitLabel = (fit: number): { text: string; tone: 'good' | 'mid' | 'b
   return { text: `تناسبك ${fit}% فقط`, tone: 'bad' };
 };
 
+/* ============================================================
+   لوحة تحكم المجموعة — فحص التعارض + تطبيق التغيير + النقل
+   ============================================================ */
+
+/** نتيجة فحص تعارض ميعاد جديد لطلاب المجموعة */
+export interface SlotConflictResult {
+  ok: boolean;
+  code?: string;
+  message?: string;
+  total?: number;
+  conflict_count?: number;
+  free_count?: number;
+  conflicts?: { student_id: string; student_name: string; with_group: string; with_day: string; with_start: string; with_end: string }[];
+}
+
+/** فحص: هل الميعاد الجديد مناسب لكل الطلاب؟ (p_excludeIndex = فهرس السلويت اللي بنغيره) */
+export const analyzeSlotConflict = (groupId: string, day: string, startTime: string, endTime: string, excludeIndex?: number): Promise<SlotConflictResult> =>
+  rpc('analyze_group_slot_conflict', { p_group_id: groupId, p_day: day, p_start_time: startTime, p_end_time: endTime, p_exclude_index: excludeIndex ?? null });
+
+/** نتيجة تطبيق تغيير الميعاد */
+export interface ApplySlotResult extends SlotConflictResult {
+  applied?: boolean;
+  sessions_updated?: number;
+  effective_from?: string;
+  new_schedule?: string;
+  hours_left?: number;
+}
+
+/** تطبيق تغيير ميعاد حصة أسبوعية — الحصص القادمة فقط */
+export const applySlotChange = (groupId: string, slotIndex: number, day: string, startTime: string, endTime: string, reason?: string): Promise<ApplySlotResult> =>
+  rpc('apply_group_slot_change', { p_group_id: groupId, p_slot_index: slotIndex, p_new_day: day, p_new_start: startTime, p_new_end: endTime, p_reason: reason || null });
+
+/** هدف نقل محتمل (مجموعة أخرى للمدرس) */
+export interface TransferTarget {
+  id: string;
+  name: string;
+  grade?: string;
+  grade_match: boolean;
+  schedule: string;
+  slots: GroupScheduleSlot[];
+  current_count: number;
+  max_students: number;
+  capacity_ok: boolean;
+  /** الطالب عنده درس في ميعاد هذه المجموعة؟ */
+  conflict: boolean;
+}
+
+/** مجموعات المدرس الأخرى كأهداف نقل مع فحص تعارض ميعاد الطالب لكل واحدة */
+export const fetchTransferTargets = (studentId: string, fromGroupId: string): Promise<TransferTarget[]> =>
+  rpc('list_group_transfer_targets', { p_student_id: studentId, p_from_group: fromGroupId });
+
+/** نقل مباشر لطالب بين مجموعات المدرس — بفحص إلزامي لتعارض الميعاد */
+export const transferStudentDirect = (studentId: string, fromGroupId: string, toGroupId: string, reason?: string) =>
+  rpc('transfer_student_direct', { p_student_id: studentId, p_from_group: fromGroupId, p_to_group: toGroupId, p_reason: reason || null });
+
 /** ألوان شارة التوافق */
 export const fitToneClass = (tone: 'good' | 'mid' | 'bad' | 'unknown'): string => {
   switch (tone) {

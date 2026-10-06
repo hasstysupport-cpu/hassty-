@@ -26,7 +26,7 @@ import {
   ArrowRightLeft,
   Percent,
   Check,
-  Brain
+  LayoutDashboard
 } from 'lucide-react';
 import { StudentGroup, GroupScheduleSlot, PricingBillingType, TeacherStudentItem } from '../../types';
 import { Badge } from '../../components/common/Badge';
@@ -44,7 +44,6 @@ import {
   getStoredStudents
 } from '../../lib/teacherStore';
 import { gradesMatch, gradeMismatchText } from '../../lib/gradeMatch';
-import { ScheduleIntelligencePanel } from '../../components/teacher/ScheduleIntelligencePanel';
 
 const ALL_EGYPT_GRADES = [
   'الصف الأول الإعدادي',
@@ -65,7 +64,7 @@ const DAYS_OF_WEEK = [
   { eng: 'Friday', ar: 'الجمعة' },
 ];
 
-export const TeacherGroupsPage: React.FC = () => {
+export const TeacherGroupsPage: React.FC<{ onNavigate?: (path: string) => void }> = ({ onNavigate }) => {
   const { user } = useAuth();
   const teacherId = user?.uid || 'teacher-current';
 
@@ -81,8 +80,6 @@ export const TeacherGroupsPage: React.FC = () => {
   // Create group modal state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [cancellingSessionGroup, setCancellingSessionGroup] = useState<StudentGroup | null>(null);
-  // ذكاء المواعيد — لوحة التحليل لكل مجموعة
-  const [intelGroupId, setIntelGroupId] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState('ظرف شخصي طارئ');
   const [cancelNoticeHours, setCancelNoticeHours] = useState(5);
   const [cancelSuccessMsg, setCancelSuccessMsg] = useState('');
@@ -386,7 +383,9 @@ export const TeacherGroupsPage: React.FC = () => {
           return (
             <div
               key={group.id}
-              className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 hover:border-blue-300 transition-all flex flex-col justify-between shadow-xs space-y-4"
+              onClick={() => onNavigate?.(`/teacher/group/${group.id}`)}
+              className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between shadow-xs space-y-4"
+              title="اضغط لفتح لوحة تحكم المجموعة"
             >
               <div>
                 <div className="flex items-start justify-between gap-2 mb-2">
@@ -469,22 +468,22 @@ export const TeacherGroupsPage: React.FC = () => {
               {/* Action Buttons */}
               <div className="pt-2 border-t border-gray-100 flex items-center gap-2">
                 <button
-                  onClick={() => setIntelGroupId(group.id)}
+                  onClick={(e) => { e.stopPropagation(); onNavigate?.(`/teacher/group/${group.id}`); }}
                   className="flex-1 py-2.5 bg-gradient-to-l from-[#EFF6FF] to-[#F5F3FF] hover:from-blue-100 hover:to-violet-100 text-[#2563EB] text-xs font-bold rounded-xl transition-colors cursor-pointer text-center flex items-center justify-center gap-1.5 border border-blue-100"
-                  title="تحليل توافق مواعيد الطلاب واقتراح أفضل موعد"
+                  title="افتح لوحة تحكم المجموعة: الطلاب والحصص والمواعيد والامتحانات"
                 >
-                  <Brain className="w-3.5 h-3.5" />
-                  <span>ذكاء المواعيد</span>
+                  <LayoutDashboard className="w-3.5 h-3.5" />
+                  <span>لوحة المجموعة</span>
                 </button>
                 <button
-                  onClick={() => setSelectedGroupRoster(group)}
+                  onClick={(e) => { e.stopPropagation(); setSelectedGroupRoster(group); }}
                   className="flex-1 py-2.5 bg-[#EFF6FF] hover:bg-blue-100 text-[#2563EB] text-xs font-bold rounded-xl transition-colors cursor-pointer text-center flex items-center justify-center gap-1.5"
                 >
                   <Users className="w-3.5 h-3.5" />
                   <span>التحكم بالطلاب ({group.currentStudents})</span>
                 </button>
                 <button
-                  onClick={() => setCancellingSessionGroup(group)}
+                  onClick={(e) => { e.stopPropagation(); setCancellingSessionGroup(group); }}
                   className="px-3 py-2.5 bg-gray-50 hover:bg-red-50 text-gray-600 hover:text-[#EF4444] border border-gray-200 hover:border-red-200 text-xs font-bold rounded-xl transition-colors cursor-pointer"
                   title="إلغاء أو تأجيل حصة قادمة"
                 >
@@ -978,8 +977,7 @@ export const TeacherGroupsPage: React.FC = () => {
         )}
       </Modal>
 
-      {/* ذكاء المواعيد — تحليل التوافق واقتراح أفضل موعد مع حماية الاستقرار */}
-      <ScheduleIntelligencePanel groupId={intelGroupId} onClose={() => setIntelGroupId(null)} />
+      {/* ذكاء المواعيد انتقل للوحة تحكم المجموعة /teacher/group/:id */}
     </div>
   );
 };
