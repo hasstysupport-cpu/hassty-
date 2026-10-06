@@ -27,9 +27,10 @@ export const StudentQRCardPage: React.FC = () => {
   const student: StudentProfile = {
     id: user?.uid || 'std-current',
     name: user?.name || 'الطالب',
-    phone: user?.phone || '010XXXXXXXX',
-    governorate: user?.governorate || 'القاهرة',
-    city: user?.area || 'مدينة نصر',
+    /* بيانات صادقة: لا أرقام وهمية — إن لم يُسجَّل الهاتف يظهر «غير مسجل» */
+    phone: user?.phone || 'غير مسجل',
+    governorate: user?.governorate || 'غير محدد',
+    city: user?.area || 'غير محدد',
     area: user?.area || '',
     stage: 'المرحلة الثانوية',
     grade: user?.profileData?.grade || 'الصف الثالث الثانوي',
