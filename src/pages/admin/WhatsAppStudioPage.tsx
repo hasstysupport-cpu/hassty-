@@ -33,6 +33,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { whatsappService, InteractiveButton, InteractiveListSection, WhatsAppGatewayStatus } from '../../lib/whatsappService';
+import { isCurrentAdminSessionValid } from '../../lib/securityConfig';
 
 export const WhatsAppStudioPage: React.FC = () => {
   useSEO({
@@ -40,6 +41,18 @@ export const WhatsAppStudioPage: React.FC = () => {
     description: 'أداة إدارية داخلية لإرسال رسائل الواتساب.',
     robots: 'noindex, nofollow',
   });
+  /* بوابة أمان: هذه أداة داخلية للأدمن فقط — لا تُعرض لأي زائر أو دور آخر.
+     (noindex ليس حماية؛ الصفحة نفسها يجب ألا تُصيَّر بدون جلسة أدمن صالحة) */
+  const [adminGate, setAdminGate] = React.useState<'checking' | 'allowed' | 'denied'>('checking');
+  React.useEffect(() => {
+    let mounted = true;
+    const evaluate = () => {
+      if (mounted) setAdminGate(isCurrentAdminSessionValid() ? 'allowed' : 'denied');
+    };
+    evaluate();
+    const t = window.setTimeout(evaluate, 300); // إعادة تحقق بعد ترميز الجلسة المحلية
+    return () => { mounted = false; window.clearTimeout(t); };
+  }, []);
   const [activeTab, setActiveTab] = useState<'text' | 'interactive' | 'list' | 'media' | 'location' | 'reaction'>('interactive');
   const [status, setStatus] = useState<WhatsAppGatewayStatus | null>(null);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
@@ -199,6 +212,25 @@ export const WhatsAppStudioPage: React.FC = () => {
       setIsSending(false);
     }
   };
+
+  if (adminGate !== 'allowed') {
+    return (
+      <div className="min-h-screen bg-[#F8FAFF] flex items-center justify-center px-4 font-['IBM_Plex_Sans_Arabic',sans-serif]" dir="rtl">
+        <div className="bg-white rounded-2xl shadow-lg border border-red-100 p-8 max-w-md w-full text-center space-y-3">
+          <div className="text-4xl">🔒</div>
+          <h1 className="text-xl font-black text-gray-900">منطقة إدارية محمية</h1>
+          <p className="text-sm text-gray-600 leading-relaxed">
+            {adminGate === 'checking'
+              ? 'جارٍ التحقق من صلاحية الجلسة…'
+              : 'هذه أداة داخلية لفريق حِصّتي فقط. إذا كنت من فريق الإدارة، سجّل دخولك من بوابة الإدارة أولًا.'}
+          </p>
+          {adminGate === 'denied' && (
+            <a href="/" className="inline-block mt-2 px-5 py-2 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700">العودة للرئيسية</a>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F8FAFF] py-10 px-4 sm:px-6 lg:px-8 text-right font-['IBM_Plex_Sans_Arabic',sans-serif]">

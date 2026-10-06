@@ -15,12 +15,25 @@ export default async function handler(req, res) {
   try {
     const body = await readJsonBody(req);
     if (!body) return jsonErr(res, 'تعذر قراءة بيانات الطلب.', 400);
-    const access = await internalOrUser(req, ['admin', 'teacher', 'assistant', 'parent', 'student']);
+    /* الأمان: الإرسال الحر بأي رقم/نص للطاقم فقط (أدمن/مدرس/مساعد).
+       ولي الأمر يُسمح له بالإرسال إلى رقم واتسابه هو فقط (اختبار الإعدادات).
+       الطلاب لا يرسلون رسائل حرة — إشعاراتهم القوالبية تمر عبر /notify
+       التي تتحقق من نوع الحدث وتجهز البيانات من الخادم. منع إساءة استخدام
+       رقم المنصة (سبام/تصيّد) واستنزاف حصة الباقة. */
+    const access = await internalOrUser(req, ['admin', 'teacher', 'assistant', 'parent']);
     if (!access) return jsonErr(res, 'غير مصرح.', 401);
 
     const kind = String(body.kind || 'text');
     const number = body.number || body.phone;
     if (!number) return jsonErr(res, 'رقم الهاتف مطلوب.', 422);
+
+    /* ولي الأمر: تقييد الوجهة برقم واتسابه المسجل نفسه */
+    if (!access.internal && access.profile?.role === 'parent') {
+      const own = String(access.profile.phone || '').replace(/\D/g, '');
+      const dest = String(number).replace(/\D/g, '');
+      const destLocal = dest.startsWith('20') ? '0' + dest.slice(2) : dest;
+      if (!own || destLocal !== own) return jsonErr(res, 'لا يمكن إرسال واتساب إلا إلى رقمك المسجل لاختبار الإشعارات.', 403);
+    }
 
     let data;
     if (kind === 'text') {

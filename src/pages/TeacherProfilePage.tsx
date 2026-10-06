@@ -62,6 +62,11 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({ tutorId,
   type PublicProfilePayload = { row: any; reviewRows: any[] } | null;
 
   const loadPublicPart = async (): Promise<PublicProfilePayload> => {
+    /* تحقق من صيغة المعرّف أولًا: روابط مثل /tutor/whatever ليست UUID —
+       نمنع الاستعلامات المقدّرة للفشل بـ HTTP 400 من PostgREST */
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tutorId)) {
+      return null;
+    }
     let row: any = null;
     const { data: viewRow, error: tutorError } = await supabase!.from('public_verified_teachers').select('*').eq('id', tutorId).maybeSingle();
     if (!tutorError && viewRow) {
@@ -144,6 +149,12 @@ export const TeacherProfilePage: React.FC<TeacherProfilePageProps> = ({ tutorId,
   const load = async () => {
     if (!supabase || !tutorId) {
       setLoadError('تعذر تحميل بيانات المدرس.');
+      setLoading(false);
+      return;
+    }
+    /* معرّف غير صالح (ليس UUID) → صفحة غير موجودة بدون أي استعلام */
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tutorId)) {
+      setLoadError('هذا المدرس غير موجود.');
       setLoading(false);
       return;
     }
