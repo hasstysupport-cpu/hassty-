@@ -7,7 +7,7 @@
  * Copyright (c) Mahmoudmadkour — All Rights Reserved.
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSEO } from '../lib/useSEO';
 import {
   MapPin,
@@ -19,12 +19,14 @@ import {
   Sparkles,
   HelpCircle,
   Code2,
-  ArrowUpRight
+  ArrowUpRight,
+  Ticket,
+  MessageSquare
 } from 'lucide-react';
 import { FAQ_ITEMS } from '../data/mockData';
 import { Badge } from '../components/common/Badge';
 import { useAuth } from '../lib/AuthContext';
-import { createSupportTicket } from '../lib/supportTicketsService';
+import { createSupportTicket, loadMySupportTickets, SupportTicket } from '../lib/supportTicketsService';
 
 interface ContactPageProps {
   onNavigate: (path: string) => void;
@@ -35,6 +37,13 @@ const SUPPORT_CHANNELS = [
   { label: 'واتساب', username: 'جروب الدعم الرسمي', href: 'https://chat.whatsapp.com/DDU2o4jiLASAcVeEb6BnNu' },
 ];
 
+const TICKET_STATUS_LABELS: Record<string, { label: string; cls: string }> = {
+  open: { label: 'مفتوحة', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+  in_progress: { label: 'قيد المعالجة', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+  resolved: { label: 'تم الحل', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  closed: { label: 'مغلقة', cls: 'bg-gray-100 text-gray-600 border-gray-200' },
+};
+
 export const ContactPage: React.FC<ContactPageProps> = ({ onNavigate }) => {
   const { user } = useAuth();
   const [openFaqId, setOpenFaqId] = useState<string | null>(FAQ_ITEMS[0].id);
@@ -42,6 +51,22 @@ export const ContactPage: React.FC<ContactPageProps> = ({ onNavigate }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [ticketNumber, setTicketNumber] = useState<string | null>(null);
+  const [myTickets, setMyTickets] = useState<SupportTicket[]>([]);
+  const [myTicketsLoading, setMyTicketsLoading] = useState(false);
+  const [myTicketsError, setMyTicketsError] = useState('');
+
+  /* تذاكري: تُحمّل للمسجلين فقط (سياسة owner read تمنع رؤية غيرها) وتُحدّث بعد كل إرسال */
+  const refreshMyTickets = React.useCallback(() => {
+    if (!user?.uid) return;
+    setMyTicketsLoading(true);
+    setMyTicketsError('');
+    loadMySupportTickets(user.uid)
+      .then((rows) => setMyTickets(rows))
+      .catch(() => setMyTicketsError('تعذر تحميل تذاكرك حاليًا.'))
+      .finally(() => setMyTicketsLoading(false));
+  }, [user?.uid]);
+
+  useEffect(() => { refreshMyTickets(); }, [refreshMyTickets]);
   const [formData, setFormData] = useState({
     name: user?.name || '',
     phone: user?.phone || '',
@@ -73,7 +98,7 @@ export const ContactPage: React.FC<ContactPageProps> = ({ onNavigate }) => {
         subject: formData.subject,
         message: formData.message,
       });
-      setTicketNumber(ticket.ticketNumber);
+      setTicketNumber(ticket.ticketNumber || null);
       setFormSubmitted(true);
       setFormData({
         name: user?.name || '',
@@ -82,6 +107,7 @@ export const ContactPage: React.FC<ContactPageProps> = ({ onNavigate }) => {
         subject: 'استفسار عام',
         message: '',
       });
+      refreshMyTickets();
     } catch (error) {
       console.error('Failed to create support ticket:', error);
       setSubmitError('تعذر إرسال الرسالة حالياً. حاول مرة أخرى أو تواصل معنا مباشرة عبر واتساب أو تليجرام.');
@@ -119,7 +145,7 @@ export const ContactPage: React.FC<ContactPageProps> = ({ onNavigate }) => {
 
           <div className="lg:col-span-2 bg-white border border-[#E5E7EB] rounded-3xl p-6 sm:p-8 shadow-xs">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-6"><div><h3 className="text-xl font-bold text-[#1E3A8A] mb-1">أرسل لنا رسالة وسنتواصل معك</h3><p className="text-xs text-[#6B7280]">رسالتك ستُحفظ كتذكرة دعم ويمكن لفريق الإدارة مراجعتها والرد عليها.</p></div><div className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-full w-fit"><CheckCircle2 className="w-3.5 h-3.5" /> تذكرة دعم</div></div>
-            {formSubmitted ? <div className="p-8 bg-emerald-50 border border-emerald-200 rounded-2xl text-center space-y-3 animate-fadeIn"><div className="w-14 h-14 bg-[#10B981] text-white rounded-full flex items-center justify-center mx-auto shadow-xs"><CheckCircle2 className="w-8 h-8" /></div><h4 className="text-base font-bold text-emerald-900">تم إرسال رسالتك بنجاح! 🎉</h4><p className="text-xs text-emerald-700 max-w-sm mx-auto">تم إنشاء تذكرة دعم برقم <strong dir="ltr">{ticketNumber}</strong> وسيقوم فريق الإدارة بمراجعتها والرد عليها.</p><button type="button" onClick={() => setFormSubmitted(false)} className="px-5 py-2.5 bg-white border border-emerald-200 rounded-xl text-xs font-bold text-emerald-800 hover:bg-emerald-100">إرسال تذكرة أخرى</button></div> : <form onSubmit={handleSubmit} className="space-y-4">
+            {formSubmitted ? <div className="p-8 bg-emerald-50 border border-emerald-200 rounded-2xl text-center space-y-3 animate-fadeIn"><div className="w-14 h-14 bg-[#10B981] text-white rounded-full flex items-center justify-center mx-auto shadow-xs"><CheckCircle2 className="w-8 h-8" /></div><h4 className="text-base font-bold text-emerald-900">تم إرسال رسالتك بنجاح! 🎉</h4><p className="text-xs text-emerald-700 max-w-sm mx-auto">{ticketNumber ? <>تم إنشاء تذكرة دعم برقم <strong dir="ltr">{ticketNumber}</strong> وسيقوم فريق الإدارة بمراجعتها والرد عليها.</> : 'وصلتنا رسالتك وسيقوم فريق الإدارة بمراجعتها والرد عليك على رقم الواتساب المُسجّل.'}</p><div className="flex items-center justify-center gap-2"><button type="button" onClick={() => setFormSubmitted(false)} className="px-5 py-2.5 bg-white border border-emerald-200 rounded-xl text-xs font-bold text-emerald-800 hover:bg-emerald-100">إرسال تذكرة أخرى</button>{!user?.uid && <button type="button" onClick={() => onNavigate('/login')} className="px-5 py-2.5 bg-emerald-600 rounded-xl text-xs font-bold text-white hover:bg-emerald-700">سجّل دخولك لمتابعة تذاكرك</button>}</div></div> : <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div><label className="block text-xs font-bold text-[#1F2937] mb-1.5">الاسم بالكامل <span className="text-[#EF4444]">*</span></label><input type="text" required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full px-4 py-2.5 bg-gray-50 border border-[#E5E7EB] rounded-xl text-xs text-right focus:bg-white focus:outline-none focus:border-[#2563EB]" /></div><div><label className="block text-xs font-bold text-[#1F2937] mb-1.5">رقم الهاتف (واتساب) <span className="text-[#EF4444]">*</span></label><input type="tel" required value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="w-full px-4 py-2.5 bg-gray-50 border border-[#E5E7EB] rounded-xl text-xs text-right focus:bg-white focus:outline-none focus:border-[#2563EB]" /></div></div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div><label className="block text-xs font-bold text-[#1F2937] mb-1.5">البريد الإلكتروني (اختياري)</label><input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="w-full px-4 py-2.5 bg-gray-50 border border-[#E5E7EB] rounded-xl text-xs text-right focus:bg-white focus:outline-none focus:border-[#2563EB]" /></div><div><label className="block text-xs font-bold text-[#1F2937] mb-1.5">نوع الاستفسار</label><select value={formData.subject} onChange={(e) => setFormData({ ...formData, subject: e.target.value })} className="w-full px-4 py-2.5 bg-gray-50 border border-[#E5E7EB] rounded-xl text-xs text-right focus:bg-white focus:outline-none focus:border-[#2563EB] cursor-pointer"><option value="استفسار عام">استفسار عام</option><option value="انضمام كمعلم">طلب انضمام كمعلم جديد</option><option value="مشكلة تقنية في الكود">مشكلة في مسح كود الـ QR</option><option value="اشتراكات ومدفوعات">استفسار عن المدفوعات والعمولات</option></select></div></div>
               <div><label className="block text-xs font-bold text-[#1F2937] mb-1.5">نص الرسالة أو الاستفسار <span className="text-[#EF4444]">*</span></label><textarea rows={5} required minLength={5} value={formData.message} onChange={(e) => setFormData({ ...formData, message: e.target.value })} placeholder="اكتب استفسارك بالتفصيل وسنرد عليك بأسرع وقت..." className="w-full px-4 py-2.5 bg-gray-50 border border-[#E5E7EB] rounded-xl text-xs text-right focus:bg-white focus:outline-none focus:border-[#2563EB] resize-y" /></div>
@@ -128,6 +154,47 @@ export const ContactPage: React.FC<ContactPageProps> = ({ onNavigate }) => {
             </form>}
           </div>
         </div>
+
+        {/* تذاكري وردود الدعم — للمسجلين فقط (owner read عبر RLS) */}
+        {user?.uid && (
+          <div className="bg-white border border-[#E5E7EB] rounded-3xl p-6 sm:p-8 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-5">
+              <div>
+                <h3 className="text-lg font-bold text-[#1E3A8A] flex items-center gap-2"><Ticket className="w-5 h-5 text-[#2563EB]" /> تذاكري وردود الدعم</h3>
+                <p className="text-xs text-[#6B7280] mt-1">تابع حالة تذاكرك واقرأ رد فريق الإدارة من هنا مباشرة.</p>
+              </div>
+              <button type="button" onClick={refreshMyTickets} disabled={myTicketsLoading} className="px-4 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 disabled:opacity-50 flex items-center gap-2 cursor-pointer">{myTicketsLoading ? 'جاري التحديث...' : 'تحديث'}</button>
+            </div>
+            {myTicketsError && <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-bold mb-3">{myTicketsError}</div>}
+            {!myTicketsLoading && !myTicketsError && myTickets.length === 0 && (
+              <div className="p-6 bg-gray-50 border border-gray-100 rounded-2xl text-center text-xs text-gray-400 font-bold">لا توجد تذاكر بعد — أرسل رسالتك من النموذج أعلاه وستظهر هنا مع ردود الدعم.</div>
+            )}
+            <div className="space-y-3">
+              {myTickets.map((t) => {
+                const st = TICKET_STATUS_LABELS[t.status] || TICKET_STATUS_LABELS.open;
+                return (
+                  <div key={t.id} className="border border-[#E5E7EB] rounded-2xl p-4 space-y-2 hover:border-blue-200 transition-colors">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[11px] font-mono font-black text-[#2563EB] bg-[#EFF6FF] border border-blue-100 px-2 py-0.5 rounded-md" dir="ltr">{t.ticketNumber}</span>
+                        <span className="text-[13px] font-black text-gray-900">{t.subject}</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${st.cls}`}>{st.label}</span>
+                      </div>
+                      <span className="text-[10px] text-gray-400 flex items-center gap-1"><Clock className="w-3 h-3" />{new Date(t.createdAt).toLocaleDateString('ar-EG')}</span>
+                    </div>
+                    <p className="text-xs text-gray-600 leading-6 whitespace-pre-wrap">{t.message}</p>
+                    {t.adminReply && (
+                      <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+                        <p className="text-[10px] font-black text-emerald-800 mb-1 flex items-center gap-1"><MessageSquare className="w-3 h-3" /> رد فريق الدعم{t.repliedAt ? ` — ${new Date(t.repliedAt).toLocaleDateString('ar-EG')}` : ''}</p>
+                        <p className="text-xs text-emerald-900 leading-6 whitespace-pre-wrap">{t.adminReply}</p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <div className="bg-white border border-[#E5E7EB] rounded-3xl p-6 sm:p-10"><div className="text-center max-w-2xl mx-auto mb-8"><div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#2563EB] bg-[#EFF6FF] px-3 py-1 rounded-full border border-blue-200 mb-2"><HelpCircle className="w-3.5 h-3.5" /><span>إجابات فورية</span></div><h3 className="text-xl sm:text-2xl font-black text-[#1E3A8A]">الأسئلة الأكثر شيوعاً</h3></div><div className="space-y-3 max-w-4xl mx-auto">{FAQ_ITEMS.map((item) => { const isOpen = openFaqId === item.id; return <div key={item.id} className="border border-[#E5E7EB] rounded-2xl overflow-hidden transition-all"><button onClick={() => toggleFaq(item.id)} className="w-full p-4 sm:p-5 flex items-center justify-between text-right bg-gray-50/60 hover:bg-[#F8FAFF] transition-colors"><span className="text-xs sm:text-sm font-bold text-[#1E3A8A]">{item.question}</span>{isOpen ? <ChevronUp className="w-4 h-4 text-[#2563EB] shrink-0" /> : <ChevronDown className="w-4 h-4 text-[#6B7280] shrink-0" />}</button>{isOpen && <div className="px-4 sm:px-5 pb-5 text-xs leading-relaxed text-[#6B7280] bg-white">{item.answer}</div>}</div>; })}</div></div>
       </div>

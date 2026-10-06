@@ -52,6 +52,12 @@ function mapTicket(row: any): SupportTicket {
   };
 }
 
+/**
+ * إنشاء تذكرة دعم.
+ * ⚠️ المستخدم الزائر (بدون user_id): الـ RLS لا يمنح anon سياسة SELECT على الجدول،
+ * لذا أي INSERT..RETURNING يفشل بـ 42501 — نستخدم return=minimal (بدون .select())
+ * ونرجع كائنًا اصطناعيًا بدون رقم تذكرة. المسجل دخوله: .select() تعمل عبر سياسة owner read.
+ */
 export async function createSupportTicket(input: {
   userId?: string | null;
   name: string;
@@ -60,16 +66,40 @@ export async function createSupportTicket(input: {
   subject: string;
   message: string;
 }): Promise<SupportTicket> {
+  const row = {
+    user_id: input.userId || null,
+    name: input.name.trim(),
+    phone: input.phone.trim(),
+    email: input.email?.trim() || null,
+    subject: input.subject.trim() || 'استفسار عام',
+    message: input.message.trim(),
+  };
+
+  if (!input.userId) {
+    // زائر: إرسال بدون RETURNING — نجاح = 201 بدون جسم
+    const { error } = await client().from('support_tickets').insert(row);
+    if (error) throw error;
+    return {
+      id: '',
+      ticketNumber: '',
+      userId: null,
+      name: row.name,
+      phone: row.phone,
+      email: row.email,
+      subject: row.subject,
+      message: row.message,
+      status: 'open',
+      adminReply: null,
+      repliedBy: null,
+      repliedAt: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
   const { data, error } = await client()
     .from('support_tickets')
-    .insert({
-      user_id: input.userId || null,
-      name: input.name.trim(),
-      phone: input.phone.trim(),
-      email: input.email?.trim() || null,
-      subject: input.subject.trim() || 'استفسار عام',
-      message: input.message.trim(),
-    })
+    .insert(row)
     .select('*')
     .single();
 
@@ -77,7 +107,20 @@ export async function createSupportTicket(input: {
   return mapTicket(data);
 }
 
+/** تذاكر المستخدم الحالي + ردود الدعم عليها (سياسة owner read في RLS تحميها) */
+export async function loadMySupportTickets(userId: string): Promise<SupportTicket[]> {
+  const { data, error } = await client()
+    .from('support_tickets')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(50);
+  if (error) throw error;
+  return (data || []).map(mapTicket);
+}
+
 export async function loadSupportTickets(): Promise<SupportTicket[]> {
+  /* للأدمن — RLS يحدد ما يراه كل دور */
   const { data, error } = await client()
     .from('support_tickets')
     .select('*')

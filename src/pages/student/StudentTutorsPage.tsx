@@ -7,27 +7,19 @@
  * Copyright (c) Mahmoudmadkour — All Rights Reserved.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Users,
-  Plus,
-  QrCode,
-  Calendar,
-  Clock,
-  MapPin,
   Star,
-  CheckCircle2,
-  X,
-  ArrowLeft,
-  Search,
-  MessageSquare,
+  MapPin,
+  BookOpen,
   GraduationCap,
-  Loader2
+  Loader2,
+  ArrowRight,
+  MessageSquare
 } from 'lucide-react';
-import { TutorProfile } from '../../types';
 import { Badge } from '../../components/common/Badge';
-import { collection, query, where, getDocs } from '../../lib/supabaseCompat';
-import { db } from '../../lib/supabaseCompat';
+import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/AuthContext';
 
 interface StudentTutorsPageProps {
@@ -35,89 +27,92 @@ interface StudentTutorsPageProps {
   onSelectTutor: (tutorId: string) => void;
 }
 
+interface MyTutorCard {
+  id: string;
+  name: string;
+  subject: string;
+  avatarUrl: string;
+  governorate: string;
+  city: string;
+  rating: number | null;
+  reviewsCount: number | null;
+  pricePerSession: number | null;
+  groups: { id: string; name: string; subject: string }[];
+}
+
+/**
+ * مدرسيني المسجلين — البيانات الحقيقية من قاعدة البيانات:
+ * قيود الطالب النشطة → مجموعاتها → ملفات المدرسين (عبر سياسة profiles_select_my_tutors)
+ * سابقًا كانت الصفحة فارغة دائمًا لأنها لم تكن تقرأ من DB إطلاقًا + «انضمام بكود» وهمي بلا أي كتابة — أُزيل.
+ */
 export const StudentTutorsPage: React.FC<StudentTutorsPageProps> = ({
   onNavigate,
   onSelectTutor,
 }) => {
   const { user } = useAuth();
-  const [tutorsList, setTutorsList] = useState<TutorProfile[]>([]);
-  const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
-  const [joinCodeInput, setJoinCodeInput] = useState('');
-  const [joinSuccessMessage, setJoinSuccessMessage] = useState('');
-  const [joinErrorMessage, setJoinErrorMessage] = useState('');
-  const [joining, setJoining] = useState(false);
+  const [tutors, setTutors] = useState<MyTutorCard[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const handleJoinTutor = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!joinCodeInput.trim()) return;
-    setJoining(true);
-    setJoinErrorMessage('');
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      if (!supabase || !user?.uid) { if (active) { setLoading(false); } return; }
+      setLoading(true);
+      setError('');
+      try {
+        const { data: enrollments, error: e1 } = await supabase
+          .from('group_enrollments').select('group_id').eq('student_id', user.uid).eq('status', 'active');
+        if (e1) throw e1;
+        const groupIds = Array.from(new Set((enrollments || []).map((x: any) => x.group_id).filter(Boolean)));
+        if (!groupIds.length) { if (active) { setTutors([]); setLoading(false); } return; }
 
-    try {
-      const code = joinCodeInput.trim().toUpperCase();
-      const q = query(
-        collection(db, 'users'),
-        where('role', '==', 'teacher')
-      );
-      const snapshot = await getDocs(q);
-      let foundTeacher: TutorProfile | null = null;
+        const { data: groups, error: e2 } = await supabase
+          .from('student_groups').select('id,tutor_id,subject,name').in('id', groupIds);
+        if (e2) throw e2;
+        const tutorIds = Array.from(new Set((groups || []).map((g: any) => g.tutor_id).filter(Boolean)));
+        if (!tutorIds.length) { if (active) { setTutors([]); setLoading(false); } return; }
 
-      snapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        const tCode = data.profileData?.joinCode || docSnap.id.substring(0, 6).toUpperCase();
-        if (tCode === code || docSnap.id.toUpperCase() === code) {
-          foundTeacher = {
-            id: docSnap.id,
-            name: data.name || 'معلم معتمد',
-            title: data.profileData?.title || `معلم ${data.profileData?.subject || ''}`,
-            subject: data.profileData?.subject || 'عام',
-            governorate: data.governorate || 'القاهرة',
-            area: data.area || '',
-            rating: data.profileData?.rating || 5.0,
-            reviewsCount: data.profileData?.reviewsCount || 0,
-            studentsCount: data.profileData?.studentsCount || 0,
-            pricePerSession: data.profileData?.pricePerSession || 100,
-            isVerified: data.profileData?.isVerified ?? true,
-            joinCode: tCode,
-            levels: data.profileData?.levels || ['المرحلة الثانوية'],
-            avatarUrl: data.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-            bio: data.profileData?.bio || `معلم معتمد لمادة ${data.profileData?.subject || ''}`,
-            experienceYears: data.profileData?.experienceYears || 5,
-            centers: data.profileData?.centers || [],
-            phone: data.phone || '',
-            email: data.email || '',
-            education: data.profileData?.education || 'مؤهل تربوي معتمد',
-            accountStatus: 'active',
-            gender: data.profileData?.gender || 'male'
+        const [profilesRes, tutorProfilesRes] = await Promise.all([
+          supabase.from('profiles').select('id,full_name,avatar_url,governorate,city,account_status').in('id', tutorIds),
+          supabase.from('tutor_profiles').select('user_id,subjects,rating,reviews_count,price_per_session').in('user_id', tutorIds),
+        ]);
+        if (profilesRes.error) throw profilesRes.error;
+
+        const cards: MyTutorCard[] = (profilesRes.data || []).map((p: any) => {
+          const myGroups = (groups || []).filter((g: any) => g.tutor_id === p.id);
+          const tp = (tutorProfilesRes.data || []).find((t: any) => t.user_id === p.id);
+          const tpSubjects = Array.isArray(tp?.subjects) ? tp.subjects : [];
+          const groupSubjects = myGroups.map((g: any) => g.subject).filter(Boolean);
+          const subject = groupSubjects[0] || tpSubjects[0] || 'مادة تعليمية';
+          return {
+            id: p.id,
+            name: p.full_name || 'مدرس حِصّتي',
+            subject,
+            avatarUrl: p.avatar_url || '',
+            governorate: p.governorate || '',
+            city: p.city || '',
+            rating: tp?.rating != null ? Number(tp.rating) : null,
+            reviewsCount: tp?.reviews_count != null ? Number(tp.reviews_count) : null,
+            pricePerSession: tp?.price_per_session != null ? Number(tp.price_per_session) : null,
+            groups: myGroups.map((g: any) => ({ id: g.id, name: g.name || 'مجموعة', subject: g.subject || subject })),
           };
-        }
-      });
-
-      if (foundTeacher) {
-        const ft = foundTeacher as TutorProfile;
-        if (!tutorsList.some((t) => t.id === ft.id)) {
-          setTutorsList([...tutorsList, ft]);
-        }
-        setJoinSuccessMessage(`تم الانضمام بنجاح لمجموعة ${ft.name} (${ft.subject})!`);
-        setTimeout(() => {
-          setIsJoinModalOpen(false);
-          setJoinSuccessMessage('');
-          setJoinCodeInput('');
-        }, 2000);
-      } else {
-        setJoinErrorMessage('لم يتم العثور على معلم بهذا الكود، يرجى التأكد من الكود المدخل.');
+        });
+        if (active) setTutors(cards);
+      } catch (err: any) {
+        console.error('MyTutors load error:', err);
+        if (active) setError(err?.message || 'تعذر تحميل مدرسينك حاليًا.');
+      } finally {
+        if (active) setLoading(false);
       }
-    } catch (err) {
-      console.error(err);
-      setJoinErrorMessage('حدث خطأ أثناء البحث عن المعلم.');
-    } finally {
-      setJoining(false);
-    }
-  };
+    };
+    void load();
+    return () => { active = false; };
+  }, [user?.uid]);
 
   return (
     <div className="space-y-4 text-right">
-      
+
       {/* Header */}
       <div className="bg-white border border-[#E5E7EB] rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
@@ -126,10 +121,10 @@ export const StudentTutorsPage: React.FC<StudentTutorsPageProps> = ({
             <span>قائمة المدرسين</span>
           </div>
           <h2 className="text-xl sm:text-2xl font-black text-[#1E3A8A]">
-            المدرسين المشترك معهم ({tutorsList.length})
+            المدرسين المشترك معهم ({tutors.length})
           </h2>
           <p className="text-xs text-[#6B7280] mt-1">
-            تابع مواعيد حصصك وسجل الحضور ونسبة الالتزام مع كل معلم
+            مدرسوك في المجموعات النشطة — تابع حصصك وقدّر تقييمك بعد أول حصة مكتملة
           </p>
         </div>
 
@@ -141,57 +136,85 @@ export const StudentTutorsPage: React.FC<StudentTutorsPageProps> = ({
             البحث عن مدرس جديد
           </button>
           <button
-            onClick={() => setIsJoinModalOpen(true)}
+            onClick={() => onNavigate('/student/reviews')}
             className="px-5 py-2.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-2 cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
-            <span>الانضمام بكود مدرس</span>
+            <Star className="w-4 h-4" />
+            <span>قيّم مدرسك</span>
           </button>
         </div>
       </div>
 
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-xs font-bold text-red-700">{error}</div>
+      )}
+
       {/* Tutors Grid */}
-      {tutorsList.length > 0 ? (
+      {loading ? (
+        <div className="bg-white border border-gray-200 rounded-2xl p-10 text-center">
+          <Loader2 className="w-8 h-8 text-[#2563EB] animate-spin mx-auto" />
+          <p className="text-xs text-gray-500 font-bold mt-3">جاري تحميل مدرسينك...</p>
+        </div>
+      ) : tutors.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {tutorsList.map((tutor) => (
+          {tutors.map((tutor) => (
             <div
               key={tutor.id}
               className="bg-white border border-[#E5E7EB] rounded-2xl p-4 hover:border-blue-300 flex flex-col justify-between shadow-xs"
             >
               <div>
                 <div className="flex items-start gap-4 mb-4">
-                  <img
-                    src={tutor.avatarUrl}
-                    alt={tutor.name}
-                    className="w-16 h-16 rounded-2xl object-cover border border-[#E5E7EB] shrink-0"
-                    referrerPolicy="no-referrer"
-                  />
+                  {tutor.avatarUrl ? (
+                    <img
+                      src={tutor.avatarUrl}
+                      alt={tutor.name}
+                      className="w-16 h-16 rounded-2xl object-cover border border-[#E5E7EB] shrink-0"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-2xl bg-blue-50 border border-blue-100 shrink-0 flex items-center justify-center">
+                      <GraduationCap className="w-8 h-8 text-[#2563EB]" />
+                    </div>
+                  )}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <h3 className="text-base font-bold text-[#1E3A8A] truncate">{tutor.name}</h3>
-                      <div className="flex items-center gap-1 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-100 text-xs font-bold text-amber-900">
-                        <Star className="w-3 h-3 text-amber-500 fill-amber-400" />
-                        <span>{tutor.rating}</span>
-                      </div>
+                      {tutor.rating != null && (
+                        <div className="flex items-center gap-1 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-100 text-xs font-bold text-amber-900 shrink-0">
+                          <Star className="w-3 h-3 text-amber-500 fill-amber-400" />
+                          <span>{tutor.rating.toFixed(1)}</span>
+                          {tutor.reviewsCount != null && <span className="text-[10px] text-amber-700">({tutor.reviewsCount})</span>}
+                        </div>
+                      )}
                     </div>
                     <Badge variant="info" size="sm" className="mt-1">{tutor.subject}</Badge>
-                    <p className="text-xs text-[#6B7280] mt-1.5 flex items-center gap-1">
-                      <MapPin className="w-3 h-3 text-gray-400" />
-                      <span>{tutor.area || tutor.governorate}</span>
-                    </p>
+                    {(tutor.city || tutor.governorate) && (
+                      <p className="text-xs text-[#6B7280] mt-1.5 flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-gray-400" />
+                        <span>{tutor.city || tutor.governorate}</span>
+                      </p>
+                    )}
                   </div>
                 </div>
 
-                {/* Tutor Info */}
+                {/* المجموعات المشترك بها مع هذا المدرس */}
                 <div className="space-y-2 p-3 bg-gray-50 rounded-xl border border-gray-100 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[#6B7280]">كود المعلم:</span>
-                    <strong className="text-[#2563EB] font-mono font-bold">{tutor.joinCode}</strong>
+                  <div className="flex items-center gap-1.5 text-[#6B7280] font-bold mb-1">
+                    <BookOpen className="w-3.5 h-3.5" />
+                    <span>مجموعاتك معه ({tutor.groups.length})</span>
                   </div>
-                  <div className="flex items-center justify-between border-t border-gray-200/60 pt-2">
-                    <span className="text-[#6B7280]">سعر الحصة:</span>
-                    <span className="font-mono font-bold text-[#1E3A8A]">{tutor.pricePerSession} ج.م</span>
-                  </div>
+                  {tutor.groups.map((g) => (
+                    <div key={g.id} className="flex items-center justify-between bg-white border border-gray-100 rounded-lg px-2.5 py-1.5">
+                      <span className="font-bold text-[#1E3A8A] truncate">{g.name}</span>
+                      <span className="text-[10px] text-gray-500 shrink-0">{g.subject}</span>
+                    </div>
+                  ))}
+                  {tutor.pricePerSession != null && tutor.pricePerSession > 0 && (
+                    <div className="flex items-center justify-between border-t border-gray-200/60 pt-2">
+                      <span className="text-[#6B7280]">سعر الحصة:</span>
+                      <span className="font-mono font-bold text-[#1E3A8A]">{tutor.pricePerSession} ج.م</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -199,9 +222,18 @@ export const StudentTutorsPage: React.FC<StudentTutorsPageProps> = ({
               <div className="pt-4 mt-4 border-t border-gray-100 flex items-center gap-2">
                 <button
                   onClick={() => onSelectTutor(tutor.id)}
-                  className="flex-1 py-2.5 bg-[#EFF6FF] hover:bg-blue-100 text-[#2563EB] text-xs font-bold rounded-xl transition-colors cursor-pointer text-center"
+                  className="flex-1 py-2.5 bg-[#EFF6FF] hover:bg-blue-100 text-[#2563EB] text-xs font-bold rounded-xl transition-colors cursor-pointer text-center flex items-center justify-center gap-1.5"
                 >
-                  عرض الملف والتقييمات
+                  <span>عرض الملف والتقييمات</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => onNavigate('/student/reviews')}
+                  className="py-2.5 px-3 bg-amber-50 hover:bg-amber-100 border border-amber-100 text-amber-800 text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center gap-1"
+                  title="اكتب تقييمًا للمدرس"
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>قيّم</span>
                 </button>
               </div>
             </div>
@@ -215,7 +247,7 @@ export const StudentTutorsPage: React.FC<StudentTutorsPageProps> = ({
           <div className="space-y-1">
             <h3 className="text-base font-bold text-[#1E3A8A]">لم تشترك مع أي معلم بعد</h3>
             <p className="text-xs text-gray-500 max-w-md mx-auto">
-              يمكنك البحث عن معلّمي مرحلتك وموادك الدراسية، أو الانضمام المباشر بكود المعلم.
+              الاشتراك بيتم لما المدرس يضيفك لمجموعته — ابحث عن معلّمي مرحلتك وموادك الدراسية وتواصل معه.
             </p>
           </div>
           <div className="flex items-center justify-center gap-3 pt-2">
@@ -225,87 +257,6 @@ export const StudentTutorsPage: React.FC<StudentTutorsPageProps> = ({
             >
               دليل المدرسين المعتمدين
             </button>
-            <button
-              onClick={() => setIsJoinModalOpen(true)}
-              className="px-5 py-2.5 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-bold rounded-xl border border-gray-200 transition-all cursor-pointer"
-            >
-              الانضمام بكود
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: Join by code / scan */}
-      {isJoinModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-4 sm:p-5 space-y-4 text-right relative animate-scaleUp">
-            
-            <button
-              onClick={() => {
-                setIsJoinModalOpen(false);
-                setJoinErrorMessage('');
-              }}
-              className="absolute left-4 top-4 p-2 text-gray-400 hover:text-gray-600 rounded-xl cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="text-center space-y-2">
-              <div className="w-12 h-12 rounded-2xl bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center mx-auto">
-                <QrCode className="w-6 h-6" />
-              </div>
-              <h3 className="text-lg font-bold text-[#1E3A8A]">الانضمام لمجموعة مدرس</h3>
-              <p className="text-xs text-[#6B7280]">
-                اطلب من المعلم كود الانضمام الخاص به، أو أدخله كما يظهر على بطاقة المعلم.
-              </p>
-            </div>
-
-            {joinSuccessMessage ? (
-              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs font-bold text-emerald-800 text-center flex items-center justify-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-[#10B981]" />
-                <span>{joinSuccessMessage}</span>
-              </div>
-            ) : (
-              <form onSubmit={handleJoinTutor} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-[#1F2937] mb-1.5">
-                    كود الانضمام المباشر للمدرس
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="مثال: TEACH-XXXXXX"
-                    value={joinCodeInput}
-                    onChange={(e) => {
-                      setJoinCodeInput(e.target.value);
-                      setJoinErrorMessage('');
-                    }}
-                    className="w-full px-4 py-3 bg-gray-50 border border-[#E5E7EB] rounded-xl text-center font-mono font-bold text-sm text-[#1E3A8A] uppercase focus:bg-white focus:outline-none focus:border-[#2563EB]"
-                  />
-                  {joinErrorMessage && (
-                    <p className="text-xs text-red-500 font-bold mt-2 text-center">
-                      {joinErrorMessage}
-                    </p>
-                  )}
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={joining}
-                  className="w-full py-3 bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  {joining ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <>
-                      <Plus className="w-4 h-4" />
-                      <span>تأكيد الانضمام للمجموعة</span>
-                    </>
-                  )}
-                </button>
-              </form>
-            )}
-
           </div>
         </div>
       )}
