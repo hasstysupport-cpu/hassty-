@@ -42,7 +42,7 @@ export const TeacherStudentsPage: React.FC<TeacherStudentsPageProps> = ({ onNavi
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGroup, setSelectedGroup] = useState('all');
-  const [availableGroups, setAvailableGroups] = useState<{ name: string; grade: string }[]>([]);
+  const [availableGroups, setAvailableGroups] = useState<{ id: string; name: string; grade: string }[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newStudentCode, setNewStudentCode] = useState('');
   const [newStudentName, setNewStudentName] = useState('');
@@ -60,7 +60,7 @@ export const TeacherStudentsPage: React.FC<TeacherStudentsPageProps> = ({ onNavi
       ]);
       setStudents(list);
       if (groups.length > 0) {
-        setAvailableGroups(groups.map((g) => ({ name: g.name, grade: g.grade || '' })));
+        setAvailableGroups(groups.map((g) => ({ id: g.id, name: g.name, grade: g.grade || '' })));
         if (!newStudentGroup || newStudentGroup === 'المجموعة العامة') {
           setNewStudentGroup(groups[0].name);
         }

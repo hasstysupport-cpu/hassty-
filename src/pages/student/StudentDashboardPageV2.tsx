@@ -18,7 +18,7 @@ import { StudentSmartSchedule } from '../../components/student/StudentSmartSched
 
 interface Props { onNavigate: (path: string) => void; onSelectTutor: (tutorId: string) => void; }
 
-type Lesson = { id: string; tutorId: string; tutorName: string; subject: string; grade: string; date: string; time: string; location: string; status: string; price: number };
+type Lesson = { id: string; tutorId: string; tutorName: string; subject: string; grade: string; date: string; time: string; location: string; status: string; price: number; groupName?: string; day?: string; };
 type Tutor = { id: string; name: string; subject: string; avatarUrl: string; verified: boolean; groupName: string };
 
 export const StudentDashboardPageV2: React.FC<Props> = ({ onNavigate, onSelectTutor }) => {

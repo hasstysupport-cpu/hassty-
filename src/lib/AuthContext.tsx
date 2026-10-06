@@ -44,6 +44,7 @@ export interface UserSession {
   avatarUrl?: string;
   governorate?: string;
   area?: string;
+  grade?: string;
   profileData?: any;
   emailVerified?: boolean;
 }
@@ -64,7 +65,7 @@ interface AuthContextType {
   finishPasswordLogin: (email: string, password: string) => Promise<UserSession>;
   loginWithGoogle: (defaultRole?: AccountRole, extraData?: any) => Promise<UserSession | null>;
   /** Server-side registration → pending account + emailed code */
-  signupUser: (data: SignupData) => Promise<{ ok: boolean; userId?: string; maskedEmail?: string; expiresIn?: number; error?: string; code?: string }>;
+  signupUser: (data: SignupData) => Promise<{ ok: boolean; userId?: string; maskedEmail?: string; expiresIn?: number; resendAfter?: number; error?: string; code?: string }>;
   updateUserProfile: (data: Partial<any>) => Promise<void>;
   /** إعادة قراءة الملف من قاعدة البيانات وتحديث جلسة الواجهة فورًا
       (تُستخدم بعد إكمال بيانات حساب Google حتى تصل اللوحة بالدور الجديد) */

@@ -36,7 +36,7 @@ const GRADES = [
 
 const EXPERIENCE_OPTIONS = ['أقل من سنة', 'سنة - 3 سنوات', '3 - 5 سنوات', '5 - 10 سنوات', 'أكثر من 10 سنوات'];
 
-const ROLE_CARDS: { role: AccountRole; icon: any; title: string; desc: string; tag: string }[] = [
+const ROLE_CARDS: { role: 'student' | 'parent' | 'teacher'; icon: any; title: string; desc: string; tag: string }[] = [
   { role: 'student', icon: GraduationCap, title: 'طالب', desc: 'احجز حصصك، وتابع حضورك بالـ QR ودرجاتك لحظيًا', tag: 'الأكثر استخدامًا' },
   { role: 'parent', icon: Users, title: 'ولي أمر', desc: 'تابع أبناءك: الحضور والدرجات والمدفوعات من مكان واحد', tag: 'متابعة كاملة' },
   { role: 'teacher', icon: Briefcase, title: 'معلم', desc: 'أدر مجموعاتك وحضورك وامتحاناتك وفواتيرك باحترافية', tag: 'للمدرسين' },
@@ -73,7 +73,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onNavigate, onSignupSucc
   const [successMessage, setSuccessMessage] = useState('');
 
   /* step 1 — role */
-  const [role, setRole] = useState<AccountRole>('student');
+  const [role, setRole] = useState<'student' | 'parent' | 'teacher' | 'assistant'>('student');
 
   /* step 2 — profile data */
   const [fullName, setFullName] = useState('');
@@ -154,7 +154,6 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onNavigate, onSignupSucc
         subject: role === 'teacher' ? subject : undefined,
         experienceYears: role === 'teacher' ? experienceYears : undefined,
         studentJoinCode: role === 'parent' && studentJoinCode.trim() ? studentJoinCode.trim() : undefined,
-        consent: true,
       });
 
       if (!res.ok) {

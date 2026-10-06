@@ -8,7 +8,7 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { BellRing, Calendar, ChevronLeft, ClipboardCheck, FileSpreadsheet, GraduationCap, Home, Layers, LayoutDashboard, LogOut, Menu, MessageCircle, PanelRightClose, PanelRightOpen, QrCode, Receipt, ScanLine, Search, ShieldCheck, Star, UserCheck, UserCog, UserPlus, Users, X, BookOpen, ArrowLeftRight, UserRoundSearch, ClipboardList, NotebookPen, Bell, UsersRound, Settings, BadgeCheck } from 'lucide-react';
+import { BellRing, Calendar, ChevronLeft, ClipboardCheck, FileSpreadsheet, GraduationCap, Home, Layers, LayoutDashboard, LogOut, Menu, MessageCircle, PanelRightClose, PanelRightOpen, QrCode, Receipt, ScanLine, Search, ShieldCheck, Smartphone, Star, UserCheck, UserCog, UserPlus, Users, X, BookOpen, ArrowLeftRight, UserRoundSearch, ClipboardList, NotebookPen, Bell, UsersRound, Settings, BadgeCheck } from 'lucide-react';
 import { AccountRole } from '../../types';
 import { useAuth } from '../../lib/AuthContext';
 import { getCleanAvatarUrl } from '../../lib/avatarHelper';
@@ -25,6 +25,7 @@ export const ROLE_SECTIONS: Record<'student' | 'parent' | 'teacher' | 'assistant
       { name: 'التقويم', path: '/teacher/calendar', icon: Calendar },
       { name: 'الإشعارات', path: '/teacher/notifications', icon: BellRing, counterKey: 'notifications' },
       { name: 'الرسائل', path: '/teacher/messages', icon: MessageCircle },
+      { name: 'واتساب المدرس', path: '/teacher/whatsapp', icon: Smartphone, badge: 'جديد' },
     ]},
     { title: 'الطلاب', links: [
       { name: 'الطلاب', path: '/teacher/students', icon: Users },

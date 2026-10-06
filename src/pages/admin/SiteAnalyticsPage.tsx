@@ -38,7 +38,7 @@ interface SiteAnalyticsPageProps {
 }
 
 export const SiteAnalyticsPage: React.FC<SiteAnalyticsPageProps> = ({ accounts }) => {
-  const verifiedTeachersCount = accounts.filter((a) => a.role === 'teacher' && (a.badge === 'verified' || a.badge === 'super_tutor')).length;
+  const verifiedTeachersCount = accounts.filter((a) => a.role === 'teacher' && (a.badge === 'verified' || (a.badge as string) === 'super_tutor')).length;
   const totalTeachersCount = accounts.filter((a) => a.role === 'teacher').length;
   const activeStudentsCount = accounts.filter((a) => a.role === 'student' && a.status === 'active').length;
   const parentsCount = accounts.filter((a) => a.role === 'parent').length;

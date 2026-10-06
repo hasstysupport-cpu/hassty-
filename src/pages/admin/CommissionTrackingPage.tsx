@@ -26,6 +26,8 @@ import {
   Pencil,
   Save,
   X,
+  Plus,
+  Trash2,
 } from 'lucide-react';
 import { TeacherCommissionTrackingItem, AdminUserAccount, CommissionTierRow, PlatformInvoiceRow } from '../../types';
 import { supabase } from '../../lib/supabase';
@@ -50,8 +52,11 @@ export const CommissionTrackingPage: React.FC<CommissionTrackingPageProps> = ({
   const [teacherNames, setTeacherNames] = useState<Record<string, string>>({});
   const [groupNames, setGroupNames] = useState<Record<string, string>>({});
   const [editingTier, setEditingTier] = useState<number | null>(null);
-  const [tierDraft, setTierDraft] = useState<string>('');
+  const [tierDraft, setTierDraft] = useState<{ min: string; max: string; rate: string }>({ min: '', max: '', rate: '' });
   const [savingTier, setSavingTier] = useState(false);
+  const [addingTier, setAddingTier] = useState(false);
+  const [newTier, setNewTier] = useState<{ min: string; max: string; rate: string }>({ min: '', max: '', rate: '' });
+  const [deletingTier, setDeletingTier] = useState<number | null>(null);
   const [invoicesLoading, setInvoicesLoading] = useState(true);
   const [markingPaid, setMarkingPaid] = useState<string | null>(null);
 
@@ -90,20 +95,78 @@ export const CommissionTrackingPage: React.FC<CommissionTrackingPageProps> = ({
 
   useEffect(() => { void loadRealData(); }, [loadRealData]);
 
+  /* ===== إدارة الشرائح: النسب تُحدد من الأدمن تمامًا (إضافة/تعديل/حذف) ===== */
+
+  const validateTierInput = (d: { min: string; max: string; rate: string }): { min: number; max: number | null; rate: number } | null => {
+    const min = Math.floor(Number(d.min));
+    const rate = Number(d.rate);
+    const max = d.max === '' ? null : Math.floor(Number(d.max));
+    if (!isFinite(min) || min < 1) { alert('أدخل حدًا أدنى صحيحًا (1 على الأقل).'); return null; }
+    if (max !== null && (!isFinite(max) || max <= min)) { alert('الحد الأقصى يجب أن يكون أكبر من الحد الأدنى — أو اتركه فارغًا لشريحة مفتوحة.'); return null; }
+    if (!isFinite(rate) || rate <= 0 || rate > 100) { alert('أدخل نسبة عمولة صحيحة بين 0 و 100.'); return null; }
+    return { min, max, rate };
+  };
+
   const saveTier = async (tierId: number) => {
-    const val = Number(tierDraft);
-    if (!isFinite(val) || val < 0 || val > 100) return;
+    const parsed = validateTierInput(tierDraft);
+    if (!parsed) return;
+    const { min, max, rate } = parsed;
     setSavingTier(true);
     try {
       if (!supabase) throw new Error('قاعدة البيانات غير متاحة');
-      const { error } = await supabase.from('commission_tiers').update({ rate_pct: val, updated_at: new Date().toISOString() }).eq('id', tierId);
+      const { error } = await supabase.from('commission_tiers').update({
+        min_students: min,
+        max_students: max,
+        rate_pct: rate,
+        label: `من ${min}${max ? ` إلى ${max}` : '+'} طالب`,
+        updated_at: new Date().toISOString(),
+      }).eq('id', tierId);
       if (error) throw error;
-      setTiers(prev => prev.map(t => t.id === tierId ? { ...t, rate_pct: val } : t));
+      setTiers(prev => prev.map(t => t.id === tierId ? { ...t, min_students: min, max_students: max, rate_pct: rate, label: `من ${min}${max ? ` إلى ${max}` : '+'} طالب` } : t).sort((a, b) => a.min_students - b.min_students));
       setEditingTier(null);
     } catch (e: any) {
       alert(`تعذر حفظ الشريحة: ${String(e?.message || e).slice(0, 100)}`);
     } finally {
       setSavingTier(false);
+    }
+  };
+
+  const addTier = async () => {
+    const parsed = validateTierInput(newTier);
+    if (!parsed) return;
+    const { min, max, rate } = parsed;
+    setSavingTier(true);
+    try {
+      if (!supabase) throw new Error('قاعدة البيانات غير متاحة');
+      const { data, error } = await supabase.from('commission_tiers').insert({
+        min_students: min,
+        max_students: max,
+        rate_pct: rate,
+        label: `من ${min}${max ? ` إلى ${max}` : '+'} طالب`,
+      }).select().single();
+      if (error) throw error;
+      setTiers(prev => [...prev, data as CommissionTierRow].sort((a, b) => a.min_students - b.min_students));
+      setAddingTier(false);
+      setNewTier({ min: '', max: '', rate: '' });
+    } catch (e: any) {
+      alert(`تعذر إضافة الشريحة: ${String(e?.message || e).slice(0, 100)}`);
+    } finally {
+      setSavingTier(false);
+    }
+  };
+
+  const removeTier = async (tierId: number) => {
+    if (tiers.length <= 1) { alert('لا يمكن حذف آخر شريحة — يجب أن تبقى شريحة واحدة على الأقل.'); return; }
+    setDeletingTier(tierId);
+    try {
+      if (!supabase) throw new Error('قاعدة البيانات غير متاحة');
+      const { error } = await supabase.from('commission_tiers').delete().eq('id', tierId);
+      if (error) throw error;
+      setTiers(prev => prev.filter(t => t.id !== tierId));
+    } catch (e: any) {
+      alert(`تعذر حذف الشريحة: ${String(e?.message || e).slice(0, 100)}`);
+    } finally {
+      setDeletingTier(null);
     }
   };
 
@@ -234,26 +297,40 @@ export const CommissionTrackingPage: React.FC<CommissionTrackingPageProps> = ({
 
       </div>
 
-      {/* 3. Progressive Commission Tiers — من قاعدة البيانات (قابلة للتعديل) */}
+      {/* 3. شرائح العمولة — إدارة كاملة من الأدمن (إضافة/تعديل/حذف) */}
       <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-3xl text-xs text-blue-900 space-y-2">
-        <div className="flex items-center gap-2 font-black">
-          <Percent className="w-4 h-4 text-blue-600" />
-          <span>جدول شرائح العمولة — يُطبق تلقائيًا على كل مدرس حسب عدد طلابه النشطين:</span>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2 font-black">
+            <Percent className="w-4 h-4 text-blue-600" />
+            <span>جدول شرائح العمولة — يُطبق تلقائيًا على كل مدرس حسب عدد طلابه النشطين:</span>
+          </div>
+          {!addingTier && (
+            <button onClick={() => { setAddingTier(true); setNewTier({ min: '', max: '', rate: '' }); }}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-[11px] cursor-pointer shadow-sm">
+              <Plus className="w-3.5 h-3.5" />
+              إضافة شريحة
+            </button>
+          )}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-[11px] text-blue-800">
           {tiers.length ? tiers.map((t) => (
-            <div key={t.id} className="bg-white/80 p-2.5 rounded-xl border border-blue-100 flex items-center justify-between gap-2">
-              <div>
+            <div key={t.id} className={`bg-white/80 p-2.5 rounded-xl border ${editingTier === t.id ? 'border-blue-400 sm:col-span-3' : 'border-blue-100'} flex items-center justify-between gap-2`}>
+              <div className="min-w-0 flex-1">
                 <div className="font-bold">{t.label || `من ${t.min_students}${t.max_students ? ` إلى ${t.max_students}` : '+'} طالب`}</div>
                 {editingTier === t.id ? (
-                  <div className="flex items-center gap-1.5 mt-1.5">
-                    <input
-                      type="number" step="0.001" min={0} max={100}
-                      value={tierDraft}
-                      onChange={(e) => setTierDraft(e.target.value)}
-                      className="w-20 px-2 py-1 rounded-lg border border-blue-200 text-xs font-black text-blue-800 outline-none focus:border-blue-400"
-                      dir="ltr"
-                    />
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                    <span className="text-[10px] font-bold text-blue-500">من</span>
+                    <input type="number" min={1} value={tierDraft.min}
+                      onChange={(e) => setTierDraft(d => ({ ...d, min: e.target.value }))}
+                      className="w-16 px-2 py-1 rounded-lg border border-blue-200 text-xs font-black text-blue-800 outline-none focus:border-blue-400" dir="ltr" />
+                    <span className="text-[10px] font-bold text-blue-500">إلى</span>
+                    <input type="number" min={1} placeholder="∞" value={tierDraft.max}
+                      onChange={(e) => setTierDraft(d => ({ ...d, max: e.target.value }))}
+                      className="w-16 px-2 py-1 rounded-lg border border-blue-200 text-xs font-black text-blue-800 outline-none focus:border-blue-400 placeholder:text-blue-300" dir="ltr" />
+                    <span className="text-[10px] font-bold text-blue-500">النسبة %</span>
+                    <input type="number" step="0.001" min={0.001} max={100} value={tierDraft.rate}
+                      onChange={(e) => setTierDraft(d => ({ ...d, rate: e.target.value }))}
+                      className="w-20 px-2 py-1 rounded-lg border border-blue-200 text-xs font-black text-blue-800 outline-none focus:border-blue-400" dir="ltr" />
                     <button onClick={() => void saveTier(t.id)} disabled={savingTier}
                       className="p-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer disabled:opacity-50">
                       {savingTier ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
@@ -263,11 +340,18 @@ export const CommissionTrackingPage: React.FC<CommissionTrackingPageProps> = ({
                     </button>
                   </div>
                 ) : (
-                  <button onClick={() => { setEditingTier(t.id); setTierDraft(String(t.rate_pct)); }}
-                    className="mt-0.5 flex items-center gap-1.5 font-black text-blue-700 hover:text-blue-900 cursor-pointer group">
-                    <span className="font-mono text-sm">{Number(t.rate_pct)}%</span>
-                    <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </button>
+                  <div className="flex items-center justify-between gap-2 mt-0.5">
+                    <button onClick={() => { setEditingTier(t.id); setTierDraft({ min: String(t.min_students), max: t.max_students === null ? '' : String(t.max_students), rate: String(t.rate_pct) }); }}
+                      className="flex items-center gap-1.5 font-black text-blue-700 hover:text-blue-900 cursor-pointer group">
+                      <span className="font-mono text-sm">{Number(t.rate_pct)}%</span>
+                      <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </button>
+                    <button onClick={() => void removeTier(t.id)} disabled={deletingTier === t.id || tiers.length <= 1}
+                      title={tiers.length <= 1 ? 'لا يمكن حذف آخر شريحة' : 'حذف الشريحة'}
+                      className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
+                      {deletingTier === t.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -276,8 +360,34 @@ export const CommissionTrackingPage: React.FC<CommissionTrackingPageProps> = ({
               جاري تحميل الشرائح...
             </div>
           )}
+          {addingTier && (
+            <div className="bg-white p-3 rounded-xl border border-blue-400 border-dashed sm:col-span-3 space-y-2">
+              <div className="font-black text-blue-900 flex items-center gap-1.5"><Plus className="w-3.5 h-3.5" />شريحة جديدة</div>
+              <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                <span className="text-[10px] font-bold text-blue-500">من</span>
+                <input type="number" min={1} value={newTier.min}
+                  onChange={(e) => setNewTier(d => ({ ...d, min: e.target.value }))}
+                  className="w-16 px-2 py-1 rounded-lg border border-blue-200 text-xs font-black text-blue-800 outline-none focus:border-blue-400" dir="ltr" />
+                <span className="text-[10px] font-bold text-blue-500">إلى (اتركه فارغًا للمفتوحة)</span>
+                <input type="number" min={1} value={newTier.max}
+                  onChange={(e) => setNewTier(d => ({ ...d, max: e.target.value }))}
+                  className="w-16 px-2 py-1 rounded-lg border border-blue-200 text-xs font-black text-blue-800 outline-none focus:border-blue-400 placeholder:text-blue-300" dir="ltr" />
+                <span className="text-[10px] font-bold text-blue-500">النسبة %</span>
+                <input type="number" step="0.001" min={0.001} max={100} value={newTier.rate}
+                  onChange={(e) => setNewTier(d => ({ ...d, rate: e.target.value }))}
+                  className="w-20 px-2 py-1 rounded-lg border border-blue-200 text-xs font-black text-blue-800 outline-none focus:border-blue-400" dir="ltr" />
+                <button onClick={() => void addTier()} disabled={savingTier}
+                  className="p-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer disabled:opacity-50">
+                  {savingTier ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                </button>
+                <button onClick={() => setAddingTier(false)} className="p-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-600 cursor-pointer">
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-        <p className="text-[10px] text-blue-600 font-bold">اضغط على النسبة لتعديلها — التعديل يُطبق فورًا على كل الحسابات الجديدة.</p>
+        <p className="text-[10px] text-blue-600 font-bold">الأدمن يتحكم في الشرائح بالكامل: عدّل الحدود والنسب، أضف شرائح جديدة أو احذفها — التعديلات تُطبق فورًا على كل حسابات المدرسين الجديدة.</p>
       </div>
 
       {/* 3.5 فواتير المنصة — لكل مجموعة (قاعدة 75%) */}

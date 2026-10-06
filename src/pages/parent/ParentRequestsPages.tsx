@@ -154,11 +154,11 @@ export const ParentTeacherChangePage: React.FC = () => {
       /* قايمة المدرسين العامة — تُخدم من كاش SWR (دليل نصف ثابت) بدل جلبها
          من قاعدة البيانات مع كل فتح للصفحة */
       const [reqs, tchs] = await Promise.all([
-        childIds.length ? supabase.from('teacher_change_requests').select('*').in('student_id', childIds).order('created_at', { ascending: false }) : Promise.resolve({ data: [] as any[] }),
+        childIds.length ? Promise.resolve(supabase.from('teacher_change_requests').select('*').in('student_id', childIds).order('created_at', { ascending: false })) : Promise.resolve({ data: [] as any[] }),
         swrFetch<any[]>(
           'parent-req-teachers-200',
           SWR_TTL.DIRECTORY,
-          () => supabase!.from('public_verified_teachers').select('id,name,subject,subjects,rating').limit(200).then((r: any) => r.data || []),
+          () => Promise.resolve(supabase!.from('public_verified_teachers').select('id,name,subject,subjects,rating').limit(200).then((r: any) => r.data || [])),
         ),
       ]);
       setRows(reqs.data || []); setTeachers(tchs || []);

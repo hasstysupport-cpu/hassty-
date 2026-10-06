@@ -182,7 +182,7 @@ export const TeacherAttendancePage: React.FC = () => {
             ['متأخر', stats.late, Clock3],
             ['غائب', stats.absent, XCircle],
             ['لم يسجل خروج', stats.open, LogOut],
-          ].map(([label, value, Icon]) => (
+          ].map(([label, value, Icon]: [string, number, any]) => (
             <div key={String(label)} className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
               <Icon className="w-5 h-5 text-blue-600" />
               <div className="text-[11px] text-gray-500 mt-2 font-bold">{label}</div>

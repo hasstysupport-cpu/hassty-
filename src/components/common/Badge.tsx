@@ -9,7 +9,7 @@
 
 import React from 'react';
 
-export type BadgeVariant = 'success' | 'danger' | 'info' | 'warning' | 'neutral' | 'navy';
+export type BadgeVariant = 'success' | 'danger' | 'error' | 'info' | 'warning' | 'neutral' | 'navy';
 
 interface BadgeProps {
   children: React.ReactNode;
@@ -29,6 +29,7 @@ export const Badge: React.FC<BadgeProps> = ({
   const variantStyles: Record<BadgeVariant, string> = {
     success: 'bg-emerald-50 text-[#10B981] border-emerald-200',
     danger: 'bg-red-50 text-[#EF4444] border-red-200',
+    error: 'bg-red-50 text-[#EF4444] border-red-200',
     info: 'bg-[#EFF6FF] text-[#2563EB] border-blue-200',
     warning: 'bg-amber-50 text-amber-700 border-amber-200',
     navy: 'bg-[#1E3A8A]/10 text-[#1E3A8A] border-[#1E3A8A]/20',

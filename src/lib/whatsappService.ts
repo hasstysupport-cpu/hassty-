@@ -45,6 +45,49 @@ async function sendKind(kind: string, body: any): Promise<WhatsAppSendResult> {
   return { success: result.success === true || result.ok === true, messageId: result.data?.idMessage || result.data?.messageId, formattedNumber: body.number, data: result.data || result, error: result.error };
 }
 
+/* ============================================================
+   واتساب المدرس (Evolution API عبر Backend فقط)
+   المتصفح لا يرى مفتاح السيرفر إطلاقًا — كل الطلبات تمر من
+   /api/whatsapp/* الخاصة بـ Hassty، والمعلم يتحكم في مثيله هو فقط.
+   ============================================================ */
+export type TeacherWhatsAppStatusKind =
+  | 'not_linked' | 'connecting' | 'qr_pending' | 'connected'
+  | 'disconnected' | 'error' | 'service_unavailable';
+
+export interface TeacherWhatsAppState {
+  ok?: boolean;
+  status: TeacherWhatsAppStatusKind;
+  mode?: 'teacher';
+  instanceName?: string | null;
+  phoneNumber?: string | null;
+  connectedAt?: string | null;
+  qr?: string | null;          // data URL جاهزة للعرض
+  pairingCode?: string | null;
+  qrTtlSeconds?: number;
+  configured?: boolean;
+  serviceUnavailable?: boolean;
+  sessionMissing?: boolean;
+  error?: string;
+  success?: boolean;
+}
+
+export const teacherWhatsApp = {
+  /** ربط واتساب: ينشئ المثيل مرة واحدة فقط ويعيد QR + رمز الربط إن توفر */
+  async create(): Promise<TeacherWhatsAppState> { return post('/api/whatsapp/create', {}); },
+  /** تحديث QR / استكمال الربط — يعمل على نفس المثيل دائمًا */
+  async connect(): Promise<TeacherWhatsAppState> { return post('/api/whatsapp/connect', {}); },
+  /** الحالة الحالية (polling آمن كل بضع ثوانٍ) */
+  async status(): Promise<TeacherWhatsAppState> { return post('/api/whatsapp/status', undefined, 'GET'); },
+  /** إرسال رسالة من رقم المعلم نفسه (الوجهة مع كود الدولة) */
+  async send(fullNumber: string, message: string): Promise<{ ok?: boolean; success?: boolean; error?: string; data?: any }> {
+    return post('/api/whatsapp/send', { phone: fullNumber, number: fullNumber, message, kind: 'text' });
+  },
+  /** فصل واتساب (يُعاد الربط بنفس المثيل لاحقًا) */
+  async disconnect(): Promise<{ ok?: boolean; success?: boolean; status?: string; error?: string }> {
+    return post('/api/whatsapp/disconnect', {});
+  },
+};
+
 export const whatsappService = {
   async checkStatus(): Promise<WhatsAppGatewayStatus> {
     const result = await post('/api/whatsapp/status', undefined, 'GET');
