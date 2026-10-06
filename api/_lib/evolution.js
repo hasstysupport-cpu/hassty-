@@ -151,7 +151,7 @@ export function findInstanceInList(list, instanceName) {
 
 /* ============ Endpoints الرسمية ============ */
 
-export function createInstance(instanceName) {
+export function createInstance(instanceName, number = '') {
   return evoFetch('/instance/create', {
     method: 'POST',
     body: {
@@ -160,14 +160,15 @@ export function createInstance(instanceName) {
       integration: 'WHATSAPP',
       token: '',
       groupsMigrate: false,
-      number: '',
+      number: number ? String(number).replace(/\\D/g, '') : '',
     },
     timeoutMs: 30000,
   });
 }
 
-export function connectInstance(instanceName) {
-  return evoFetch(`/instance/connect/${encodeURIComponent(instanceName)}`, { method: 'GET', timeoutMs: 30000 });
+export function connectInstance(instanceName, number = '') {
+  const suffix = number ? `?number=${encodeURIComponent(String(number).replace(/\\D/g, ''))}` : '';
+  return evoFetch(`/instance/connect/${encodeURIComponent(instanceName)}${suffix}`, { method: 'GET', timeoutMs: 30000 });
 }
 
 export function connectionState(instanceName) {
