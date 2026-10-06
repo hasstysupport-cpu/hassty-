@@ -24,8 +24,13 @@ import {
 } from './config.js';
 
 const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
-const hashCode = (email, code) => sha256(`${String(email).toLowerCase()}::${code}::${PEPPER}`);
-export const hashDevice = (userId, deviceId) => sha256(`device::${userId}::${deviceId}::${PEPPER}`);
+/* 🔒 حارس السر: رفض صريح بدل تجزئة بسر فارغ/ضعيف قابل للتخمين */
+function requirePepper() {
+  if (!PEPPER) throw new Error('AUTH_CODE_PEPPER is not configured — refusing to hash with an empty secret');
+  return PEPPER;
+}
+const hashCode = (email, code) => sha256(`${String(email).toLowerCase()}::${code}::${requirePepper()}`);
+export const hashDevice = (userId, deviceId) => sha256(`device::${userId}::${deviceId}::${requirePepper()}`);
 
 const genCode = () => String(crypto.randomInt(0, 1000000)).padStart(6, '0');
 

@@ -21,9 +21,10 @@ app.set('trust proxy', true);
 
 // ----------------------------------------------------
 // SMTP EMAIL TRANSPORTER CONFIGURATION (GMAIL)
+// 🔒 الأسرار تُقرأ من متغيرات البيئة فقط — لا قيم افتراضية في الكود إطلاقًا
 // ----------------------------------------------------
-const SMTP_USER = process.env.SMTP_USER || 'hasstysupport@gmail.com';
-const rawPass = process.env.SMTP_PASS || 'nsdp ludq gqqr zgkm';
+const SMTP_USER = process.env.SMTP_USER || process.env.GMAIL_USER || '';
+const rawPass = process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD || '';
 const SMTP_PASS = rawPass.replace(/\s+/g, '');
 const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
 const SMTP_PORT = parseInt(process.env.SMTP_PORT || '465', 10);
@@ -274,7 +275,7 @@ app.use(express.json({ limit: '1mb' }));
 // ----------------------------------------------------
 // CRYPTOGRAPHIC TOKEN & AUTHENTICATION SECRETS
 // ----------------------------------------------------
-const AUTH_TOKEN_SECRET = process.env.AUTH_TOKEN_SECRET || 'hassty_sec_k98f23_71e4a90bf1a_e78d142';
+const AUTH_TOKEN_SECRET = process.env.AUTH_TOKEN_SECRET || '';
 export const OFFICIAL_ADMIN_EMAIL = 'hasstysupport@gmail.com';
 export const SECRET_ADMIN_ROUTE_PREFIX = '/sys-ctrl-98xf-vault';
 
@@ -302,6 +303,8 @@ interface TokenPayload {
 }
 
 function signToken(payload: Omit<TokenPayload, 'iat'>): string {
+  // 🔒 رفض التوقيع بدون سر مُهيّأ — لا fallback غير آمن
+  if (!AUTH_TOKEN_SECRET) throw new Error('AUTH_TOKEN_SECRET is not configured');
   const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
   const fullPayload: TokenPayload = {
     ...payload,
@@ -317,6 +320,7 @@ function signToken(payload: Omit<TokenPayload, 'iat'>): string {
 
 function verifyToken(token: string): { valid: boolean; payload?: TokenPayload; error?: string } {
   try {
+    if (!AUTH_TOKEN_SECRET) return { valid: false, error: 'Token signing secret not configured' };
     if (!token || typeof token !== 'string') return { valid: false, error: 'Missing token' };
     const parts = token.split('.');
     if (parts.length !== 3) return { valid: false, error: 'Malformed token' };
@@ -359,9 +363,9 @@ interface EmailOtpEntry {
 const emailOtpStore = new Map<string, EmailOtpEntry>();
 const emailRateLimits = new Map<string, RateLimitRecord>();
 
-// WhatsApp Server Endpoint & Secret Key
-const WHATSAPP_SERVER_URL = process.env.WHATSAPP_SERVER_URL || 'http://54.85.197.100:3000';
-const WHATSAPP_API_KEY = process.env.WHATSAPP_API_KEY || 'CHANGE_THIS_SECRET_KEY';
+// WhatsApp Server Endpoint & Secret Key — 🔒 من البيئة فقط، لا قيم افتراضية
+const WHATSAPP_SERVER_URL = process.env.WHATSAPP_SERVER_URL || '';
+const WHATSAPP_API_KEY = process.env.WHATSAPP_API_KEY || '';
 
 // In-Memory Temporary Store for OTP requests
 interface OtpEntry {

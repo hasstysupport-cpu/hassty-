@@ -14,7 +14,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   ArrowRight, Users, CalendarClock, GraduationCap, History, LayoutDashboard, Clock,
   MapPin, DollarSign, Plus, Phone, UserX, ArrowLeftRight, CalendarDays, TrendingUp,
-  ListChecks, Loader2, RefreshCw,
+  ListChecks, Loader2, RefreshCw, UserCog, FileSpreadsheet, FileText,
 } from 'lucide-react';
 import { PageHeader, StatCard, Tabs, Card, Btn, DataTable, StatusBadge, LoadingBlock, ErrorBlock, EmptyState, ConfirmDialog, useToast, fmtMoney, fmtDate, fmtDateTime, Column } from '../../components/common/ui';
 import { Badge } from '../../components/common/Badge';
@@ -24,6 +24,8 @@ import { useAuth } from '../../lib/AuthContext';
 import { formatTimeArabic } from '../../lib/scheduleSync';
 import type { StudentGroup, GroupScheduleSlot } from '../../types';
 import { ChangeSlotModal, TransferStudentModal, AddSessionModal, AddExamModal, SlotRow } from '../../components/teacher/GroupScheduleControls';
+import { StudentOptionsModal, StudentOptionsData } from '../../components/teacher/StudentOptionsModal';
+import { exportToExcel, exportToPdf } from '../../utils/exportData';
 
 const DAY_ORDER = ['Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 const dayAr = (d: string) => ({ Saturday: 'السبت', Sunday: 'الأحد', Monday: 'الإثنين', Tuesday: 'الثلاثاء', Wednesday: 'الأربعاء', Thursday: 'الخميس', Friday: 'الجمعة' } as Record<string, string>)[d] || d;
@@ -33,6 +35,8 @@ interface EnrollmentRow {
   parent_phone?: string; grade?: string; qr_code?: string; avatar_url?: string;
   attendance_rate?: number; total_sessions?: number; attended_sessions?: number;
   payment_status?: string; enrolled_at?: string;
+  attendance_mode?: 'fixed' | 'flexible'; custom_schedule_slots?: any[];
+  fee_exempt?: boolean; fee_exempt_reason?: string; fee_exempt_until?: string;
 }
 interface SessionRow { id: string; title: string; session_date: string; starts_at: string; ends_at: string; location?: string; status: string; }
 interface ExamRow { id: string; title: string; exam_date: string; starts_at?: string; duration_minutes?: number; total_marks?: number; location?: string; status: string; }
@@ -67,6 +71,7 @@ export const GroupDashboardPage: React.FC<{ groupId: string; onNavigate?: (path:
   const [addExam, setAddExam] = useState(false);
   const [cancelSession, setCancelSession] = useState<SessionRow | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [studentOptions, setStudentOptions] = useState<StudentOptionsData | null>(null);
 
   const load = useCallback(async () => {
     if (!supabase || !groupId) { setError('قاعدة البيانات غير متاحة.'); setLoading(false); return; }
@@ -156,7 +161,14 @@ export const GroupDashboardPage: React.FC<{ groupId: string; onNavigate?: (path:
   const nextSession = upcoming[0];
 
   const studentColumns: Column<EnrollmentRow>[] = [
-    { key: 'student_name', header: 'الطالب', render: r => <span className="font-black text-slate-800">{r.student_name}</span> },
+    { key: 'student_name', header: 'الطالب', render: r => (
+      <span className="font-black text-slate-800 flex items-center gap-1.5 flex-wrap">
+        {r.student_name}
+        {r.attendance_mode === 'flexible' && <Badge variant="info" size="sm">مرن</Badge>}
+        {r.fee_exempt && <Badge variant="warning" size="sm">معفو</Badge>}
+        {(r.custom_schedule_slots?.length || 0) > 0 && <Badge variant="neutral" size="sm">جدول خاص</Badge>}
+      </span>
+    ) },
     { key: 'grade', header: 'المرحلة', hideOnMobile: true, render: r => r.grade || '—' },
     { key: 'student_phone', header: 'هاتف الطالب', hideOnMobile: true, render: r => r.student_phone ? <span className="flex items-center gap-1 text-[11px]" dir="ltr"><Phone className="w-3 h-3 text-slate-400" />{r.student_phone}</span> : '—' },
     { key: 'parent_phone', header: 'ولي الأمر', hideOnMobile: true, render: r => r.parent_phone ? <span className="flex items-center gap-1 text-[11px]" dir="ltr"><Phone className="w-3 h-3 text-emerald-500" />{r.parent_phone}</span> : '—' },
@@ -164,9 +176,25 @@ export const GroupDashboardPage: React.FC<{ groupId: string; onNavigate?: (path:
       const rate = Math.round(Number(r.attendance_rate ?? 0));
       return <span className={`font-black ${rate >= 80 ? 'text-emerald-600' : rate >= 60 ? 'text-amber-600' : 'text-red-600'}`}>{rate}%</span>;
     } },
-    { key: 'payment_status', header: 'الدفع', render: r => <StatusBadge status={r.payment_status === 'paid' ? 'paid' : 'overdue'} size="sm" /> },
+    { key: 'payment_status', header: 'الدفع', render: r => <StatusBadge status={r.fee_exempt ? 'exempt' : r.payment_status === 'paid' ? 'paid' : 'overdue'} size="sm" label={r.fee_exempt ? 'معفو' : undefined} /> },
     { key: 'actions', header: 'إجراءات', render: r => (
       <div className="flex items-center gap-1.5">
+        <button onClick={() => setStudentOptions({
+          enrollmentId: r.id,
+          studentId: r.student_id,
+          studentName: r.student_name,
+          grade: r.grade,
+          groupId,
+          groupName: group.name,
+          groupSlots: slots,
+          attendanceMode: r.attendance_mode || 'fixed',
+          customScheduleSlots: r.custom_schedule_slots || [],
+          feeExempt: r.fee_exempt === true,
+          feeExemptReason: r.fee_exempt_reason,
+          feeExemptUntil: r.fee_exempt_until,
+        })} className="px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 text-[10px] font-black flex items-center gap-1 cursor-pointer transition-colors" title="خيارات الطالب: حضور مرن — جدول خاص — إعفاء — مجموعات شقيقة">
+          <UserCog className="w-3 h-3" /> خيارات
+        </button>
         <button onClick={() => setTransferStudent(r)} className="px-2.5 py-1.5 rounded-lg bg-violet-50 hover:bg-violet-100 border border-violet-200 text-violet-700 text-[10px] font-black flex items-center gap-1 cursor-pointer transition-colors" title="نقل لمجموعة أخرى (بفحص المواعيد)">
           <ArrowLeftRight className="w-3 h-3" /> نقل
         </button>
@@ -176,6 +204,41 @@ export const GroupDashboardPage: React.FC<{ groupId: string; onNavigate?: (path:
       </div>
     ) },
   ];
+
+  /* تصدير طلاب المجموعة */
+  const exportColumns = [
+    { key: 'student_name', label: 'اسم الطالب', width: 22 },
+    { key: 'grade', label: 'المرحلة', width: 18 },
+    { key: 'student_phone', label: 'هاتف الطالب', width: 14 },
+    { key: 'parent_phone', label: 'هاتف ولي الأمر', width: 14 },
+    { key: 'attendanceLabel', label: 'نسبة الحضور', width: 11 },
+    { key: 'sessionsLabel', label: 'حضر/إجمالي الحصص', width: 14 },
+    { key: 'paymentLabel', label: 'حالة الدفع', width: 12 },
+    { key: 'joined', label: 'تاريخ الالتحاق', width: 12 },
+  ];
+  const exportRows = students.map(r => ({
+    ...r,
+    attendanceLabel: `${Math.round(Number(r.attendance_rate || 0))}%`,
+    sessionsLabel: `${r.attended_sessions || 0} / ${r.total_sessions || 0}`,
+    paymentLabel: r.fee_exempt ? 'معفو من المصاريف' : r.payment_status === 'paid' ? 'سدد' : 'غير مسدد',
+    joined: r.enrolled_at ? String(r.enrolled_at).slice(0, 10) : '—',
+  }));
+  const doExport = async (kind: 'excel' | 'pdf') => {
+    try {
+      if (kind === 'excel') {
+        await exportToExcel({ filename: `طلاب-${group.name}-${new Date().toISOString().slice(0, 10)}`, sheetName: 'الطلاب', columns: exportColumns, rows: exportRows });
+      } else {
+        await exportToPdf({
+          filename: `طلاب-${group.name}-${new Date().toISOString().slice(0, 10)}`,
+          title: `طلاب مجموعة «${group.name}»`,
+          subtitle: `${group.subject || ''} · ${group.grade || ''} · ${group.schedule}`,
+          columns: exportColumns, rows: exportRows,
+          footer: `إجمالي الطلاب: ${students.length} — معفيون: ${students.filter(s => s.fee_exempt).length}`,
+        });
+      }
+      toast.push('success', 'تم التصدير بنجاح ✅');
+    } catch (e: any) { toast.push('error', `تعذر التصدير: ${String(e?.message || e).slice(0, 80)}`); }
+  };
 
   return (
     <div className="space-y-5" dir="rtl">
@@ -282,23 +345,30 @@ export const GroupDashboardPage: React.FC<{ groupId: string; onNavigate?: (path:
 
       {/* ============ الطلاب ============ */}
       {tab === 'students' && (
-        <DataTable
-          rows={students}
-          columns={studentColumns}
-          searchKeys={r => `${r.student_name} ${r.student_phone || ''} ${r.parent_phone || ''}`}
-          searchPlaceholder="ابحث باسم الطالب أو الهاتف..."
-          emptyText="لا طلاب مسجلين بعد — أضفهم من صفحة الطلاب أو بالمسح"
-          mobileCard={r => (
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between"><span className="text-xs font-black text-slate-800">{r.student_name}</span><StatusBadge status={r.payment_status === 'paid' ? 'paid' : 'overdue'} size="sm" /></div>
-              <div className="flex items-center justify-between text-[11px]"><span className="text-slate-400 font-bold">الحضور</span><span className="font-black">{Math.round(Number(r.attendance_rate || 0))}%</span></div>
-              <div className="flex gap-1.5 pt-1">
-                <button onClick={() => setTransferStudent(r)} className="flex-1 py-1.5 rounded-lg bg-violet-50 border border-violet-200 text-violet-700 text-[10px] font-black cursor-pointer">نقل</button>
-                <button onClick={() => setRemoveStudent(r)} className="flex-1 py-1.5 rounded-lg bg-red-50 border border-red-200 text-red-600 text-[10px] font-black cursor-pointer">إزالة</button>
+        <div className="space-y-3">
+          <div className="flex items-center justify-end gap-2">
+            <Btn variant="secondary" size="sm" onClick={() => void doExport('excel')}><FileSpreadsheet className="w-3.5 h-3.5" /> تصدير Excel</Btn>
+            <Btn variant="secondary" size="sm" onClick={() => void doExport('pdf')}><FileText className="w-3.5 h-3.5" /> تصدير PDF</Btn>
+          </div>
+          <DataTable
+            rows={students}
+            columns={studentColumns}
+            searchKeys={r => `${r.student_name} ${r.student_phone || ''} ${r.parent_phone || ''}`}
+            searchPlaceholder="ابحث باسم الطالب أو الهاتف..."
+            emptyText="لا طلاب مسجلين بعد — أضفهم من صفحة الطلاب أو بالمسح"
+            mobileCard={r => (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between"><span className="text-xs font-black text-slate-800">{r.student_name}</span><StatusBadge status={r.fee_exempt ? 'exempt' : r.payment_status === 'paid' ? 'paid' : 'overdue'} size="sm" label={r.fee_exempt ? 'معفو' : undefined} /></div>
+                <div className="flex items-center justify-between text-[11px]"><span className="text-slate-400 font-bold">الحضور</span><span className="font-black">{Math.round(Number(r.attendance_rate || 0))}%</span></div>
+                <div className="flex gap-1.5 pt-1">
+                  <button onClick={() => setStudentOptions({ enrollmentId: r.id, studentId: r.student_id, studentName: r.student_name, grade: r.grade, groupId, groupName: group.name, groupSlots: slots, attendanceMode: r.attendance_mode || 'fixed', customScheduleSlots: r.custom_schedule_slots || [], feeExempt: r.fee_exempt === true, feeExemptReason: r.fee_exempt_reason, feeExemptUntil: r.fee_exempt_until })} className="flex-1 py-1.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 text-[10px] font-black cursor-pointer">خيارات</button>
+                  <button onClick={() => setTransferStudent(r)} className="flex-1 py-1.5 rounded-lg bg-violet-50 border border-violet-200 text-violet-700 text-[10px] font-black cursor-pointer">نقل</button>
+                  <button onClick={() => setRemoveStudent(r)} className="flex-1 py-1.5 rounded-lg bg-red-50 border border-red-200 text-red-600 text-[10px] font-black cursor-pointer">إزالة</button>
+                </div>
               </div>
-            </div>
-          )}
-        />
+            )}
+          />
+        </div>
       )}
 
       {/* ============ الحصص والمواعيد ============ */}
@@ -473,6 +543,16 @@ export const GroupDashboardPage: React.FC<{ groupId: string; onNavigate?: (path:
         confirmLabel="إلغاء الحصة" tone="danger" busy={cancelling}
         onConfirm={doCancelSession} onCancel={() => setCancelSession(null)}
       />
+
+      {/* خيارات الطالب: حضور مرن / جدول خاص / إعفاء / مجموعات شقيقة */}
+      {studentOptions && (
+        <StudentOptionsModal
+          data={studentOptions}
+          teacherId={teacherId}
+          onClose={() => setStudentOptions(null)}
+          onUpdated={() => void load()}
+        />
+      )}
     </div>
   );
 };

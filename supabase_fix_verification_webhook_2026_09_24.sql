@@ -20,14 +20,23 @@ CREATE OR REPLACE FUNCTION public.notify_verification_email_webhook()
 AS $function$
 declare
   v_url text := 'https://hassty.site/api/admin/ops';
-  v_secret text := 'k7hd6oMmdzKFNGoq48SNZ2iFwwTAmd0i';
-  v_headers jsonb := jsonb_build_object(
-    'Content-Type', 'application/json',
-    'x-whatsapp-internal-secret', 'k7hd6oMmdzKFNGoq48SNZ2iFwwTAmd0i'
-  );
+  -- 🔒 السر لم يعد يُكتب في الكود — يُقرأ من جدول platform_internal_secrets
+  -- راجع supabase_secret_rotation_2026_10_06.sql (آلية التدوير والتخزين الآمن)
+  v_secret text;
+  v_headers jsonb;
   v_teacher_email text;
   v_payload jsonb;
 begin
+  select value into v_secret from public.platform_internal_secrets
+   where key = 'whatsapp_internal_secret';
+  if v_secret is null then
+    raise warning 'HASSTY: missing whatsapp_internal_secret — skipping webhook';
+    return new;
+  end if;
+  v_headers := jsonb_build_object(
+    'Content-Type', 'application/json',
+    'x-whatsapp-internal-secret', v_secret
+  );
   if tg_op = 'INSERT' then
     -- طلب جديد → تنبيه بريد الإدارة
     select p.email into v_teacher_email from public.profiles p where p.id = new.teacher_id;

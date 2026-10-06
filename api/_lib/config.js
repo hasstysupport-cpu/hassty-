@@ -16,7 +16,9 @@ export const SUPABASE_URL =
 
 export const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-export const PEPPER = process.env.AUTH_CODE_PEPPER || 'hassty-dev-pepper';
+/* 🔒 من متغيرات البيئة فقط — لا fallback. الإنتاج مضبوط عبر Vercel env.
+   لو ناقص محليًا، دوال التجزئة في codes.js سترفض العمل برسالة واضحة بدلًا من توقيع ضعيف قابل للتخمين. */
+export const PEPPER = process.env.AUTH_CODE_PEPPER || '';
 
 export const GMAIL_USER = process.env.GMAIL_USER || process.env.SMTP_USER || 'hasstysupport@gmail.com';
 export const GMAIL_PASS = (process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS || '').replace(/\s+/g, '');

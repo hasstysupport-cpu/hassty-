@@ -227,9 +227,10 @@ export interface ApplySlotResult extends SlotConflictResult {
   hours_left?: number;
 }
 
-/** تطبيق تغيير ميعاد حصة أسبوعية — الحصص القادمة فقط */
-export const applySlotChange = (groupId: string, slotIndex: number, day: string, startTime: string, endTime: string, reason?: string): Promise<ApplySlotResult> =>
-  rpc('apply_group_slot_change', { p_group_id: groupId, p_slot_index: slotIndex, p_new_day: day, p_new_start: startTime, p_new_end: endTime, p_reason: reason || null });
+/** تطبيق تغيير ميعاد حصة أسبوعية — الحصص القادمة فقط
+ *  p_force: فرض التغيير رغم تعارض بعض الطلاب وفترة التهدئة (قرار المدرس) */
+export const applySlotChange = (groupId: string, slotIndex: number, day: string, startTime: string, endTime: string, reason?: string, force = false): Promise<ApplySlotResult> =>
+  rpc('apply_group_slot_change', { p_group_id: groupId, p_slot_index: slotIndex, p_new_day: day, p_new_start: startTime, p_new_end: endTime, p_reason: reason || null, p_force: force });
 
 /** هدف نقل محتمل (مجموعة أخرى للمدرس) */
 export interface TransferTarget {

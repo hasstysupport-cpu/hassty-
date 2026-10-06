@@ -10,16 +10,19 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   DollarSign, RefreshCw, Loader2, AlertCircle, TrendingUp, Banknote, QrCode,
-  BellRing, CheckCircle2, BadgeCheck, Clock, History, Users, X
+  BellRing, CheckCircle2, BadgeCheck, Clock, History, Users, X, Receipt, FileSpreadsheet, FileText, Target
 } from 'lucide-react';
 import { useAuth } from '../../lib/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { Badge } from '../../components/common/Badge';
+import { StatusBadge } from '../../components/common/ui';
 import {
   loadTeacherCollectionStatus, loadRecentCollections, collectStudentMonth,
   currentMonthKey, monthLabel, CollectionStatusRow,
 } from '../../lib/studentPaymentService';
 import { notifyParentDuesReminder } from '../../lib/parentNotify';
+import { exportToExcel, exportToPdf } from '../../utils/exportData';
+import type { PlatformInvoiceRow } from '../../types';
 
 export const TeacherPaymentsPageV2: React.FC<{ onNavigate?: (path: string) => void }> = ({ onNavigate }) => {
   const { user } = useAuth();
@@ -38,6 +41,11 @@ export const TeacherPaymentsPageV2: React.FC<{ onNavigate?: (path: string) => vo
   const [busyStudent, setBusyStudent] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ kind: 'success' | 'error' | 'info'; text: string } | null>(null);
   const [activeStudentsCount, setActiveStudentsCount] = useState(0);
+
+  /* حالة فواتير المنصة (لكل مجموعة) + شريحة العمولة الفعالة */
+  const [invoices, setInvoices] = useState<PlatformInvoiceRow[]>([]);
+  const [tier, setTier] = useState<{ active_students: number; rate_pct: number; tier_label?: string; next_tier_students?: number; students_to_next?: number } | null>(null);
+  const [groupNames, setGroupNames] = useState<Record<string, string>>({});
 
   const loadCommissions = useCallback(async () => {
     if (!supabase || !teacherId) return;
@@ -70,11 +78,32 @@ export const TeacherPaymentsPageV2: React.FC<{ onNavigate?: (path: string) => vo
     }
   }, [teacherId, monthKey]);
 
+  /* فواتير المنصة + الشريحة الفعالة (realtime) */
+  const loadInvoices = useCallback(async () => {
+    if (!supabase || !teacherId) return;
+    try {
+      const [invRes, tierRes, groupsRes] = await Promise.all([
+        supabase.from('platform_invoices')
+          .select('id,teacher_id,group_id,billing_period,total_active_students,exempt_students,billable_students,paid_students,collection_rate_pct,gross_collected_egp,tier_rate_pct,invoice_amount_egp,status,threshold_met_at,paid_at,created_at')
+          .eq('teacher_id', teacherId)
+          .order('billing_period', { ascending: false })
+          .limit(60),
+        (supabase.rpc('get_effective_commission_rate', { p_teacher_id: teacherId }) as any),
+        supabase.from('student_groups').select('id,name').eq('tutor_id', teacherId),
+      ]);
+      if (!invRes.error) setInvoices((invRes.data || []) as PlatformInvoiceRow[]);
+      if (!tierRes.error && tierRes.data) setTier(tierRes.data as any);
+      const names: Record<string, string> = {};
+      (groupsRes.data || []).forEach((g: any) => { names[g.id] = g.name; });
+      setGroupNames(names);
+    } catch { /* صامت — القسم اختياري */ }
+  }, [teacherId]);
+
   const load = useCallback(async () => {
     setLoading(true); setError('');
-    await Promise.all([loadCommissions(), loadCollections()]);
+    await Promise.all([loadCommissions(), loadCollections(), loadInvoices()]);
     setLoading(false);
-  }, [loadCommissions, loadCollections]);
+  }, [loadCommissions, loadCollections, loadInvoices]);
 
   useEffect(() => { void load(); }, [user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { void loadCollections(); }, [monthKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -84,11 +113,12 @@ export const TeacherPaymentsPageV2: React.FC<{ onNavigate?: (path: string) => vo
     if (!supabase || !teacherId) return;
     const ch = supabase
       .channel(`teacher-payments-${teacherId}-${Date.now().toString(36)}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'payment_records', filter: `tutor_id=eq.${teacherId}` }, () => void loadCollections())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payment_records', filter: `tutor_id=eq.${teacherId}` }, () => { void loadCollections(); void loadInvoices(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'commission_tracking', filter: `tutor_id=eq.${teacherId}` }, () => void loadCommissions())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'platform_invoices', filter: `teacher_id=eq.${teacherId}` }, () => void loadInvoices())
       .subscribe();
     return () => { void supabase.removeChannel(ch); };
-  }, [teacherId, loadCollections, loadCommissions]);
+  }, [teacherId, loadCollections, loadCommissions, loadInvoices]);
 
   const handleCollect = async (row: CollectionStatusRow) => {
     if (busyStudent) return;
@@ -308,6 +338,85 @@ export const TeacherPaymentsPageV2: React.FC<{ onNavigate?: (path: string) => vo
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </section>
+
+      {/* ===== شريحة العمولة + فواتير المنصة ===== */}
+      <section className="bg-white border border-violet-200/70 rounded-3xl p-5 sm:p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="inline-flex items-center gap-2 text-xs font-black text-violet-700 bg-violet-50 border border-violet-200 px-3 py-1.5 rounded-full"><Receipt className="w-4 h-4" />فواتير المنصة — لكل مجموعة على حدة</div>
+            <h2 className="text-lg font-black mt-2">عمولتك وفواتير مجموعاتك</h2>
+            <p className="text-xs text-slate-500 mt-0.5">فاتورة المجموعة تنزل تلقائيًا لما 75% من طلابها القابلين للتحصيل يسددوا — والمعفيون مستثنون من الحساب.</p>
+          </div>
+          {tier && (
+            <div className="rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-center min-w-[190px]">
+              <div className="text-[10px] font-bold text-violet-600">شريحتك الحالية</div>
+              <div className="text-2xl font-black text-violet-800">{tier.rate_pct}%</div>
+              <div className="text-[10px] font-bold text-violet-500">{tier.tier_label || `${tier.active_students} طالب نشط`}</div>
+              {tier.students_to_next != null && tier.students_to_next > 0 && (
+                <div className="text-[10px] font-black text-violet-700 mt-1">باقي {tier.students_to_next} طالب للشريحة الأفضل</div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* شريط تقدم نحو الشريحة التالية */}
+        {tier && tier.next_tier_students != null && tier.students_to_next && tier.students_to_next > 0 && (
+          <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 space-y-1.5">
+            <div className="flex items-center justify-between text-[11px] font-bold text-slate-500">
+              <span>تقدمك نحو شريحة العمولة الأقل ({tier.next_tier_students} طالب)</span>
+              <span className="text-slate-800 font-black">{tier.active_students} / {tier.next_tier_students}</span>
+            </div>
+            <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+              <div className="h-full rounded-full bg-gradient-to-l from-violet-500 to-blue-500" style={{ width: `${Math.min(100, Math.round(tier.active_students / tier.next_tier_students * 100))}%` }} />
+            </div>
+          </div>
+        )}
+
+        {invoices.length === 0 ? (
+          <div className="py-8 text-center text-slate-500">
+            <Receipt className="mx-auto mb-2 text-slate-300 w-10 h-10" />
+            <p className="font-bold text-sm">لا توجد فواتير منصة بعد</p>
+            <p className="text-xs mt-1">تُنشأ الفاتورة تلقائيًا لكل مجموعة عند وصول تحصيلها 75% من الشهر.</p>
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {invoices.slice(0, 8).map(inv => {
+              const rate = Math.round(Number(inv.collection_rate_pct || 0));
+              const isDue = inv.status === 'due' || inv.status === 'paid';
+              return (
+                <div key={inv.id} className={`p-4 rounded-2xl border space-y-2.5 ${isDue ? 'border-violet-200 bg-violet-50/50' : 'border-slate-200 bg-white'}`}>
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${isDue ? 'bg-violet-100 text-violet-700' : 'bg-slate-100 text-slate-500'}`}>
+                        <Target className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-black text-slate-800">{groupNames[inv.group_id] || 'مجموعة'}</div>
+                        <div className="text-[10px] font-bold text-slate-400">{monthLabel(inv.billing_period)} · عمولة {Number(inv.tier_rate_pct)}%</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <StatusBadge status={inv.status} size="sm" label={inv.status === 'due' ? 'مستحقة' : inv.status === 'paid' ? 'سددت' : 'لم تُصدر بعد'} />
+                      <span className="text-xs font-black text-slate-800">{Number(inv.invoice_amount_egp || 0).toLocaleString('ar-EG')} ج.م</span>
+                    </div>
+                  </div>
+                  {/* شريط التحصيل نحو 75% */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-[10px] font-bold text-slate-500">
+                      <span>التحصيل: {inv.paid_students} سدد من {inv.billable_students} قابل للتحصيل{inv.exempt_students > 0 ? ` (${inv.exempt_students} معفو)` : ''}</span>
+                      <span className={rate >= 75 ? 'text-violet-700 font-black' : ''}>{rate}% / 75%</span>
+                    </div>
+                    <div className="relative w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full transition-all ${rate >= 75 ? 'bg-gradient-to-l from-violet-500 to-violet-600' : 'bg-gradient-to-l from-blue-400 to-blue-500'}`} style={{ width: `${Math.min(100, rate)}%` }} />
+                      <div className="absolute top-0 right-[75%] w-0.5 h-full bg-violet-800/40" title="عتبة 75%" />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </section>

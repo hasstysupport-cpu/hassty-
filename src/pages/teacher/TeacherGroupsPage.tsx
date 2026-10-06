@@ -26,7 +26,14 @@ import {
   ArrowRightLeft,
   Percent,
   Check,
-  LayoutDashboard
+  LayoutDashboard,
+  Edit3,
+  FileSpreadsheet,
+  FileText,
+  Archive,
+  UserCog,
+  Loader2,
+  ShieldAlert,
 } from 'lucide-react';
 import { StudentGroup, GroupScheduleSlot, PricingBillingType, TeacherStudentItem } from '../../types';
 import { Badge } from '../../components/common/Badge';
@@ -44,6 +51,9 @@ import {
 import { gradesMatch, gradeMismatchText } from '../../lib/gradeMatch';
 import { supabase } from '../../lib/supabase';
 import { whatsappService } from '../../lib/whatsappService';
+import { GroupEditModal, GROUP_COLORS } from '../../components/teacher/GroupEditModal';
+import { StudentOptionsModal, StudentOptionsData } from '../../components/teacher/StudentOptionsModal';
+import { exportToExcel, exportToPdf } from '../../utils/exportData';
 
 const ALL_EGYPT_GRADES = [
   'الصف الأول الإعدادي',
@@ -85,31 +95,16 @@ export const TeacherGroupsPage: React.FC<{ onNavigate?: (path: string) => void }
   const [studentToTransfer, setStudentToTransfer] = useState<TeacherStudentItem | null>(null);
   const [targetTransferGroupId, setTargetTransferGroupId] = useState<string>('');
   
-  // Create group modal state
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  // Group edit/create modal (النظام الجديد — تحكم كامل)
+  const [groupModal, setGroupModal] = useState<{ mode: 'create' } | { mode: 'edit'; group: StudentGroup } | null>(null);
+  const [studentOptions, setStudentOptions] = useState<StudentOptionsData | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ group: StudentGroup; action: 'archive' | 'hard'; busy: boolean } | null>(null);
   const [cancellingSessionGroup, setCancellingSessionGroup] = useState<StudentGroup | null>(null);
   const [cancelReason, setCancelReason] = useState('ظرف شخصي طارئ');
   const [cancelNoticeHours, setCancelNoticeHours] = useState(5);
   const [cancelSuccessMsg, setCancelSuccessMsg] = useState('');
   const [cancelBusy, setCancelBusy] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
-
-  // New group form fields with multi-day schedule slots & pricing
-  const [newGroupName, setNewGroupName] = useState('');
-  const [newGroupSubject, setNewGroupSubject] = useState(TEACHER_SUBJECTS[0]);
-  const [newGroupGrade, setNewGroupGrade] = useState(ALL_EGYPT_GRADES[0]);
-  const [newGroupLocation, setNewGroupLocation] = useState('سنتر الأهرام — مدينة نصر');
-  const [newGroupMax, setNewGroupMax] = useState<number | ''>('');
-  
-  // Pricing state
-  const [newBillingType, setNewBillingType] = useState<PricingBillingType>('per_session');
-  const [newPriceAmount, setNewPriceAmount] = useState<number | ''>('');
-
-  // Multi-day schedule slots
-  const [newSlots, setNewSlots] = useState<GroupScheduleSlot[]>([
-    { id: 'slot-1', day: 'Sunday', dayArabic: 'الأحد', startTime: '16:30', endTime: '18:30' },
-    { id: 'slot-2', day: 'Tuesday', dayArabic: 'الثلاثاء', startTime: '16:30', endTime: '18:30' },
-  ]);
 
   // Fetch real groups and students from store / Supabase
   const loadData = async () => {
@@ -140,81 +135,67 @@ export const TeacherGroupsPage: React.FC<{ onNavigate?: (path: string) => void }
     };
   }, [teacherId]);
 
-  const addSlotRow = () => {
-    const newId = `slot-${Date.now()}`;
-    setNewSlots([
-      ...newSlots,
-      { id: newId, day: 'Wednesday', dayArabic: 'الأربعاء', startTime: '17:00', endTime: '19:00' },
-    ]);
-  };
-
-  const removeSlotRow = (id: string) => {
-    if (newSlots.length <= 1) return;
-    setNewSlots(newSlots.filter((s) => s.id !== id));
-  };
-
-  const updateSlot = (id: string, field: keyof GroupScheduleSlot, val: string) => {
-    setNewSlots(
-      newSlots.map((s) => {
-        if (s.id !== id) return s;
-        if (field === 'day') {
-          const match = DAYS_OF_WEEK.find((d) => d.eng === val);
-          return { ...s, day: val, dayArabic: match ? match.ar : val };
-        }
-        return { ...s, [field]: val };
-      })
-    );
-  };
-
-  const handleCreateGroup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newGroupName) return;
-
-    // Format human-readable summary of schedule
-    const scheduleSummary = newSlots
-      .map((s) => `${s.dayArabic} من ${formatTimeArabic(s.startTime)} إلى ${formatTimeArabic(s.endTime)}`)
-      .join(' و ');
-
-    const commissionRate = newBillingType === 'per_session' ? 2 : 1.2;
-
-    const newGroup: StudentGroup = {
-      id: `grp-${Date.now()}`,
-      name: newGroupName,
-      subject: newGroupSubject,
-      level: newGroupGrade,
-      grade: newGroupGrade,
-      schedule: scheduleSummary,
-      scheduleSlots: newSlots,
-      location: newGroupLocation,
-      studentCount: 0,
-      currentStudents: 0,
-      maxCapacity: Number(newGroupMax) || 35,
-      studentIds: [],
-      billingType: newBillingType,
-      priceAmount: Number(newPriceAmount) || (newBillingType === 'per_session' ? 120 : 450),
-      commissionRate,
-    };
-
-    const teacherId = user?.uid || 'teacher-current';
+  /* ===== تصدير قائمة المجموعات Excel / PDF ===== */
+  const handleExportGroups = async (kind: 'excel' | 'pdf') => {
+    const columns = [
+      { key: 'name', label: 'اسم المجموعة', width: 26 },
+      { key: 'subject', label: 'المادة', width: 14 },
+      { key: 'grade', label: 'المرحلة', width: 20 },
+      { key: 'schedule', label: 'المواعيد', width: 40 },
+      { key: 'location', label: 'المقر', width: 24 },
+      { key: 'currentStudents', label: 'عدد الطلاب', width: 10 },
+      { key: 'maxCapacity', label: 'السعة', width: 8 },
+      { key: 'billingLabel', label: 'طريقة الحساب', width: 16 },
+      { key: 'price', label: 'السعر (ج.م)', width: 12 },
+      { key: 'status', label: 'الحالة', width: 12 },
+    ];
+    const rows = groups.map((g) => ({
+      ...g,
+      billingLabel: g.billingType === 'monthly' ? 'شهري' : 'بالحصة',
+      price: `${g.priceAmount || 0}`,
+      status: g.isPaused ? 'مؤرشفة' : 'نشطة',
+    }));
     try {
-      await saveTeacherGroup(teacherId, newGroup);
-    } catch (createErr: any) {
-      /* لا نجاح كاذب: نعرض سبب الفشل الحقيقي للمدرس */
-      const msg = String(createErr?.message || createErr || '');
-      if (msg.includes('42501') || msg.toLowerCase().includes('row-level security')) {
-        setActionFeedback('حسابك قيد التوثيق من إدارة المنصة 🔒 — إنشاء المجموعات يتفعل تلقائيًا فور اعتماد حسابك.');
+      if (kind === 'excel') {
+        await exportToExcel({ filename: `مجموعاتي-${new Date().toISOString().slice(0, 10)}`, sheetName: 'المجموعات', columns, rows });
       } else {
-        setActionFeedback(`تعذر إنشاء المجموعة: ${msg.slice(0, 90)}`);
+        await exportToPdf({
+          filename: `مجموعاتي-${new Date().toISOString().slice(0, 10)}`,
+          title: 'قائمة المجموعات الدراسية',
+          subtitle: `إجمالي ${groups.length} مجموعة — ${groups.reduce((s, g) => s + (g.currentStudents || 0), 0)} طالب مسجل`,
+          columns, rows,
+        });
       }
-      setTimeout(() => setActionFeedback(null), 7000);
-      return;
+      setActionFeedback('تم تصدير قائمة المجموعات بنجاح ✅');
+      setTimeout(() => setActionFeedback(null), 3500);
+    } catch (e: any) {
+      setActionFeedback(`تعذر التصدير: ${String(e?.message || e).slice(0, 80)}`);
+      setTimeout(() => setActionFeedback(null), 5000);
     }
+  };
 
-    setGroups((prev) => [newGroup, ...prev]);
-    setIsCreateModalOpen(false);
-    setNewGroupName('');
-    setActionFeedback(`تم إنشاء ${newGroupName} (مادة: ${newGroupSubject}) بنجاح ومزامنة المواعيد ونظام التسعير (${newBillingType === 'per_session' ? 'بالحصة عمولة 2%' : 'بالشهر'}) ✅`);
-    setTimeout(() => setActionFeedback(null), 4500);
+  /* ===== حذف / أرشفة مجموعة ===== */
+  const handleDeleteGroup = async () => {
+    if (!deleteConfirm || !supabase) return;
+    setDeleteConfirm({ ...deleteConfirm, busy: true });
+    try {
+      if (deleteConfirm.action === 'archive') {
+        const { error } = await supabase.from('student_groups').update({ is_active: false, updated_at: new Date().toISOString() }).eq('id', deleteConfirm.group.id);
+        if (error) throw error;
+        setActionFeedback(`تمت أرشفة «${deleteConfirm.group.name}» — بياناتها وسجل حضورها محفوظ، ويمكن استعادتها من الإدارة.`);
+      } else {
+        await deleteTeacherGroup(teacherId, deleteConfirm.group.id);
+        setActionFeedback(`تم حذف «${deleteConfirm.group.name}» نهائيًا بكل قيودها.`);
+      }
+      setDeleteConfirm(null);
+      void loadData();
+      window.dispatchEvent(new Event('hassty_teacher_groups_updated'));
+      setTimeout(() => setActionFeedback(null), 6000);
+    } catch (e: any) {
+      setDeleteConfirm(null);
+      setActionFeedback(`تعذر تنفيذ العملية: ${String(e?.message || e).slice(0, 100)}`);
+      setTimeout(() => setActionFeedback(null), 7000);
+    }
   };
 
   // إزالة طالب من هذه المجموعة فقط — محصورة بمعرّف المجموعة ولا تمس أي قيود أخرى
@@ -375,13 +356,6 @@ export const TeacherGroupsPage: React.FC<{ onNavigate?: (path: string) => void }
     }
   };
 
-  // Commission live preview for new group
-  const commissionPreview = calculateTeacherCommission(
-    newBillingType,
-    Number(newPriceAmount) || 0,
-    Number(newGroupMax) || 30
-  );
-
   return (
     <div className="space-y-6 text-right">
       {/* Header Card */}
@@ -389,23 +363,41 @@ export const TeacherGroupsPage: React.FC<{ onNavigate?: (path: string) => void }
         <div>
           <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#2563EB] bg-[#EFF6FF] px-3 py-1 rounded-full border border-blue-200 mb-2">
             <Layers className="w-3.5 h-3.5" />
-            <span>نظام المجموعات والمواعيد المتزامنة</span>
+            <span>نظام المجموعات — تحكم احترافي كامل</span>
           </div>
           <h2 className="text-xl sm:text-2xl font-black text-[#1E3A8A]">
             إدارة المجموعات وتحديد المواعيد الدقيقة ({groups.length})
           </h2>
           <p className="text-xs text-[#6B7280] mt-1">
-            إضافة المواعيد (من ساعة كذا لكذا)، تحديد طريقة الحساب (بالحصة نسبة 2% أو بالشهر)، ونقل وإدارة الطلاب بحرية تامة
+            تعديل وإنشاء وحذف المجموعات، تحكم كامل بالطلاب، حضور مرن بين المجموعات، إعفاء مصاريف، وتصدير البيانات
           </p>
         </div>
 
-        <button
-          onClick={() => setIsCreateModalOpen(true)}
-          className="px-5 py-3.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-black rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-95"
-        >
-          <Plus className="w-4 h-4" />
-          <span>+ إنشاء مجموعة ومواعيد جديدة</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => handleExportGroups('excel')}
+            className="px-3.5 py-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-black rounded-2xl transition-all flex items-center gap-1.5 cursor-pointer"
+            title="تصدير قائمة المجموعات ملف Excel"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            <span className="hidden sm:inline">Excel</span>
+          </button>
+          <button
+            onClick={() => handleExportGroups('pdf')}
+            className="px-3.5 py-3 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 text-xs font-black rounded-2xl transition-all flex items-center gap-1.5 cursor-pointer"
+            title="تصدير قائمة المجموعات ملف PDF"
+          >
+            <FileText className="w-4 h-4" />
+            <span className="hidden sm:inline">PDF</span>
+          </button>
+          <button
+            onClick={() => setGroupModal({ mode: 'create' })}
+            className="px-5 py-3.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-black rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ مجموعة جديدة</span>
+          </button>
+        </div>
       </div>
 
       {/* Global Action Feedback Alert */}
@@ -444,11 +436,18 @@ export const TeacherGroupsPage: React.FC<{ onNavigate?: (path: string) => void }
             >
               <div>
                 <div className="flex items-start justify-between gap-2 mb-2">
-                  <h3 className="text-base font-black text-[#1E3A8A] leading-snug">{group.name}</h3>
+                  <h3 className="text-base font-black text-[#1E3A8A] leading-snug flex items-center gap-2">
+                    <span className={`w-3 h-3 rounded-full shrink-0 ${GROUP_COLORS.find(c => c.key === group.color)?.dot || 'bg-[#2563EB]'}`} />
+                    {group.name}
+                  </h3>
                   <Badge variant="info" size="sm">
                     {group.grade || group.level}
                   </Badge>
                 </div>
+
+                {group.description && (
+                  <p className="text-[11px] text-slate-500 font-bold mb-1.5 leading-5 line-clamp-2">{group.description}</p>
+                )}
 
                 {/* Slots and Schedule Pills */}
                 <div className="space-y-2 text-xs text-[#4B5563] pt-2 border-t border-gray-100">
@@ -535,14 +534,28 @@ export const TeacherGroupsPage: React.FC<{ onNavigate?: (path: string) => void }
                   className="flex-1 py-2.5 bg-[#EFF6FF] hover:bg-blue-100 text-[#2563EB] text-xs font-bold rounded-xl transition-colors cursor-pointer text-center flex items-center justify-center gap-1.5"
                 >
                   <Users className="w-3.5 h-3.5" />
-                  <span>التحكم بالطلاب ({group.currentStudents})</span>
+                  <span>الطلاب ({group.currentStudents})</span>
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setGroupModal({ mode: 'edit', group }); }}
+                  className="px-2.5 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                  title="تحرير المجموعة: الاسم والمواعيد والتسعير واللون"
+                >
+                  <Edit3 className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ group, action: group.currentStudents > 0 ? 'archive' : 'hard', busy: false }); }}
+                  className="px-2.5 py-2.5 bg-gray-50 hover:bg-red-50 text-gray-500 hover:text-[#EF4444] border border-gray-200 hover:border-red-200 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                  title={group.currentStudents > 0 ? 'أرشفة أو حذف المجموعة' : 'حذف المجموعة'}
+                >
+                  <Trash2 className="w-4 h-4" />
                 </button>
                 <button
                   onClick={(e) => { e.stopPropagation(); setCancellingSessionGroup(group); }}
-                  className="px-3 py-2.5 bg-gray-50 hover:bg-red-50 text-gray-600 hover:text-[#EF4444] border border-gray-200 hover:border-red-200 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                  className="px-2.5 py-2.5 bg-gray-50 hover:bg-amber-50 text-gray-500 hover:text-amber-600 border border-gray-200 hover:border-amber-200 text-xs font-bold rounded-xl transition-colors cursor-pointer"
                   title="إلغاء أو تأجيل حصة قادمة"
                 >
-                  إلغاء حصة
+                  <Calendar className="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -627,15 +640,20 @@ export const TeacherGroupsPage: React.FC<{ onNavigate?: (path: string) => void }
                   )
                   .map((std) => (
                     <div key={std.id} className="py-3 flex items-center justify-between gap-3 text-xs">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
                         <img
-                          src={std.avatarUrl}
+                          src={std.avatarUrl || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg"/%3E'}
                           alt={std.name}
-                          className="w-9 h-9 rounded-xl object-cover border border-gray-200"
+                          className="w-9 h-9 rounded-xl object-cover border border-gray-200 bg-gray-50"
                           referrerPolicy="no-referrer"
                         />
-                        <div>
-                          <div className="font-bold text-[#1F2937]">{std.name}</div>
+                        <div className="min-w-0">
+                          <div className="font-bold text-[#1F2937] flex items-center gap-1.5 flex-wrap">
+                            {std.name}
+                            {std.attendanceMode === 'flexible' && <Badge variant="info" size="sm">حضور مرن</Badge>}
+                            {std.feeExempt && <Badge variant="warning" size="sm">معفو من المصاريف</Badge>}
+                            {(std.customScheduleSlots?.length || 0) > 0 && <Badge variant="neutral" size="sm">جدول خاص</Badge>}
+                          </div>
                           <div className="flex items-center gap-2 text-[10px] text-gray-500 font-mono">
                             <span>{std.qrCode}</span>
                             <span>•</span>
@@ -644,10 +662,33 @@ export const TeacherGroupsPage: React.FC<{ onNavigate?: (path: string) => void }
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 shrink-0">
                         <Badge variant="success" size="sm">
                           حضور {std.attendanceRate}%
                         </Badge>
+
+                        {/* خيارات الطالب: حضور مرن/جدول مخصص/إعفاء */}
+                        <button
+                          onClick={() => selectedGroupRoster && setStudentOptions({
+                            enrollmentId: std.enrollmentId || '',
+                            studentId: std.id,
+                            studentName: std.name,
+                            grade: std.grade,
+                            groupId: selectedGroupRoster.id,
+                            groupName: selectedGroupRoster.name,
+                            groupSlots: selectedGroupRoster.scheduleSlots || [],
+                            attendanceMode: std.attendanceMode || 'fixed',
+                            customScheduleSlots: std.customScheduleSlots || [],
+                            feeExempt: std.feeExempt === true,
+                            feeExemptReason: std.feeExemptReason,
+                            feeExemptUntil: std.feeExemptUntil,
+                          })}
+                          className="px-2.5 py-1.5 bg-violet-50 hover:bg-violet-100 text-violet-700 font-bold rounded-lg border border-violet-200 transition-colors flex items-center gap-1 cursor-pointer"
+                          title="خيارات الطالب: الحضور المرن — الجدول الخاص — الإعفاء من المصاريف — المجموعات الشقيقة"
+                        >
+                          <UserCog className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">خيارات</span>
+                        </button>
                         
                         {/* Transfer button */}
                         <button
@@ -656,7 +697,7 @@ export const TeacherGroupsPage: React.FC<{ onNavigate?: (path: string) => void }
                           title="نقل لمجموعة أخرى"
                         >
                           <ArrowRightLeft className="w-3.5 h-3.5" />
-                          <span>نقل</span>
+                          <span className="hidden sm:inline">نقل</span>
                         </button>
 
                         {/* Remove button */}
@@ -691,293 +732,90 @@ export const TeacherGroupsPage: React.FC<{ onNavigate?: (path: string) => void }
         )}
       </Modal>
 
-      {/* MODAL: Create New Group with Multi-Day Schedules and Pricing */}
-      <Modal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        title="إنشاء مجموعة دراسية وضبط المواعيد الدقيقة"
-        subtitle="أدخل تفاصيل الأيام والساعات (من كذا لكذا) وطريقة الحساب (بالحصة أو بالشهر)"
-        icon={<Layers className="w-6 h-6" />}
-        maxWidth="lg"
-      >
-        <form onSubmit={handleCreateGroup} className="space-y-4 pt-1">
-          <div>
-            <label className="block text-xs font-bold text-[#1F2937] mb-1">
-              اسم المجموعة <span className="text-[#EF4444]">*</span>
-            </label>
-            <input
-              type="text"
-              required
-              placeholder="مثال: مجموعة الأحد والثلاثاء — سنتر الأهرام"
-              value={newGroupName}
-              onChange={(e) => setNewGroupName(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-right focus:bg-white focus:outline-none focus:border-[#2563EB]"
-            />
-          </div>
+      {/* MODAL: Create / Edit Group — التحكم الكامل */}
+      {groupModal && (
+        <GroupEditModal
+          mode={groupModal.mode}
+          group={groupModal.mode === 'edit' ? groupModal.group : undefined}
+          teacherId={teacherId}
+          activeStudents={groupModal.mode === 'edit' ? groupModal.group.currentStudents : 0}
+          onClose={() => setGroupModal(null)}
+          onSaved={(saved, opts) => {
+            setGroupModal(null);
+            const verb = opts.created ? 'تم إنشاء' : 'تم تحديث';
+            setActionFeedback(`${verb} «${saved.name}» بنجاح${opts.scheduleChanged ? ' — المواعيد اتحدثت والحصص القادمة والطلاب تمت مزامنتهم تلقائيًا' : ''} ✅`);
+            setTimeout(() => setActionFeedback(null), 5000);
+            void loadData();
+            window.dispatchEvent(new Event('hassty_teacher_groups_updated'));
+          }}
+        />
+      )}
 
-          <div>
-            <label className="block text-xs font-bold text-[#1F2937] mb-1">
-              المادة الدراسية <span className="text-[#EF4444]">*</span>
-            </label>
-            <select
-              value={newGroupSubject}
-              onChange={(e) => setNewGroupSubject(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-right focus:bg-white focus:outline-none focus:border-[#2563EB] cursor-pointer"
-            >
-              {TEACHER_SUBJECTS.map((subject) => (
-                <option key={subject} value={subject}>
-                  {subject}
-                </option>
-              ))}
-            </select>
-          </div>
+      {/* MODAL: Student Options — حضور مرن/جدول خاص/إعفاء/مجموعات شقيقة */}
+      {studentOptions && (
+        <StudentOptionsModal
+          data={studentOptions}
+          teacherId={teacherId}
+          onClose={() => setStudentOptions(null)}
+          onUpdated={() => { void loadData(); window.dispatchEvent(new Event('hassty_teacher_students_updated')); }}
+        />
+      )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-[#1F2937] mb-1">
-                المرحلة والصف الدراسي
-              </label>
-              <select
-                value={newGroupGrade}
-                onChange={(e) => setNewGroupGrade(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-right focus:bg-white focus:outline-none focus:border-[#2563EB] cursor-pointer"
-              >
-                {ALL_EGYPT_GRADES.map((grade) => (
-                  <option key={grade} value={grade}>
-                    {grade}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-[#1F2937] mb-1">
-                المقر / السنتر
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="مثال: سنتر الأهرام - قاعة 4"
-                value={newGroupLocation}
-                onChange={(e) => setNewGroupLocation(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-right focus:bg-white focus:outline-none focus:border-[#2563EB]"
-              />
-            </div>
-          </div>
-
-          {/* DYNAMIC MULTI-DAY SCHEDULE SLOTS */}
-          <div className="p-4 bg-emerald-50/60 border border-emerald-200 rounded-2xl space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-xs font-black text-emerald-900">
-                <Clock className="w-4 h-4 text-emerald-600" />
-                <span>مواعيد الحصص (مزامنة الوقت والتفعيل التلقائي)</span>
+      {/* MODAL: Delete / Archive Group */}
+      {deleteConfirm && (
+        <Modal
+          isOpen
+          onClose={() => setDeleteConfirm(null)}
+          title={deleteConfirm.action === 'archive' ? `أرشفة مجموعة «${deleteConfirm.group.name}»` : `حذف «${deleteConfirm.group.name}» نهائيًا`}
+          subtitle={deleteConfirm.action === 'archive' ? 'تجميد المجموعة مع حفظ كل البيانات والسجلات' : 'لا يمكن التراجع عن الحذف النهائي'}
+          icon={<AlertTriangle className="w-6 h-6 text-red-600" />}
+          maxWidth="md"
+        >
+          <div className="space-y-4" dir="rtl">
+            {deleteConfirm.group.currentStudents > 0 && (
+              <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-xs font-bold text-amber-900 flex items-start gap-2">
+                <Users className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>المجموعة فيها <strong>{deleteConfirm.group.currentStudents} طالب</strong> وسجل حضور حقيقي — الأرشفة هي الخيار الآمن (تجمّد المجموعة ويظل كل شيء محفوظ).</span>
               </div>
+            )}
+            {deleteConfirm.action === 'hard' && (
+              <div className="p-3.5 rounded-2xl bg-red-50 border border-red-200 text-xs font-bold text-red-900 flex items-start gap-2">
+                <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>الحذف النهائي سيمسح: قيود الطلاب + سجلات الحضور + سجل المواعيد نهائيًا ولا يمكن استرجاعها. متأكد؟</span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {deleteConfirm.group.currentStudents > 0 && (
+                <button
+                  onClick={() => setDeleteConfirm({ ...deleteConfirm, action: 'archive' })}
+                  className={`py-3.5 rounded-2xl border-2 text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-2 ${deleteConfirm.action === 'archive' ? 'border-emerald-500 bg-emerald-50 text-emerald-800' : 'border-slate-200 text-slate-600 hover:border-emerald-300'}`}
+                >
+                  <Archive className="w-4 h-4" />
+                  أرشفة آمنة (موصى به)
+                </button>
+              )}
               <button
-                type="button"
-                onClick={addSlotRow}
-                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                onClick={() => setDeleteConfirm({ ...deleteConfirm, action: 'hard' })}
+                className={`py-3.5 rounded-2xl border-2 text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-2 ${deleteConfirm.action === 'hard' ? 'border-red-500 bg-red-50 text-red-800' : 'border-slate-200 text-slate-600 hover:border-red-300'}`}
               >
-                <Plus className="w-3.5 h-3.5" />
-                <span>إضافة يوم آخر</span>
+                <Trash2 className="w-4 h-4" />
+                حذف نهائي
               </button>
             </div>
 
-            <div className="space-y-2.5">
-              {newSlots.map((slot, idx) => (
-                <div
-                  key={slot.id}
-                  className="grid grid-cols-12 gap-2 items-center bg-white p-2.5 rounded-xl border border-emerald-100 text-xs"
-                >
-                  <div className="col-span-4">
-                    <label className="block text-[10px] text-gray-500 font-bold mb-0.5">اليوم</label>
-                    <select
-                      value={slot.day}
-                      onChange={(e) => updateSlot(slot.id, 'day', e.target.value)}
-                      className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold text-[#1E3A8A]"
-                    >
-                      {DAYS_OF_WEEK.map((d) => (
-                        <option key={d.eng} value={d.eng}>
-                          {d.ar}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="col-span-3">
-                    <label className="block text-[10px] text-gray-500 font-bold mb-0.5">من الساعة</label>
-                    <input
-                      type="time"
-                      value={slot.startTime}
-                      onChange={(e) => updateSlot(slot.id, 'startTime', e.target.value)}
-                      className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold text-center"
-                    />
-                  </div>
-
-                  <div className="col-span-3">
-                    <label className="block text-[10px] text-gray-500 font-bold mb-0.5">إلى الساعة</label>
-                    <input
-                      type="time"
-                      value={slot.endTime}
-                      onChange={(e) => updateSlot(slot.id, 'endTime', e.target.value)}
-                      className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold text-center"
-                    />
-                  </div>
-
-                  <div className="col-span-2 flex justify-end pt-3">
-                    {newSlots.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeSlotRow(slot.id)}
-                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
-                        title="حذف هذا اليوم"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <p className="text-[11px] text-emerald-800">
-              💡 عند قدوم موعد الحصة (مثلاً الساعة 2)، سيفعّل الموقع هذه المجموعة تلقائياً في صفحة الماسح لمسح الـ QR بسرعة.
-            </p>
-          </div>
-
-          {/* PRICING & COMMISSION MODEL SELECTION */}
-          <div className="p-4 bg-blue-50/70 border border-blue-200 rounded-2xl space-y-3">
-            <div className="flex items-center gap-1.5 text-xs font-black text-[#1E3A8A]">
-              <DollarSign className="w-4 h-4 text-blue-600" />
-              <span>طريقة الحساب والاشتراك (بالحصة أو بالشهر)</span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <label
-                className={`p-3 rounded-xl border-2 flex items-start gap-2.5 cursor-pointer transition-all ${
-                  newBillingType === 'per_session'
-                    ? 'border-blue-600 bg-white shadow-xs'
-                    : 'border-gray-200 bg-gray-50/50'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="billingType"
-                  value="per_session"
-                  checked={newBillingType === 'per_session'}
-                  onChange={() => {
-                    setNewBillingType('per_session');
-                    if (typeof newPriceAmount === 'number' && newPriceAmount === 480) setNewPriceAmount(120);
-                  }}
-                  className="mt-1"
-                />
-                <div>
-                  <strong className="text-xs text-[#1E3A8A] block">حساب بالحصة</strong>
-                  <span className="text-[10px] text-emerald-700 font-bold">العمولة 2% ثابتة لكل طالب/حصة</span>
-                </div>
-              </label>
-
-              <label
-                className={`p-3 rounded-xl border-2 flex items-start gap-2.5 cursor-pointer transition-all ${
-                  newBillingType === 'monthly'
-                    ? 'border-blue-600 bg-white shadow-xs'
-                    : 'border-gray-200 bg-gray-50/50'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="billingType"
-                  value="monthly"
-                  checked={newBillingType === 'monthly'}
-                  onChange={() => {
-                    setNewBillingType('monthly');
-                    if (typeof newPriceAmount === 'number' && newPriceAmount === 120) setNewPriceAmount(480);
-                  }}
-                  className="mt-1"
-                />
-                <div>
-                  <strong className="text-xs text-[#1E3A8A] block">حساب شهري</strong>
-                  <span className="text-[10px] text-blue-700 font-bold">نسبة شهرية متدرجة (1% - 1.5%)</span>
-                </div>
-              </label>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 pt-1">
-              <div>
-                <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                  {newBillingType === 'per_session' ? 'سعر الحصة للطالب (ج.م)' : 'سعر الشهر للطالب (ج.م)'}
-                </label>
-                <input
-                  type="number"
-                  min={10}
-                  required
-                  placeholder={newBillingType === 'per_session' ? 'مثلاً 120' : 'مثلاً 480'}
-                  value={newPriceAmount === '' || newPriceAmount === 0 ? '' : newPriceAmount}
-                  onFocus={(e) => {
-                    if (e.target.value === '0') {
-                      setNewPriceAmount('');
-                    } else {
-                      e.target.select();
-                    }
-                  }}
-                  onChange={(e) => {
-                    const v = e.target.value.trim();
-                    setNewPriceAmount(v === '' ? '' : Number(v));
-                  }}
-                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs text-right font-bold focus:outline-none focus:border-blue-600 placeholder:text-gray-400 placeholder:font-normal"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                  الحد الأقصى للطلاب (السعة)
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  max={150}
-                  placeholder="مثلاً 35"
-                  value={newGroupMax === '' || newGroupMax === 0 ? '' : newGroupMax}
-                  onFocus={(e) => {
-                    if (e.target.value === '0') {
-                      setNewGroupMax('');
-                    } else {
-                      e.target.select();
-                    }
-                  }}
-                  onChange={(e) => {
-                    const v = e.target.value.trim();
-                    setNewGroupMax(v === '' ? '' : Number(v));
-                  }}
-                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs text-right font-bold focus:outline-none focus:border-blue-600 placeholder:text-gray-400 placeholder:font-normal"
-                />
-              </div>
-            </div>
-
-            {/* Live commission breakdown box */}
-            <div className="p-3 bg-white rounded-xl border border-blue-100 text-[11px] space-y-1 text-gray-700">
-              <div className="flex justify-between">
-                <span>النسبة المقررة:</span>
-                <strong className="text-blue-700">{commissionPreview.commissionRateLabel}</strong>
-              </div>
-              <div className="flex justify-between">
-                <span>عمولة المنصة للطالب:</span>
-                <strong>{Number(newPriceAmount) > 0 ? `${commissionPreview.feePerStudent} ج.م` : '—'}</strong>
-              </div>
-              <div className="flex justify-between text-emerald-700 font-bold border-t border-gray-100 pt-1">
-                <span>صافي أرباح المدرس للطالب:</span>
-                <strong>{Number(newPriceAmount) > 0 ? `${commissionPreview.netPerStudent} ج.م` : '—'}</strong>
-              </div>
+            <div className="flex items-center gap-2 justify-end pt-1 border-t border-slate-100">
+              <button type="button" onClick={() => setDeleteConfirm(null)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-600 hover:bg-slate-50 cursor-pointer">إلغاء</button>
+              <button type="button" onClick={handleDeleteGroup} disabled={deleteConfirm.busy}
+                className={`rounded-xl px-5 py-2.5 text-xs font-black text-white shadow-md flex items-center gap-2 disabled:opacity-50 cursor-pointer ${deleteConfirm.action === 'archive' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'}`}>
+                {deleteConfirm.busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                {deleteConfirm.action === 'archive' ? 'تأكيد الأرشفة' : 'تأكيد الحذف النهائي'}
+              </button>
             </div>
           </div>
-
-          <button
-            type="submit"
-            className="w-full py-3.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-black rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer mt-3 active:scale-95"
-          >
-            <Plus className="w-4 h-4" />
-            <span>حفظ وإنشاء المجموعة وتفعيل المزامنة</span>
-          </button>
-        </form>
-      </Modal>
+        </Modal>
+      )}
 
       {/* MODAL: Cancel / Postpone Session */}
       <Modal

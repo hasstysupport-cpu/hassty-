@@ -117,6 +117,9 @@ export const STATUS_TONES: Record<string, { label: string; cls: string }> = {
   paid: { label: 'مدفوع', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   overdue: { label: 'متأخر', cls: 'bg-red-50 text-red-700 border-red-200' },
   refunded: { label: 'مسترد', cls: 'bg-slate-100 text-slate-600 border-slate-200' },
+  exempt: { label: 'معفو من المصاريف', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+  // platform invoices
+  due: { label: 'فاتورة مستحقة', cls: 'bg-violet-50 text-violet-700 border-violet-200' },
   // sessions / exams
   scheduled: { label: 'مجدول', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
   in_progress: { label: 'جارٍ الآن', cls: 'bg-amber-50 text-amber-700 border-amber-200' },

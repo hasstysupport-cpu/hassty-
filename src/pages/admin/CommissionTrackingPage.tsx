@@ -7,7 +7,7 @@
  * Copyright (c) Mahmoudmadkour — All Rights Reserved.
  */
 
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Percent,
   Search,
@@ -20,9 +20,15 @@ import {
   CreditCard,
   Download,
   Calendar,
-  Send
+  Send,
+  Receipt,
+  Loader2,
+  Pencil,
+  Save,
+  X,
 } from 'lucide-react';
-import { TeacherCommissionTrackingItem, AdminUserAccount } from '../../types';
+import { TeacherCommissionTrackingItem, AdminUserAccount, CommissionTierRow, PlatformInvoiceRow } from '../../types';
+import { supabase } from '../../lib/supabase';
 
 interface CommissionTrackingPageProps {
   commissions: TeacherCommissionTrackingItem[];
@@ -37,6 +43,83 @@ export const CommissionTrackingPage: React.FC<CommissionTrackingPageProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'overdue' | 'pending'>('all');
+
+  /* ===== الشرائح الحقيقية + فواتير المنصة من قاعدة البيانات ===== */
+  const [tiers, setTiers] = useState<CommissionTierRow[]>([]);
+  const [invoices, setInvoices] = useState<PlatformInvoiceRow[]>([]);
+  const [teacherNames, setTeacherNames] = useState<Record<string, string>>({});
+  const [groupNames, setGroupNames] = useState<Record<string, string>>({});
+  const [editingTier, setEditingTier] = useState<number | null>(null);
+  const [tierDraft, setTierDraft] = useState<string>('');
+  const [savingTier, setSavingTier] = useState(false);
+  const [invoicesLoading, setInvoicesLoading] = useState(true);
+  const [markingPaid, setMarkingPaid] = useState<string | null>(null);
+
+  const loadRealData = useCallback(async () => {
+    if (!supabase) return;
+    setInvoicesLoading(true);
+    try {
+      const [tiersRes, invoicesRes] = await Promise.all([
+        supabase.from('commission_tiers').select('*').order('min_students', { ascending: true }),
+        supabase.from('platform_invoices')
+          .select('id,teacher_id,group_id,billing_period,total_active_students,exempt_students,billable_students,paid_students,collection_rate_pct,gross_collected_egp,tier_rate_pct,invoice_amount_egp,status,threshold_met_at,paid_at,created_at')
+          .order('billing_period', { ascending: false }).limit(40),
+      ]);
+      if (!tiersRes.error) setTiers((tiersRes.data || []) as CommissionTierRow[]);
+      if (!invoicesRes.error) setInvoices((invoicesRes.data || []) as PlatformInvoiceRow[]);
+
+      /* أسماء المدرسين والمجموعات للعرض */
+      const tIds = Array.from(new Set((invoicesRes.data || []).map((i: any) => i.teacher_id)));
+      const gIds = Array.from(new Set((invoicesRes.data || []).map((i: any) => i.group_id)));
+      if (tIds.length) {
+        const { data: profiles } = await supabase.from('profiles').select('id,full_name').in('id', tIds);
+        const m: Record<string, string> = {};
+        (profiles || []).forEach((p: any) => { m[p.id] = p.full_name || 'مدرس'; });
+        setTeacherNames(m);
+      }
+      if (gIds.length) {
+        const { data: groups } = await supabase.from('student_groups').select('id,name').in('id', gIds);
+        const m: Record<string, string> = {};
+        (groups || []).forEach((g: any) => { m[g.id] = g.name; });
+        setGroupNames(m);
+      }
+    } finally {
+      setInvoicesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void loadRealData(); }, [loadRealData]);
+
+  const saveTier = async (tierId: number) => {
+    const val = Number(tierDraft);
+    if (!isFinite(val) || val < 0 || val > 100) return;
+    setSavingTier(true);
+    try {
+      if (!supabase) throw new Error('قاعدة البيانات غير متاحة');
+      const { error } = await supabase.from('commission_tiers').update({ rate_pct: val, updated_at: new Date().toISOString() }).eq('id', tierId);
+      if (error) throw error;
+      setTiers(prev => prev.map(t => t.id === tierId ? { ...t, rate_pct: val } : t));
+      setEditingTier(null);
+    } catch (e: any) {
+      alert(`تعذر حفظ الشريحة: ${String(e?.message || e).slice(0, 100)}`);
+    } finally {
+      setSavingTier(false);
+    }
+  };
+
+  const markInvoicePaid = async (invId: string) => {
+    setMarkingPaid(invId);
+    try {
+      if (!supabase) throw new Error('قاعدة البيانات غير متاحة');
+      const { error } = await supabase.from('platform_invoices').update({ status: 'paid', paid_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', invId);
+      if (error) throw error;
+      setInvoices(prev => prev.map(i => i.id === invId ? { ...i, status: 'paid', paid_at: new Date().toISOString() } : i));
+    } catch (e: any) {
+      alert(`تعذر تأكيد السداد: ${String(e?.message || e).slice(0, 100)}`);
+    } finally {
+      setMarkingPaid(null);
+    }
+  };
 
   // Compute live commission rows from Supabase teacher accounts if direct commission collection is empty
   const activeCommissions: TeacherCommissionTrackingItem[] = commissions.length > 0
@@ -63,6 +146,7 @@ export const CommissionTrackingPage: React.FC<CommissionTrackingPageProps> = ({
             dueCommissionEgp: due,
             paymentStatus: students === 0 ? 'paid' : (idx % 2 === 0 ? 'pending' : 'paid'),
             lastPaymentDate: '2026-08-01',
+            billingCycle: new Date().toISOString().slice(0, 7),
             invoicePdfUrl: '#',
           };
         });
@@ -150,23 +234,126 @@ export const CommissionTrackingPage: React.FC<CommissionTrackingPageProps> = ({
 
       </div>
 
-      {/* 3. Progressive Commission Tier Notice */}
-      <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-3xl text-xs text-blue-900 space-y-1">
+      {/* 3. Progressive Commission Tiers — من قاعدة البيانات (قابلة للتعديل) */}
+      <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-3xl text-xs text-blue-900 space-y-2">
         <div className="flex items-center gap-2 font-black">
           <Percent className="w-4 h-4 text-blue-600" />
-          <span>جدول الشرائح التصاعدي لعمولات حِصّتي:</span>
+          <span>جدول شرائح العمولة — يُطبق تلقائيًا على كل مدرس حسب عدد طلابه النشطين:</span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-[11px] text-blue-800">
-          <div className="bg-white/80 p-2 rounded-xl border border-blue-100">
-            • الشريحة الأولى (1 - 149 طالب): <strong>2.0%</strong>
-          </div>
-          <div className="bg-white/80 p-2 rounded-xl border border-blue-100">
-            • الشريحة الثانية (150 - 299 طالب): <strong>1.25% - 1.5%</strong>
-          </div>
-          <div className="bg-white/80 p-2 rounded-xl border border-blue-100">
-            • الشريحة الذهبية (300+ طالب): <strong>1.0%</strong>
-          </div>
+          {tiers.length ? tiers.map((t) => (
+            <div key={t.id} className="bg-white/80 p-2.5 rounded-xl border border-blue-100 flex items-center justify-between gap-2">
+              <div>
+                <div className="font-bold">{t.label || `من ${t.min_students}${t.max_students ? ` إلى ${t.max_students}` : '+'} طالب`}</div>
+                {editingTier === t.id ? (
+                  <div className="flex items-center gap-1.5 mt-1.5">
+                    <input
+                      type="number" step="0.001" min={0} max={100}
+                      value={tierDraft}
+                      onChange={(e) => setTierDraft(e.target.value)}
+                      className="w-20 px-2 py-1 rounded-lg border border-blue-200 text-xs font-black text-blue-800 outline-none focus:border-blue-400"
+                      dir="ltr"
+                    />
+                    <button onClick={() => void saveTier(t.id)} disabled={savingTier}
+                      className="p-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer disabled:opacity-50">
+                      {savingTier ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                    </button>
+                    <button onClick={() => setEditingTier(null)} className="p-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-600 cursor-pointer">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={() => { setEditingTier(t.id); setTierDraft(String(t.rate_pct)); }}
+                    className="mt-0.5 flex items-center gap-1.5 font-black text-blue-700 hover:text-blue-900 cursor-pointer group">
+                    <span className="font-mono text-sm">{Number(t.rate_pct)}%</span>
+                    <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </button>
+                )}
+              </div>
+            </div>
+          )) : (
+            <div className="bg-white/80 p-2 rounded-xl border border-blue-100 col-span-3 text-center font-bold text-blue-500 py-3">
+              جاري تحميل الشرائح...
+            </div>
+          )}
         </div>
+        <p className="text-[10px] text-blue-600 font-bold">اضغط على النسبة لتعديلها — التعديل يُطبق فورًا على كل الحسابات الجديدة.</p>
+      </div>
+
+      {/* 3.5 فواتير المنصة — لكل مجموعة (قاعدة 75%) */}
+      <div className="bg-white border border-violet-200 rounded-3xl p-4 sm:p-5 shadow-xs space-y-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2 text-sm font-black text-violet-900">
+            <Receipt className="w-4 h-4 text-violet-600" />
+            فواتير المنصة — تنزل تلقائيًا عند تحصيل 75% من المجموعة
+          </div>
+          <button onClick={() => void loadRealData()} className="text-[11px] font-bold text-violet-600 hover:text-violet-800 cursor-pointer">تحديث</button>
+        </div>
+        {invoicesLoading ? (
+          <div className="py-8 text-center"><Loader2 className="mx-auto animate-spin text-violet-500" /><p className="text-xs font-bold text-gray-400 mt-2">جاري تحميل الفواتير...</p></div>
+        ) : invoices.length === 0 ? (
+          <div className="py-6 text-center text-xs font-bold text-gray-400">لا توجد فواتير منصة بعد — تُنشأ تلقائيًا عند بلوغ أي مجموعة عتبة 75% تحصيلًا.</div>
+        ) : (
+          <div className="overflow-x-auto rounded-2xl border border-gray-100">
+            <table className="w-full text-right text-xs min-w-[760px]">
+              <thead className="bg-violet-50/60 text-gray-500 font-bold border-b border-gray-100">
+                <tr>
+                  <th className="py-3 px-3">المدرس</th>
+                  <th className="py-3 px-3">المجموعة</th>
+                  <th className="py-3 px-3">الفترة</th>
+                  <th className="py-3 px-3">سدد/قابل للتحصيل</th>
+                  <th className="py-3 px-3">نسبة التحصيل</th>
+                  <th className="py-3 px-3">المحصل</th>
+                  <th className="py-3 px-3">قيمة الفاتورة</th>
+                  <th className="py-3 px-3">الحالة</th>
+                  <th className="py-3 px-3 text-center">إجراء</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {invoices.map((inv) => {
+                  const rate = Math.round(Number(inv.collection_rate_pct || 0));
+                  return (
+                    <tr key={inv.id} className={inv.status === 'due' ? 'bg-violet-50/30' : ''}>
+                      <td className="py-3 px-3 font-bold text-gray-800">{teacherNames[inv.teacher_id] || '—'}</td>
+                      <td className="py-3 px-3 font-bold text-gray-700">{groupNames[inv.group_id] || '—'}</td>
+                      <td className="py-3 px-3 text-gray-500 font-mono">{inv.billing_period}</td>
+                      <td className="py-3 px-3 font-bold text-gray-700">{inv.paid_students} / {inv.billable_students}{inv.exempt_students > 0 && <span className="text-amber-600 font-bold"> (معفو: {inv.exempt_students})</span>}</td>
+                      <td className="py-3 px-3">
+                        <div className="flex items-center gap-2">
+                          <div className="relative w-20 bg-gray-200 h-1.5 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full ${rate >= 75 ? 'bg-violet-500' : 'bg-blue-400'}`} style={{ width: `${Math.min(100, rate)}%` }} />
+                          </div>
+                          <span className={`font-black ${rate >= 75 ? 'text-violet-700' : 'text-gray-500'}`}>{rate}%</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-3 font-mono text-gray-600">{Number(inv.gross_collected_egp || 0).toLocaleString('ar-EG')}</td>
+                      <td className="py-3 px-3 font-mono font-black text-violet-700">{Number(inv.invoice_amount_egp || 0).toLocaleString('ar-EG')} ج.م</td>
+                      <td className="py-3 px-3">
+                        <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-black ${
+                          inv.status === 'paid' ? 'bg-emerald-100 text-emerald-800' :
+                          inv.status === 'due' ? 'bg-violet-100 text-violet-800' : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          {inv.status === 'paid' ? 'سددت' : inv.status === 'due' ? 'مستحقة' : 'تحت العتبة'}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        {inv.status === 'due' ? (
+                          <button onClick={() => void markInvoicePaid(inv.id)} disabled={markingPaid === inv.id}
+                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black cursor-pointer disabled:opacity-50 inline-flex items-center gap-1">
+                            {markingPaid === inv.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
+                            تأكيد السداد
+                          </button>
+                        ) : (
+                          <span className="text-[10px] text-gray-400 font-mono">{inv.paid_at ? String(inv.paid_at).slice(0, 10) : '—'}</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* 4. Filters & Search */}

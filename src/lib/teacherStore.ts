@@ -30,6 +30,9 @@ const mapGroup = (g: any): StudentGroup => ({
   billingType: g.billing_type || 'per_session',
   priceAmount: Number(g.price_amount ?? g.monthly_fee ?? 120),
   commissionRate: Number(g.commission_rate ?? (g.billing_type === 'monthly' ? 1.2 : 2)),
+  description: g.description || undefined,
+  color: g.color || undefined,
+  allowScheduleOverride: g.allow_schedule_override !== false,
 });
 
 const mapStudent = (r: any, groupName = ''): TeacherStudentItem => ({
@@ -47,6 +50,13 @@ const mapStudent = (r: any, groupName = ''): TeacherStudentItem => ({
   paymentStatus: r.payment_status || 'pending',
   joinedDate: r.enrolled_at ? String(r.enrolled_at).slice(0, 10) : '',
   status: r.status === 'suspended' ? 'paused' : r.status === 'left' ? 'transferred' : 'active',
+  enrollmentId: r.id,
+  groupId: r.group_id,
+  attendanceMode: r.attendance_mode === 'flexible' ? 'flexible' : 'fixed',
+  customScheduleSlots: Array.isArray(r.custom_schedule_slots) ? r.custom_schedule_slots : [],
+  feeExempt: r.fee_exempt === true,
+  feeExemptReason: r.fee_exempt_reason || undefined,
+  feeExemptUntil: r.fee_exempt_until || undefined,
 });
 
 export const getStoredStudents = (_teacherId: string): TeacherStudentItem[] => [];
@@ -94,6 +104,9 @@ export async function saveTeacherGroup(teacherId: string, group: StudentGroup): 
     billing_type: group.billingType || 'per_session',
     student_ids: group.studentIds || [],
     is_active: group.isPaused !== true,
+    description: group.description || null,
+    color: group.color || null,
+    allow_schedule_override: group.allowScheduleOverride !== false,
     updated_at: new Date().toISOString(),
   }).select('*').single();
   if (error) throw error;

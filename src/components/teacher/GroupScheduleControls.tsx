@@ -69,6 +69,8 @@ export const ChangeSlotModal: React.FC<{
   const [phase, setPhase] = useState<'form' | 'result' | 'applied' | 'transfer'>('form');
   const [checking, setChecking] = useState(false);
   const [applying, setApplying] = useState(false);
+  const [force, setForce] = useState(false);
+  const [blocked, setBlocked] = useState<{ code: string; message: string } | null>(null);
   const [result, setResult] = useState<SlotConflictResult | null>(null);
   const [appliedInfo, setAppliedInfo] = useState<{ sessions: number; effective?: string; schedule?: string } | null>(null);
   const [transferQueue, setTransferQueue] = useState<SlotConflictResult['conflicts']>([]);
@@ -90,20 +92,21 @@ export const ChangeSlotModal: React.FC<{
 
   const runApply = async () => {
     setApplying(true);
+    setBlocked(null);
     try {
-      const r = await applySlotChange(groupId, slotIndex, day, start, end, 'تغيير مباشر من لوحة المجموعة');
+      const r = await applySlotChange(groupId, slotIndex, day, start, end, force ? 'فرض مباشر من المدرس (تجاوز التعارض)' : 'تغيير مباشر من لوحة المجموعة', force);
       if (r.ok) {
         setAppliedInfo({ sessions: r.sessions_updated || 0, effective: r.effective_from, schedule: r.new_schedule });
         setTransferQueue((r.conflicts || []).filter(c => !transferDone.includes(c.student_id)));
         setPhase('applied');
         onApplied();
       } else if (r.code === 'COOLDOWN') {
-        toast.push('error', r.message || `تغيير المواعيد متاح بعد ${r.hours_left} ساعة (فترة تهدئة).`);
+        setBlocked({ code: 'COOLDOWN', message: r.message || `تغيير المواعيد متاح بعد ${r.hours_left} ساعة (فترة تهدئة).` });
       } else if (r.code === 'MAJORITY_CONFLICT') {
         setResult(r); setPhase('result');
-        toast.push('error', r.message || 'الأغلبية عليهم درس في الميعاد الجديد.');
+        setBlocked({ code: 'MAJORITY_CONFLICT', message: r.message || 'الأغلبية عليهم درس في الميعاد الجديد.' });
       } else {
-        toast.push('error', r.message || 'تعذر تطبيق التغيير.');
+        setBlocked({ code: 'UNKNOWN', message: r.message || 'تعذر تطبيق التغيير.' });
       }
     } catch (e: any) {
       toast.push('error', e?.message || 'تعذر تطبيق التغيير.');
@@ -234,26 +237,47 @@ export const ChangeSlotModal: React.FC<{
         )}
 
         {/* أزرار التحكم */}
-        <div className="flex items-center gap-2 justify-end pt-2 border-t border-slate-100">
-          <Btn variant="secondary" size="sm" onClick={onClose}>إغلاق</Btn>
-          {phase === 'form' && (
-            <Btn variant="primary" size="sm" onClick={runCheck} disabled={checking || !changed || !start || !end}>
-              <Search className="w-3.5 h-3.5" /> افحص التوافق
-            </Btn>
+        <div className="space-y-3">
+          {/* وضع الفرض: يظهر عند الحجب أو كخيار للمدرس دائمًا */}
+          {phase !== 'applied' && (
+            <div className={`rounded-2xl border p-3 ${force ? 'bg-rose-50 border-rose-200' : 'bg-slate-50 border-slate-200'}`}>
+              <label className="flex items-start gap-2 text-[11px] font-black text-slate-700 cursor-pointer select-none">
+                <input type="checkbox" checked={force} onChange={e => setForce(e.target.checked)} className="w-4 h-4 mt-0.5 accent-rose-600 shrink-0" />
+                <span>
+                  فرض التغيير رغم تعارض الطلاب وفترة التهدئة
+                  <span className="block text-[10px] font-bold text-slate-400 mt-0.5">للمدرس صلاحية كاملة — النظام هيسجل التعارضات ويبلغ الطلاب المتأثرين.</span>
+                </span>
+              </label>
+              {blocked && (
+                <div className="mt-2 rounded-xl bg-white border border-rose-200 p-2.5 text-[11px] font-bold text-rose-800 flex items-start gap-2">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  {blocked.message}
+                </div>
+              )}
+            </div>
           )}
-          {phase === 'result' && result?.ok && (
-            <>
-              <Btn variant="secondary" size="sm" onClick={() => setPhase('form')}>تعديل الميعاد</Btn>
-              <Btn
-                variant="primary" size="sm" onClick={runApply} disabled={applying || (result.conflict_count || 0) >= (result.free_count || 0) && (result.conflict_count || 0) > 0}
-                title={(result.conflict_count || 0) >= (result.free_count || 0) && (result.conflict_count || 0) > 0 ? 'الأغلبية عليهم درس — جرب ميعاد تاني' : ''}
-              >
-                {applying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-                تطبيق التغيير على الحصص القادمة
+
+          <div className="flex items-center gap-2 justify-end pt-2 border-t border-slate-100">
+            <Btn variant="secondary" size="sm" onClick={onClose}>إغلاق</Btn>
+            {phase === 'form' && (
+              <Btn variant="primary" size="sm" onClick={runCheck} disabled={checking || !changed || !start || !end}>
+                <Search className="w-3.5 h-3.5" /> افحص التوافق
               </Btn>
-            </>
-          )}
-          {phase === 'applied' && <Btn variant="primary" size="sm" onClick={() => { onApplied(); onClose(); }}>تم — إغلاق</Btn>}
+            )}
+            {phase === 'result' && result?.ok && (
+              <>
+                <Btn variant="secondary" size="sm" onClick={() => setPhase('form')}>تعديل الميعاد</Btn>
+                <Btn
+                  variant={force ? 'danger' : 'primary'} size="sm" onClick={runApply} disabled={applying || (!force && (result.conflict_count || 0) >= (result.free_count || 0) && (result.conflict_count || 0) > 0)}
+                  title={!force && (result.conflict_count || 0) >= (result.free_count || 0) && (result.conflict_count || 0) > 0 ? 'الأغلبية عليهم درس — فعّل «فرض التغيير» لو متأكد' : ''}
+                >
+                  {applying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                  {force ? 'فرض التطبيق على الحصص القادمة' : 'تطبيق التغيير على الحصص القادمة'}
+                </Btn>
+              </>
+            )}
+            {phase === 'applied' && <Btn variant="primary" size="sm" onClick={() => { onApplied(); onClose(); }}>تم — إغلاق</Btn>}
+          </div>
         </div>
       </div>
     </Modal>
@@ -267,6 +291,7 @@ const InlineTransfer: React.FC<{
   teacherName: string;
   onDone: (studentName: string) => void;
 }> = ({ groupId, queue, teacherName, onDone }) => {
+  const toast = useToast();
   const [idx, setIdx] = useState(0);
   const [targets, setTargets] = useState<TransferTarget[] | null>(null);
   const [loading, setLoading] = useState(false);
