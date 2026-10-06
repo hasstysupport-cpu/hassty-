@@ -73,9 +73,13 @@ export interface TeacherWhatsAppState {
 
 export const teacherWhatsApp = {
   /** ربط واتساب: ينشئ المثيل مرة واحدة فقط ويعيد QR + رمز الربط إن توفر */
-  async create(): Promise<TeacherWhatsAppState> { return post('/api/whatsapp/create', {}); },
+  async create(phone?: string): Promise<TeacherWhatsAppState> {
+    return post('/api/whatsapp/create', phone ? { phone, number: phone } : {});
+  },
   /** تحديث QR / استكمال الربط — يعمل على نفس المثيل دائمًا */
-  async connect(): Promise<TeacherWhatsAppState> { return post('/api/whatsapp/connect', {}); },
+  async connect(phone?: string): Promise<TeacherWhatsAppState> {
+    return post('/api/whatsapp/connect', phone ? { phone, number: phone } : {});
+  },
   /** الحالة الحالية (polling آمن كل بضع ثوانٍ) */
   async status(): Promise<TeacherWhatsAppState> { return post('/api/whatsapp/status', undefined, 'GET'); },
   /** إرسال رسالة من رقم المعلم نفسه (الوجهة مع كود الدولة) */
