@@ -64,6 +64,12 @@ export const TeacherWhatsAppPage: React.FC<{ onNavigate?: (path: string) => void
   const [sessionMissing, setSessionMissing] = useState(false);
   const [linking, setLinking] = useState(false);          // جاري إنشاء الاتصال
 
+  /* ربط برقم الهاتف + Pairing Code */
+  const [pairingModalOpen, setPairingModalOpen] = useState(false);
+  const [pairCountryCode, setPairCountryCode] = useState('20');
+  const [pairPhoneInput, setPairPhoneInput] = useState('');
+  const [pairingBusy, setPairingBusy] = useState(false);
+
   /* QR Modal */
   const [qrModalOpen, setQrModalOpen] = useState(false);
   const [qr, setQr] = useState<string | null>(null);
@@ -205,6 +211,53 @@ export const TeacherWhatsAppPage: React.FC<{ onNavigate?: (path: string) => void
       setLinking(false);
     }
   }, [linking, toast]);
+
+  /* ============ الربط الحقيقي برقم الهاتف + Pairing Code ============ */
+  const pairingFullNumber = `${pairCountryCode}${pairPhoneInput.replace(/\D/g, '')}`;
+  const pairingPhoneValid = pairPhoneInput.replace(/\D/g, '').length >= 8
+    && pairPhoneInput.replace(/\D/g, '').length <= 14;
+
+  const openPairingModal = useCallback(() => {
+    setPairCountryCode('20');
+    setPairPhoneInput('');
+    setPairingModalOpen(true);
+  }, []);
+
+  const requestPairingCode = useCallback(async () => {
+    if (pairingBusy || !pairingPhoneValid) return;
+    setPairingBusy(true);
+    setLoadState((p) => (p === 'auth_error' ? p : 'ready'));
+    try {
+      const res = await teacherWhatsApp.create(pairingFullNumber);
+      if (res?.ok === true) {
+        setSt(res);
+        setDegraded(false);
+        setSessionMissing(false);
+        if (res.status === 'connected') {
+          setPairingModalOpen(false);
+          toast.push('success', 'واتساب متصل بالفعل ✅');
+          return;
+        }
+        setQr(res.qr || null);
+        if (res.qr) setQrNonce((n) => n + 1);
+        setPairingCode(res.pairingCode || null);
+        if (res.qrTtlSeconds) setQrTtl(res.qrTtlSeconds);
+        setPairingModalOpen(false);
+        setQrModalOpen(true);
+        if (res.pairingCode) {
+          toast.push('success', 'تم إنشاء رمز ربط واتساب الحقيقي ✅');
+        } else {
+          toast.push('error', 'لم يُرجع السيرفر رمز الربط بعد. جرّب تحديث الرمز.');
+        }
+      } else {
+        toast.push('error', res?.error || 'تعذر إنشاء رمز الربط — حاول مرة أخرى.');
+      }
+    } catch {
+      toast.push('error', 'تعذر الاتصال بخدمة واتساب — حاول مرة أخرى.');
+    } finally {
+      setPairingBusy(false);
+    }
+  }, [pairingBusy, pairingPhoneValid, pairingFullNumber, toast]);
 
   /* ============ نسخ رمز الربط ============ */
   const copyPairing = useCallback(async () => {
@@ -380,10 +433,16 @@ export const TeacherWhatsAppPage: React.FC<{ onNavigate?: (path: string) => void
                     </div>
                   ))}
                 </div>
-                <Btn variant="primary" onClick={() => void startLinking()} disabled={linking} className="mt-1 min-w-44">
-                  {linking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Smartphone className="w-4 h-4" />}
-                  {linking ? 'جاري تجهيز الاتصال...' : 'ربط واتساب'}
-                </Btn>
+                <div className="w-full max-w-2xl grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-1">
+                  <Btn variant="primary" onClick={() => void startLinking()} disabled={linking || pairingBusy}>
+                    {linking ? <Loader2 className="w-4 h-4 animate-spin" /> : <QrCode className="w-4 h-4" />}
+                    {linking ? 'جاري تجهيز QR...' : 'ربط عبر QR'}
+                  </Btn>
+                  <Btn variant="secondary" onClick={openPairingModal} disabled={linking || pairingBusy}>
+                    <Smartphone className="w-4 h-4" />
+                    ربط برقم الهاتف والرمز
+                  </Btn>
+                </div>
                 {isLinkedButOffline && (
                   <p className="text-[10px] text-slate-400">يوجد ربط سابق بحسابك — الضغط على «ربط واتساب» سيعيد استخدام نفس الجلسة بدون تكرار.</p>
                 )}
@@ -423,6 +482,69 @@ export const TeacherWhatsAppPage: React.FC<{ onNavigate?: (path: string) => void
           </div>
         </>
       )}
+
+      {/* ============ مودال ربط الهاتف + Pairing Code ============ */}
+      <Modal
+        isOpen={pairingModalOpen}
+        onClose={() => { if (!pairingBusy) setPairingModalOpen(false); }}
+        title="ربط واتساب برقم الهاتف"
+        subtitle="اكتب نفس الرقم الموجود على هاتفك، وسنطلب من WhatsApp إنشاء رمز ربط حقيقي."
+        maxWidth="md"
+        icon={<Smartphone className="w-6 h-6" />}
+      >
+        <div className="space-y-4" dir="rtl">
+          <div className="rounded-2xl bg-blue-50 border border-blue-200 p-4 text-xs text-blue-900 leading-6">
+            <div className="font-black mb-1">كيف يعمل؟</div>
+            <div>بعد إنشاء الرمز افتح واتساب ← الأجهزة المرتبطة ← ربط جهاز ← الربط برقم الهاتف، ثم أدخل الرمز الظاهر لك.</div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-black text-slate-700">رقم واتساب المرتبط</label>
+            <div className="flex gap-2" dir="ltr">
+              <div className="relative shrink-0 w-36">
+                <select
+                  value={pairCountryCode}
+                  onChange={(e) => setPairCountryCode(e.target.value)}
+                  className="w-full appearance-none h-11 rounded-xl border border-slate-200 bg-white pl-3 pr-8 text-xs font-black text-slate-700 outline-none focus:border-[color:var(--role-color)] cursor-pointer"
+                  disabled={pairingBusy}
+                >
+                  {COUNTRY_CODES.map((cc) => <option key={cc.code} value={cc.code}>{cc.label}</option>)}
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+              <input
+                value={pairPhoneInput}
+                onChange={(e) => setPairPhoneInput(e.target.value.replace(/[^\d\s]/g, ''))}
+                inputMode="tel"
+                dir="ltr"
+                placeholder="1012345678"
+                disabled={pairingBusy}
+                className="flex-1 min-w-0 h-11 rounded-xl border border-slate-200 px-3 text-sm font-bold tracking-wide outline-none focus:border-[color:var(--role-color)] placeholder:text-slate-300"
+              />
+            </div>
+            {pairPhoneInput && (
+              <div className={`text-[11px] font-bold ${pairingPhoneValid ? 'text-emerald-600' : 'text-red-500'}`} dir="ltr">
+                +{pairingFullNumber}
+                {!pairingPhoneValid && ' — رقم غير مكتمل'}
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <Btn
+              variant="primary"
+              onClick={() => void requestPairingCode()}
+              disabled={pairingBusy || !pairingPhoneValid}
+            >
+              {pairingBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Smartphone className="w-4 h-4" />}
+              {pairingBusy ? 'جاري إنشاء الرمز...' : 'إنشاء رمز الربط'}
+            </Btn>
+            <Btn variant="ghost" onClick={() => { if (!pairingBusy) setPairingModalOpen(false); }} disabled={pairingBusy}>
+              <X className="w-4 h-4" />إلغاء
+            </Btn>
+          </div>
+        </div>
+      </Modal>
 
       {/* ============ مودال QR ============ */}
       <Modal
@@ -486,7 +608,9 @@ export const TeacherWhatsAppPage: React.FC<{ onNavigate?: (path: string) => void
                   {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
                   {copied ? 'تم النسخ' : 'نسخ الرمز'}
                 </Btn>
-                <p className="text-[11px] text-slate-500 text-center leading-5 max-w-xs">يمكنك استخدام رمز الربط إذا كنت لا تريد مسح QR.</p>
+                <p className="text-[11px] text-slate-500 text-center leading-5 max-w-xs">
+                  على الهاتف: <strong className="text-slate-700">الأجهزة المرتبطة ← ربط جهاز ← الربط برقم الهاتف</strong> ثم أدخل الرمز.
+                </p>
               </div>
             </div>
           )}
