@@ -182,6 +182,11 @@ export async function create(req, res) {
   const access = guard.access;
   if (!evolutionConfigured()) return jsonErr(res, 'خدمة واتساب غير متاحة مؤقتًا — حاول مرة أخرى بعد قليل.', 503, { status: 'service_unavailable' });
 
+  const body = await readJsonBody(req);
+  if (!body) return jsonErr(res, 'تعذر قراءة بيانات الطلب.', 400);
+  const requestedNumber = body.phone || body.number ? normalizeWhatsAppNumber(body.phone || body.number) : null;
+  if ((body.phone || body.number) && !requestedNumber) return jsonErr(res, 'رقم الهاتف غير صحيح — أدخل الرقم مع كود الدولة.', 422);
+
   const teacherId = access.user.id;
   try {
     const name = buildInstanceName(teacherId);
@@ -203,15 +208,22 @@ export async function create(req, res) {
       }
     }
 
-    /* 2) إنشاء المثيل (مرة واحدة فقط في حياة المعلم) */
+    /* 2) إنشاء المثيل.
+       في وضع الربط برقم الهاتف، نعيد إنشاء المثيل فقط إذا كان موجودًا
+       وغير متصل، حتى يُستخدم الرقم في لحظة الإنشاء ويكون pairingCode صالحًا. */
     let instanceToken = null;
     if (!exists) {
-      const created = await createInstance(name);
+      const created = await createInstance(name, requestedNumber || '');
       instanceToken = parseInstanceToken(created);
+    } else if (requestedNumber) {
+      try { await deleteInstance(name); } catch (err) { if (err?.status !== 404) throw err; }
+      const created = await createInstance(name, requestedNumber);
+      instanceToken = parseInstanceToken(created);
+      exists = true;
     }
 
-    /* 3) طلب بيانات الاتصال (QR + pairingCode إن توفر) */
-    const conn = await connectInstance(name);
+    /* 3) طلب بيانات الاتصال (QR + pairingCode) — ?number= هو مسار الربط الحقيقي برقم الهاتف */
+    const conn = await connectInstance(name, requestedNumber || '');
     const qr = parseQrImage(conn);
     const pairingCode = parsePairingCode(conn);
     const status = qr ? 'qr_pending' : 'connecting';
@@ -262,6 +274,11 @@ export async function connect(req, res) {
   const access = guard.access;
   if (!evolutionConfigured()) return jsonErr(res, 'خدمة واتساب غير متاحة مؤقتًا — حاول مرة أخرى بعد قليل.', 503, { status: 'service_unavailable' });
 
+  const body = req.method === 'POST' ? await readJsonBody(req) : {};
+  if (body === null) return jsonErr(res, 'تعذر قراءة بيانات الطلب.', 400);
+  const requestedNumber = body?.phone || body?.number ? normalizeWhatsAppNumber(body.phone || body.number) : null;
+  if ((body?.phone || body?.number) && !requestedNumber) return jsonErr(res, 'رقم الهاتف غير صحيح — أدخل الرقم مع كود الدولة.', 422);
+
   const teacherId = access.user.id;
   try {
     const name = buildInstanceName(teacherId);
@@ -284,7 +301,7 @@ export async function connect(req, res) {
       }
     }
 
-    const conn = await connectInstance(name);
+    const conn = await connectInstance(name, requestedNumber || '');
     const qr = parseQrImage(conn);
     const pairingCode = parsePairingCode(conn);
     const status = qr ? 'qr_pending' : 'connecting';
