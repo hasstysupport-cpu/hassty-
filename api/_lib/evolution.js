@@ -19,6 +19,7 @@
    ============================================================ */
 
 export const EVOLUTION_URL = String(process.env.EVOLUTION_API_URL || 'https://hassty-whatsapp-api-production.up.railway.app').replace(/\/+$/, '');
+export const EVOLUTION_WHATSAPP_INTEGRATION = 'WHATSAPP-BAILEYS';
 const EVOLUTION_KEY = String(process.env.EVOLUTION_API_KEY || '');
 
 export function evolutionConfigured() {
@@ -157,17 +158,15 @@ export function createInstance(instanceName, number = '') {
     body: {
       instanceName: String(instanceName),
       qrcode: true,
-      integration: 'WHATSAPP-BAILEYS',
-      token: '',
-      groupsMigrate: false,
-      number: number ? String(number).replace(/\\D/g, '') : '',
+      integration: EVOLUTION_WHATSAPP_INTEGRATION,
+      ...(number ? { number: String(number).replace(/\D/g, '') } : {}),
     },
     timeoutMs: 30000,
   });
 }
 
 export function connectInstance(instanceName, number = '') {
-  const suffix = number ? `?number=${encodeURIComponent(String(number).replace(/\\D/g, ''))}` : '';
+  const suffix = number ? `?number=${encodeURIComponent(String(number).replace(/\D/g, ''))}` : '';
   return evoFetch(`/instance/connect/${encodeURIComponent(instanceName)}${suffix}`, { method: 'GET', timeoutMs: 30000 });
 }
 
