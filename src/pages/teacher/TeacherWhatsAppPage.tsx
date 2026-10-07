@@ -70,6 +70,7 @@ export const TeacherWhatsAppPage: React.FC<{ onNavigate?: (path: string) => void
   const [pairCountryCode, setPairCountryCode] = useState('20');
   const [pairPhoneInput, setPairPhoneInput] = useState('');
   const [pairingBusy, setPairingBusy] = useState(false);
+  const [resumeBusy, setResumeBusy] = useState(false);
 
   /* QR Modal */
   const [qrModalOpen, setQrModalOpen] = useState(false);
@@ -181,6 +182,40 @@ export const TeacherWhatsAppPage: React.FC<{ onNavigate?: (path: string) => void
       void refreshQr(true);
     }
   }, [qrCountdown, qrModalOpen, qr, linking, refreshQr]);
+
+  /* ============ استكمال جلسة ربط سابقة (تظل 3 دقائق على السيرفر) ============ */
+  const pendingLinkActive = Boolean(
+    st?.pendingExpiresAt &&
+    new Date(st.pendingExpiresAt).getTime() > Date.now() &&
+    (st.status === 'connecting' || st.status === 'qr_pending')
+  );
+
+  const resumePendingLink = useCallback(async () => {
+    if (resumeBusy) return;
+    setResumeBusy(true);
+    try {
+      const res = await teacherWhatsApp.connect(st?.pendingPhoneNumber || undefined);
+      if (res?.ok === true) {
+        setSt(res);
+        setQr(res.qr || null);
+        if (res.qr) setQrNonce((n) => n + 1);
+        setPairingCode(res.pairingCode || null);
+        if (res.qrTtlSeconds) setQrTtl(res.qrTtlSeconds);
+        if (res.status === 'connected') {
+          toast.push('success', 'تم ربط واتساب بنجاح 🎉');
+        } else {
+          setQrModalOpen(true);
+          toast.push('success', res.pairingCode ? 'تم استكمال جلسة الربط ✅' : 'تم استكمال جلسة الربط — امسح QR الآن ✅');
+        }
+      } else {
+        toast.push('error', res?.error || 'انتهت جلسة الربط أو تعذر استكمالها.');
+      }
+    } catch {
+      toast.push('error', 'تعذر استكمال جلسة الربط — حاول مرة أخرى.');
+    } finally {
+      setResumeBusy(false);
+    }
+  }, [resumeBusy, st?.pendingPhoneNumber, toast]);
 
   /* ============ ربط واتساب ============ */
   const startLinking = useCallback(async () => {
@@ -434,6 +469,21 @@ export const TeacherWhatsAppPage: React.FC<{ onNavigate?: (path: string) => void
                     </div>
                   ))}
                 </div>
+                {pendingLinkActive && !qrModalOpen && (
+                  <div className="w-full max-w-2xl rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-right" dir="rtl">
+                    <div className="text-xs font-black text-blue-900">🔵 جلسة ربط سابقة ما زالت مفتوحة</div>
+                    <div className="text-[11px] text-blue-700 mt-1 leading-5">
+                      الجلسة محفوظة على السيرفر لمدة 3 دقائق من بداية الربط، حتى لو أغلقت الموقع. استكمل الربط قبل انتهاء المهلة.
+                    </div>
+                    <div className="mt-2">
+                      <Btn variant="primary" size="sm" onClick={() => void resumePendingLink()} disabled={resumeBusy}>
+                        {resumeBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                        {resumeBusy ? 'جاري الاستكمال...' : 'استكمال الربط'}
+                      </Btn>
+                    </div>
+                  </div>
+                )}
+
                 <div className="w-full max-w-2xl grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-1">
                   <Btn variant="primary" onClick={() => void startLinking()} disabled={linking || pairingBusy}>
                     {linking ? <Loader2 className="w-4 h-4 animate-spin" /> : <QrCode className="w-4 h-4" />}
