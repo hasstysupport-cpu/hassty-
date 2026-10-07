@@ -67,6 +67,8 @@ export interface TeacherWhatsAppState {
   configured?: boolean;
   serviceUnavailable?: boolean;
   sessionMissing?: boolean;
+  pendingExpiresAt?: string | null;
+  pendingPhoneNumber?: string | null;
   error?: string;
   success?: boolean;
 }
