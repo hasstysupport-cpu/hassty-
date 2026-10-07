@@ -157,17 +157,17 @@ export function createInstance(instanceName, number = '') {
     body: {
       instanceName: String(instanceName),
       qrcode: true,
-      integration: 'WHATSAPP',
+      integration: 'WHATSAPP-BAILEYS',
       token: '',
       groupsMigrate: false,
-      number: number ? String(number).replace(/\\D/g, '') : '',
+      number: number ? String(number).replace(/\D/g, '') : '',
     },
     timeoutMs: 30000,
   });
 }
 
 export function connectInstance(instanceName, number = '') {
-  const suffix = number ? `?number=${encodeURIComponent(String(number).replace(/\\D/g, ''))}` : '';
+  const suffix = number ? `?number=${encodeURIComponent(String(number).replace(/\D/g, ''))}` : '';
   return evoFetch(`/instance/connect/${encodeURIComponent(instanceName)}${suffix}`, { method: 'GET', timeoutMs: 30000 });
 }
 
