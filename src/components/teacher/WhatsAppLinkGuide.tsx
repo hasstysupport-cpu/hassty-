@@ -32,14 +32,14 @@ const CODE_STEPS = [
     title: 'افتح الأجهزة المرتبطة',
     text: 'افتح واتساب على هاتفك، ثم من القائمة ⋮ اختر «الأجهزة المرتبطة» واضغط «ربط جهاز».',
     image: '/whatsapp-link-guide/1-menu-linked-devices.webp',
-    sourceUrl: 'https://ibb.co/spRGM7Cq',
+    sourceUrl: 'https://ibb.co/BVrhx6by',
     alt: 'واتساب مع قائمة الأجهزة المرتبطة',
   },
   {
     title: 'اختر الربط برقم الهاتف',
     text: 'بعد فتح شاشة مسح QR، اضغط «الربط برقم الهاتف بدلًا من ذلك».',
     image: '/whatsapp-link-guide/4-link-with-phone-number.webp',
-    sourceUrl: 'https://ibb.co/S45nKwhZ',
+    sourceUrl: 'https://ibb.co/spRGM7Cq',
     alt: 'خيار الربط برقم الهاتف بدلًا من QR',
   },
   {
