@@ -16,6 +16,7 @@ import { useAuth } from '../../lib/AuthContext';
 import { teacherWhatsApp, TeacherWhatsAppState } from '../../lib/whatsappService';
 import { PageHeader, Card, Btn, ConfirmDialog, useToast, fmtDateTime } from '../../components/common/ui';
 import { Modal } from '../../components/common/Modal';
+import { WhatsAppLinkGuide } from '../../components/teacher/WhatsAppLinkGuide';
 
 /* أكواد الدول الشائعة (الافتراضي مصر +20) */
 const COUNTRY_CODES = [
@@ -449,6 +450,9 @@ export const TeacherWhatsAppPage: React.FC<{ onNavigate?: (path: string) => void
               </div>
             )}
           </Card>
+
+          {/* شرح مصور لطريقتي الربط: QR + Pairing Code */}
+          <WhatsAppLinkGuide />
 
           {/* حالة جاري الاتصال (خارج المودال — أثناء polling بعد بدء الربط) */}
           {status === 'connecting' && !qrModalOpen && !isConnected && (
