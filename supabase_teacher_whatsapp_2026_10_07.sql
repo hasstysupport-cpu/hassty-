@@ -25,6 +25,8 @@ create table if not exists public.teacher_whatsapp_instances (
   status_message    text,
   connected_at      timestamptz,
   last_status_check timestamptz,
+  pending_expires_at timestamptz,
+  pending_phone_number text,
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now(),
   constraint teacher_whatsapp_one_per_teacher unique (teacher_id),
@@ -34,6 +36,9 @@ create table if not exists public.teacher_whatsapp_instances (
 
 create index if not exists teacher_whatsapp_instances_teacher_idx
   on public.teacher_whatsapp_instances (teacher_id);
+
+create index if not exists teacher_whatsapp_pending_expiry_idx
+  on public.teacher_whatsapp_instances (pending_expires_at);
 
 alter table public.teacher_whatsapp_instances enable row level security;
 
