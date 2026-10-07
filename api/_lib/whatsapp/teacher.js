@@ -31,6 +31,7 @@ import {
 
 const TABLE = 'teacher_whatsapp_instances';
 const QR_TTL_SECONDS = 25;          // عمر QR قبل التحديث التلقائي
+const LINK_SESSION_TTL_MS = 3 * 60 * 1000; // 3 دقائق لجلسة الربط حتى لو أُغلقت الصفحة
 const LAST_CHECK_WRITE_MS = 30000;  // لا نكتب last_status_check أكثر من كل 30 ثانية
 
 /* ---------- مساعدات قاعدة البيانات ---------- */
@@ -166,8 +167,34 @@ function statusPayload(row, extra = {}) {
     instanceName: row?.instance_name || null,
     phoneNumber: row?.phone_number || null,
     connectedAt: row?.connected_at || null,
+    pendingExpiresAt: row?.pending_expires_at || null,
+    pendingPhoneNumber: row?.pending_phone_number || null,
     ...extra,
   };
+}
+
+function pendingLinkActive(row) {
+  if (!row?.pending_expires_at) return false;
+  const expires = new Date(row.pending_expires_at).getTime();
+  return Number.isFinite(expires) && expires > Date.now() && ['connecting', 'qr_pending'].includes(String(row.status || ''));
+}
+
+async function expirePendingLink(teacherId, row) {
+  if (!row?.pending_expires_at || pendingLinkActive(row)) return false;
+  try {
+    await deleteInstance(row.instance_name);
+  } catch (err) {
+    if (err?.status !== 404) console.error('[whatsapp/teacher/expire]', err?.message || err);
+  }
+  await saveRow(teacherId, {
+    status: 'disconnected',
+    pending_expires_at: null,
+    pending_phone_number: null,
+    status_message: 'انتهت مهلة جلسة ربط واتساب (3 دقائق).',
+    connected_at: null,
+    phone_number: null,
+  });
+  return true;
 }
 
 /* ============================================================
@@ -190,53 +217,62 @@ export async function create(req, res) {
   const teacherId = access.user.id;
   try {
     const name = buildInstanceName(teacherId);
-    const row = await getRow(teacherId);
+    let row = await getRow(teacherId);
 
-    /* 1) هل المثيل متصل بالفعل؟ → نعرض الحالة مباشرة بدون أي إنشاء */
-    let exists = Boolean(row);
-    if (exists) {
+    if (row && !pendingLinkActive(row) && row.pending_expires_at && row.status !== 'connected') {
+      await expirePendingLink(teacherId, row);
+      row = await getRow(teacherId);
+    }
+
+    if (row) {
       try {
         const stateRaw = parseInstanceState(await connectionState(name));
         if (mapInstanceState(stateRaw) === 'connected') {
           const updated = await persistStatus(teacherId, row, 'connected', null);
           const phone = updated.phone_number || await tryFetchPhone(name, teacherId, updated);
-          return jsonOk(res, statusPayload({ ...updated, phone_number: phone }, { qr: null, pairingCode: null }));
+          await saveRow(teacherId, { pending_expires_at: null, pending_phone_number: null });
+          return jsonOk(res, statusPayload({ ...updated, phone_number: phone, pending_expires_at: null, pending_phone_number: null }, { qr: null, pairingCode: null }));
+        }
+
+        if (pendingLinkActive(row)) {
+          const resumeNumber = requestedNumber || row.pending_phone_number || '';
+          const conn = await connectInstance(name, resumeNumber);
+          const qr = parseQrImage(conn);
+          const pairingCode = parsePairingCode(conn);
+          const values = {
+            status: qr ? 'qr_pending' : 'connecting',
+            pending_expires_at: row.pending_expires_at,
+            pending_phone_number: row.pending_phone_number || requestedNumber || null,
+            last_status_check: new Date().toISOString(),
+          };
+          await saveRow(teacherId, values);
+          return jsonOk(res, statusPayload({ ...row, ...values, instance_name: name }, { qr, pairingCode, qrTtlSeconds: QR_TTL_SECONDS }));
         }
       } catch (err) {
-        if (err?.status === 404) exists = false; /* المثيل ضاع من السيرفر → نعيد إنشائه بنفس الاسم */
+        if (err?.status === 404) row = null;
         else throw err;
       }
     }
 
-    /* 2) إنشاء المثيل.
-       في وضع الربط برقم الهاتف، نعيد إنشاء المثيل فقط إذا كان موجودًا
-       وغير متصل، حتى يُستخدم الرقم في لحظة الإنشاء ويكون pairingCode صالحًا. */
     let instanceToken = null;
-    if (!exists) {
-      const created = await createInstance(name, requestedNumber || '');
-      instanceToken = parseInstanceToken(created);
-    } else if (requestedNumber) {
-      try { await deleteInstance(name); } catch (err) { if (err?.status !== 404) throw err; }
-      const created = await createInstance(name, requestedNumber);
-      instanceToken = parseInstanceToken(created);
-      exists = true;
-    }
+    const created = await createInstance(name, requestedNumber || '');
+    instanceToken = parseInstanceToken(created);
 
-    /* 3) طلب بيانات الاتصال (QR + pairingCode) — ?number= هو مسار الربط الحقيقي برقم الهاتف */
     const conn = await connectInstance(name, requestedNumber || '');
     const qr = parseQrImage(conn);
     const pairingCode = parsePairingCode(conn);
     const status = qr ? 'qr_pending' : 'connecting';
-
-    /* 4) حفظ/تحديث السجل */
     const values = {
       instance_name: name,
       status,
       status_message: null,
       connected_at: null,
+      pending_expires_at: new Date(Date.now() + LINK_SESSION_TTL_MS).toISOString(),
+      pending_phone_number: requestedNumber || null,
       last_status_check: new Date().toISOString(),
     };
     if (instanceToken) values.instance_token = instanceToken;
+
     if (row) await saveRow(teacherId, values);
     else await saveRow(teacherId, values, { upsert: true });
 
