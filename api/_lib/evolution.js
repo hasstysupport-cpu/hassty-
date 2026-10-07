@@ -182,7 +182,7 @@ export function fetchInstances() {
 export function sendTextMessage(instanceName, number, text) {
   return evoFetch(`/message/sendText/${encodeURIComponent(instanceName)}`, {
     method: 'POST',
-    body: { number: String(number), textMessage: { text: String(text) }, linkPreview: true },
+    body: { number: String(number), text: String(text), linkPreview: true },
     timeoutMs: 25000,
   });
 }
