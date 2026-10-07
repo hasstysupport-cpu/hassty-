@@ -7,19 +7,19 @@ const QR_STEPS = [
   {
     title: 'افتح الأجهزة المرتبطة',
     text: 'افتح واتساب على هاتفك، واضغط على القائمة ⋮ ثم اختر «الأجهزة المرتبطة».',
-    image: 'https://mobiletrans.wondershare.com/images/images2026/transfer-whatsapp-from-oppo-to-iphone-5.jpg',
+    image: '/whatsapp-link-guide/1-menu-linked-devices.webp',
     alt: 'واتساب مع قائمة الأجهزة المرتبطة',
   },
   {
     title: 'اضغط ربط جهاز',
     text: 'من شاشة الأجهزة المرتبطة اضغط على «ربط جهاز» لفتح أداة مسح رمز QR.',
-    image: 'https://www.nextpit.fr/img/WhatsApp-Link-QR-step-2.png?class=gallery_preview',
+    image: '/whatsapp-link-guide/2-link-a-device.webp',
     alt: 'زر ربط جهاز في واتساب',
   },
   {
     title: 'امسح رمز QR الظاهر في Hassty',
     text: 'وجّه كاميرا واتساب إلى رمز QR الموجود في نافذة الربط داخل Hassty، وانتظر حتى يتم الاتصال.',
-    image: 'https://www.nextpit.de/img/Link-WhatsApp-via-laptop-on-the-phone-step-1.png?class=gallery_preview',
+    image: '/whatsapp-link-guide/3-scan-qr.webp',
     alt: 'شاشة مسح رمز QR في واتساب',
   },
 ];
@@ -40,7 +40,7 @@ const CODE_STEPS = [
   {
     title: 'استخدم الرمز الذي يظهر في Hassty',
     text: 'سيظهر لك رمز ربط في Hassty. استخدمه في شاشة إدخال الرمز داخل واتساب لإكمال ربط الجهاز.',
-    image: 'https://www.nextpit.de/img/Link-WhatsApp-via-laptop-on-the-phone-step-2.png?class=gallery_preview',
+    image: '/whatsapp-link-guide/5-enter-code.webp',
     alt: 'شاشة إدخال رمز الربط في واتساب',
   },
 ];
