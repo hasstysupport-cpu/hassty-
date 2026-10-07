@@ -258,9 +258,18 @@ export async function create(req, res) {
     const created = await createInstance(name, requestedNumber || '');
     instanceToken = parseInstanceToken(created);
 
-    const conn = await connectInstance(name, requestedNumber || '');
-    const qr = parseQrImage(conn);
-    const pairingCode = parsePairingCode(conn);
+    // Evolution's /instance/create with qrcode=true + number already starts the
+    // WhatsApp connection and may return the QR/pairing code. Calling /connect
+    // immediately again can restart the Baileys socket and invalidate the
+    // freshly generated pairing code.
+    let conn = created;
+    let qr = parseQrImage(created);
+    let pairingCode = parsePairingCode(created);
+    if (!qr && !pairingCode) {
+      conn = await connectInstance(name, requestedNumber || '');
+      qr = parseQrImage(conn);
+      pairingCode = parsePairingCode(conn);
+    }
     const status = qr ? 'qr_pending' : 'connecting';
     const values = {
       instance_name: name,
@@ -336,8 +345,26 @@ export async function connect(req, res) {
         }
       } catch (err) {
         if (err?.status === 404) {
-          await createInstance(name, requestedNumber || row?.pending_phone_number || '');
-          row = null;
+          const pendingNumber = row?.pending_phone_number || null;
+          const createNumber = requestedNumber || pendingNumber || '';
+          const created = await createInstance(name, createNumber);
+          // /instance/create already starts the socket when qrcode=true.
+          // Keep its returned QR/pairing payload instead of immediately
+          // calling /instance/connect a second time.
+          const qr = parseQrImage(created);
+          const pairingCode = parsePairingCode(created);
+          const createdToken = parseInstanceToken(created);
+          const values = {
+            instance_name: name,
+            status: qr ? 'qr_pending' : 'connecting',
+            connected_at: null,
+            pending_expires_at: new Date(Date.now() + LINK_SESSION_TTL_MS).toISOString(),
+            pending_phone_number: createNumber || null,
+            last_status_check: new Date().toISOString(),
+            ...(createdToken ? { instance_token: createdToken } : {}),
+          };
+          await saveRow(teacherId, values, { upsert: true });
+          return jsonOk(res, statusPayload({ ...values, instance_name: name }, { qr, pairingCode, qrTtlSeconds: QR_TTL_SECONDS }));
         } else throw err;
       }
     }
