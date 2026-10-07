@@ -31,7 +31,7 @@ import {
 
 const TABLE = 'teacher_whatsapp_instances';
 const QR_TTL_SECONDS = 25;          // عمر QR قبل التحديث التلقائي
-const LINK_SESSION_TTL_MS = 3 * 60 * 1000; // 3 دقائق لجلسة الربط حتى لو أُغلقت الصفحة
+// جلسة الربط لا تنتهي تلقائيًا: تبقى على Evolution حتى يكتمل الربط أو يضغط المدرس «فصل واتساب».
 const LAST_CHECK_WRITE_MS = 30000;  // لا نكتب last_status_check أكثر من كل 30 ثانية
 
 /* ---------- مساعدات قاعدة البيانات ---------- */
@@ -198,27 +198,9 @@ function statusPayload(row, extra = {}) {
 }
 
 function pendingLinkActive(row) {
-  if (!row?.pending_expires_at) return false;
-  const expires = new Date(row.pending_expires_at).getTime();
-  return Number.isFinite(expires) && expires > Date.now() && ['connecting', 'qr_pending'].includes(String(row.status || ''));
-}
-
-async function expirePendingLink(teacherId, row) {
-  if (!row?.pending_expires_at || pendingLinkActive(row)) return false;
-  try {
-    await deleteInstance(row.instance_name);
-  } catch (err) {
-    if (err?.status !== 404) console.error('[whatsapp/teacher/expire]', err?.message || err);
-  }
-  await saveRow(teacherId, {
-    status: 'disconnected',
-    pending_expires_at: null,
-    pending_phone_number: null,
-    status_message: 'انتهت مهلة جلسة ربط واتساب (3 دقائق).',
-    connected_at: null,
-    phone_number: null,
-  });
-  return true;
+  // لا توجد مهلة زمنية لجلسة الربط. المثيل يظل موجودًا على Evolution
+  // حتى يتصل واتساب أو يفصل المدرس الربط يدويًا.
+  return ['connecting', 'qr_pending'].includes(String(row?.status || ''));
 }
 
 /* ============================================================
@@ -242,11 +224,6 @@ export async function create(req, res) {
   try {
     const name = buildInstanceName(teacherId);
     let row = await getRow(teacherId);
-
-    if (row && !pendingLinkActive(row) && row.pending_expires_at && row.status !== 'connected') {
-      await expirePendingLink(teacherId, row);
-      row = await getRow(teacherId);
-    }
 
     if (row) {
       try {
@@ -300,7 +277,7 @@ export async function create(req, res) {
       status,
       status_message: null,
       connected_at: null,
-      pending_expires_at: new Date(Date.now() + LINK_SESSION_TTL_MS).toISOString(),
+      pending_expires_at: null,
       pending_phone_number: requestedNumber || null,
       last_status_check: new Date().toISOString(),
     };
@@ -353,11 +330,6 @@ export async function connect(req, res) {
     const name = buildInstanceName(teacherId);
     let row = await getRow(teacherId);
 
-    if (row && !pendingLinkActive(row) && row.pending_expires_at && row.status !== 'connected') {
-      await expirePendingLink(teacherId, row);
-      row = await getRow(teacherId);
-    }
-
     if (row) {
       try {
         const stateRaw = parseInstanceState(await connectionState(name));
@@ -382,7 +354,7 @@ export async function connect(req, res) {
             instance_name: name,
             status: qr ? 'qr_pending' : 'connecting',
             connected_at: null,
-            pending_expires_at: new Date(Date.now() + LINK_SESSION_TTL_MS).toISOString(),
+            pending_expires_at: null,
             pending_phone_number: createNumber || null,
             last_status_check: new Date().toISOString(),
             ...(createdToken ? { instance_token: createdToken } : {}),
@@ -402,7 +374,7 @@ export async function connect(req, res) {
       instance_name: name,
       status,
       connected_at: null,
-      pending_expires_at: row?.pending_expires_at || new Date(Date.now() + LINK_SESSION_TTL_MS).toISOString(),
+      pending_expires_at: null,
       pending_phone_number: row?.pending_phone_number || requestedNumber || null,
       last_status_check: new Date().toISOString(),
     };
