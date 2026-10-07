@@ -7,22 +7,19 @@ const QR_STEPS = [
   {
     title: 'افتح الأجهزة المرتبطة',
     text: 'افتح واتساب على هاتفك، واضغط على القائمة ⋮ ثم اختر «الأجهزة المرتبطة».',
-    image: '/whatsapp-link-guide/1-menu-linked-devices.webp',
-    sourceUrl: 'https://ibb.co/BVrhx6by',
+    image: 'https://i.ibb.co/pvRH8Kcf/1-menu-linked-devices.png',
     alt: 'واتساب مع قائمة الأجهزة المرتبطة',
   },
   {
     title: 'اضغط ربط جهاز',
     text: 'من شاشة الأجهزة المرتبطة اضغط على «ربط جهاز» لفتح أداة مسح رمز QR.',
-    image: '/whatsapp-link-guide/2-link-a-device.webp',
-    sourceUrl: 'https://ibb.co/gFrr1BpV',
+    image: 'https://i.ibb.co/dJff9zqg/2-link-a-device.png',
     alt: 'زر ربط جهاز في واتساب',
   },
   {
     title: 'امسح رمز QR الظاهر في Hassty',
     text: 'وجّه كاميرا واتساب إلى رمز QR الموجود في نافذة الربط داخل Hassty، وانتظر حتى يتم الاتصال.',
-    image: '/whatsapp-link-guide/3-scan-qr.webp',
-    sourceUrl: 'https://ibb.co/LdHNT3mY',
+    image: 'https://i.ibb.co/PG0D2dKF/3-scan-qr.png',
     alt: 'شاشة مسح رمز QR في واتساب',
   },
 ];
@@ -31,22 +28,19 @@ const CODE_STEPS = [
   {
     title: 'افتح الأجهزة المرتبطة',
     text: 'افتح واتساب على هاتفك، ثم من القائمة ⋮ اختر «الأجهزة المرتبطة» واضغط «ربط جهاز».',
-    image: '/whatsapp-link-guide/1-menu-linked-devices.webp',
-    sourceUrl: 'https://ibb.co/BVrhx6by',
+    image: 'https://i.ibb.co/pvRH8Kcf/1-menu-linked-devices.png',
     alt: 'واتساب مع قائمة الأجهزة المرتبطة',
   },
   {
     title: 'اختر الربط برقم الهاتف',
     text: 'بعد فتح شاشة مسح QR، اضغط «الربط برقم الهاتف بدلًا من ذلك».',
-    image: '/whatsapp-link-guide/4-link-with-phone-number.webp',
-    sourceUrl: 'https://ibb.co/spRGM7Cq',
+    image: 'https://i.ibb.co/8nspSkb9/4-link-with-phone-number.png',
     alt: 'خيار الربط برقم الهاتف بدلًا من QR',
   },
   {
     title: 'استخدم الرمز الذي يظهر في Hassty',
     text: 'سيظهر لك رمز ربط في Hassty. استخدمه في شاشة إدخال الرمز داخل واتساب لإكمال ربط الجهاز.',
-    image: '/whatsapp-link-guide/5-enter-code.webp',
-    sourceUrl: 'https://ibb.co/S45nKwhZ',
+    image: 'https://i.ibb.co/bMQBr5SG/5-enter-code.png',
     alt: 'شاشة إدخال رمز الربط في واتساب',
   },
 ];
@@ -107,21 +101,13 @@ export const WhatsAppLinkGuide: React.FC = () => {
 
             <div className="p-3 sm:p-5 bg-slate-50">
               <div className="mx-auto max-w-sm rounded-3xl bg-white border border-slate-200 p-2 sm:p-3 shadow-sm">
-                <a
-                  href={step.sourceUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block"
-                  title="فتح الصورة على ImgBB"
-                >
-                  <img
-                    src={step.image}
-                    alt={step.alt}
-                    loading="lazy"
-                    referrerPolicy="no-referrer"
-                    className="w-full h-auto max-h-[560px] object-contain rounded-2xl"
-                  />
-                </a>
+                <img
+                  src={step.image}
+                  alt={step.alt}
+                  loading="lazy"
+                  referrerPolicy="no-referrer"
+                  className="w-full h-auto max-h-[560px] object-contain rounded-2xl"
+                />
               </div>
             </div>
 
