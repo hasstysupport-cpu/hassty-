@@ -24,7 +24,7 @@ import { internalOrUser } from '../green.js';
 import { dbSelect, dbUpsert, dbUpdate } from '../supabase.js';
 import {
   evolutionConfigured, serviceUnavailableError, describeEvolutionError, evolutionHttpStatus, EvolutionError,
-  createInstance, connectInstance, connectionState, fetchInstances, sendTextMessage, logoutInstance,
+  createInstance, connectInstance, connectionState, fetchInstances, sendTextMessage, logoutInstance, deleteInstance,
   parseQrImage, parsePairingCode, parseInstanceState, mapInstanceState, parsePhoneNumber,
   parseInstanceToken, findInstanceInList,
 } from '../evolution.js';
