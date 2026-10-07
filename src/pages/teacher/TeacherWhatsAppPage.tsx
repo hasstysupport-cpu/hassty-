@@ -141,18 +141,8 @@ export const TeacherWhatsAppPage: React.FC<{ onNavigate?: (path: string) => void
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [poll]);
 
-  /* ============ عدّاد انتهاء QR + تحديث تلقائي ============ */
-  useEffect(() => {
-    // Pairing codes are intentionally NOT refreshed with the QR timer.
-    // Refreshing /instance/connect every 25s can invalidate the visible code
-    // before the teacher finishes entering it in WhatsApp.
-    if (!qrModalOpen || !qr || pairingCode) return;
-    setQrCountdown(qrTtl);
-    const id = setInterval(() => setQrCountdown((c) => (c > 0 ? c - 1 : 0)), 1000);
-    return () => clearInterval(id);
-  }, [qr, qrNonce, qrModalOpen, qrTtl, pairingCode]);
-
-  const refreshQr = useCallback(async (auto = false) => {
+  /* ============ QR ثابت + جلسة سيرفر مستمرة ============ */
+  const refreshQr = useCallback(async (_auto = false) => {
     if (refreshingQrRef.current) return;
     refreshingQrRef.current = true;
     try {
@@ -178,15 +168,6 @@ export const TeacherWhatsAppPage: React.FC<{ onNavigate?: (path: string) => void
       refreshingQrRef.current = false;
     }
   }, [toast]);
-
-  /* انتهاء العدّاد → تحديث تلقائي للرمز (طالما المودال مفتوحًا وفيه QR) */
-  useEffect(() => {
-    // In phone-number mode the pairing code should remain stable for the
-    // pending session; do not auto-request a new code every 25 seconds.
-    if (qrModalOpen && qr && !pairingCode && qrCountdown === 0 && !linking && !refreshingQrRef.current) {
-      void refreshQr(true);
-    }
-  }, [qrCountdown, qrModalOpen, qr, pairingCode, linking, refreshQr]);
 
   /* ============ استكمال جلسة ربط سابقة (تبقى على السيرفر حتى يكتمل الربط) ============ */
   const pendingLinkActive = st?.status === 'connecting' || st?.status === 'qr_pending';
@@ -620,11 +601,9 @@ export const TeacherWhatsAppPage: React.FC<{ onNavigate?: (path: string) => void
             {qr ? (
               <div className="relative bg-white border-2 border-dashed border-slate-300 rounded-2xl p-3">
                 <img src={qr} alt="رمز QR لربط واتساب" className="w-56 h-56 sm:w-64 sm:h-64 object-contain rounded-xl" />
-                {qrCountdown > 0 && (
-                  <span className="absolute -top-2.5 -right-2.5 min-w-7 h-7 px-1.5 rounded-full bg-slate-800 text-white text-[11px] font-black flex items-center justify-center tabular-nums shadow-md" dir="ltr">
-                    {qrCountdown}s
-                  </span>
-                )}
+                <span className="absolute -top-2.5 -right-2.5 px-2 h-7 rounded-full bg-slate-800 text-white text-[10px] font-black flex items-center justify-center shadow-md">
+                  جلسة مستمرة
+                </span>
               </div>
             ) : (
               <div className="w-56 h-56 sm:w-64 sm:h-64 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col items-center justify-center gap-2 text-slate-400">
@@ -635,7 +614,7 @@ export const TeacherWhatsAppPage: React.FC<{ onNavigate?: (path: string) => void
 
             <div className="flex items-center gap-2 text-xs font-black text-slate-600">
               <span className="w-2 h-2 rounded-full bg-amber-400 status-pulse" />
-              {qrCountdown === 0 && qr ? 'انتهت صلاحية الرمز — جاري تحديثه...' : 'في انتظار المسح...'}
+              {qr ? 'في انتظار المسح… جلسة الربط مستمرة على السيرفر.' : 'جاري تجهيز الرمز…'}
             </div>
           </div>
 
