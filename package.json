@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "vite build && node scripts/make-route-html.mjs",
+    "build": "node scripts/validate-whatsapp-config.mjs && vite build && node scripts/make-route-html.mjs",
     "start": "node dist/server.cjs",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
