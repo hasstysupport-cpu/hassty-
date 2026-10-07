@@ -50,13 +50,37 @@ async function saveRow(teacherId, values, { upsert = false } = {}) {
 /* ---------- مصادقة: معلم فقط، من الـ Session ---------- */
 /* تمييز واضح: 401 = جلسة منتهية/غير موجودة، 403 = دور ليس معلمًا */
 async function requireTeacher(req) {
-  const access = await internalOrUser(req); /* أي دور — نفحص الدور بأنفسنا */
+  const access = await internalOrUser(req); /* الهوية من Session فقط */
   if (!access) return { code: 401, message: 'انتهت الجلسة — سجّل الدخول من جديد.' };
-  /* السر الداخلي بلا هوية معلم — لا يُدار واتساب المدرس عبره */
-  if (access.internal || access.profile?.role !== 'teacher') {
-    return { code: 403, message: 'هذه الخدمة متاحة للمعلمين فقط.' };
+  /* لا نسمح بالوصول عبر السر الداخلي لمسارات المدرس. */
+  if (access.internal) return { code: 403, message: 'هذه الخدمة متاحة للمعلمين فقط.' };
+
+  /*
+   * بعض الحسابات القديمة قد يكون profile.role فيها متأخرًا عن tutor_profiles
+   * رغم أن الحساب نفسه مدرس فعليًا. نتحقق من المصدرين المرتبطين بنفس user.id
+   * بدل إسقاط الطلب بـ403 بينما واجهة المدرس تعمل طبيعيًا.
+   */
+  if (access.profile?.role === 'teacher') return { access };
+
+  try {
+    const { ok, data } = await dbSelect('tutor_profiles', {
+      select: 'user_id',
+      user_id: `eq.${access.user.id}`,
+      limit: '1',
+    });
+    if (ok && data?.[0]?.user_id === access.user.id) {
+      access.profile = { ...access.profile, role: 'teacher' };
+      return { access };
+    }
+  } catch (err) {
+    console.error('[whatsapp/teacher/auth-check]', err?.message || err);
   }
-  return { access };
+
+  console.error('[whatsapp/teacher/auth] Forbidden', {
+    userId: access.user?.id || null,
+    profileRole: access.profile?.role || null,
+  });
+  return { code: 403, message: 'هذا الحساب ليس حساب مدرس صالحًا لاستخدام واتساب المدرس.' };
 }
 
 /* هل المتصل معلمًا (أيًا كان لديه ربط أو لا)؟ — يُستخدم لتوجيه status دائمًا
