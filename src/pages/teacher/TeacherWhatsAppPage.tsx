@@ -55,8 +55,12 @@ function formatPairing(code?: string | null): string {
 const AUTH_ERROR_HINT = 'انتهت الجلسة أو لا تملك صلاحية الوصول — سجّل الدخول من جديد.';
 
 export const TeacherWhatsAppPage: React.FC<{ onNavigate?: (path: string) => void }> = ({ onNavigate }) => {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const toast = useToast();
+
+  useEffect(() => {
+    void refreshUser();
+  }, [refreshUser]);
 
   /* الحالة العامة */
   const [st, setSt] = useState<TeacherWhatsAppState | null>(null);
