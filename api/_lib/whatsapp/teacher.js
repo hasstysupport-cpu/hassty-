@@ -21,6 +21,7 @@
 
 import { jsonOk, jsonErr, readJsonBody } from '../config.js';
 import { internalOrUser } from '../green.js';
+import { getUserById } from '../supabase.js';
 import { dbSelect, dbUpsert, dbUpdate } from '../supabase.js';
 import {
   evolutionConfigured, serviceUnavailableError, describeEvolutionError, evolutionHttpStatus, EvolutionError,
@@ -62,13 +63,18 @@ async function requireTeacher(req) {
    */
   if (access.profile?.role === 'teacher') return { access };
 
+  let tutorLookupOk = false;
+  let tutorExists = false;
+  let authMetaRole = null;
   try {
-    const { ok, data } = await dbSelect('tutor_profiles', {
+    const tutorResult = await dbSelect('tutor_profiles', {
       select: 'user_id',
       user_id: `eq.${access.user.id}`,
       limit: '1',
     });
-    if (ok && data?.[0]?.user_id === access.user.id) {
+    tutorLookupOk = Boolean(tutorResult?.ok);
+    tutorExists = Boolean(tutorResult?.ok && tutorResult?.data?.[0]?.user_id === access.user.id);
+    if (tutorExists) {
       access.profile = { ...access.profile, role: 'teacher' };
       return { access };
     }
@@ -76,9 +82,30 @@ async function requireTeacher(req) {
     console.error('[whatsapp/teacher/auth-check]', err?.message || err);
   }
 
+  /* Auth metadata is the last authoritative fallback for older teacher accounts. */
+  try {
+    const authResult = await getUserById(access.user.id);
+    const authUser = authResult?.ok ? authResult.data : null;
+    authMetaRole =
+      authUser?.app_metadata?.role ||
+      authUser?.user_metadata?.role ||
+      authUser?.user_metadata?.account_role ||
+      null;
+    if (authMetaRole === 'teacher') {
+      access.profile = { ...access.profile, role: 'teacher' };
+      return { access };
+    }
+  } catch (err) {
+    console.error('[whatsapp/teacher/auth-meta-check]', err?.message || err);
+  }
+
   console.error('[whatsapp/teacher/auth] Forbidden', {
     userId: access.user?.id || null,
     profileRole: access.profile?.role || null,
+    accountStatus: access.profile?.account_status || null,
+    tutorLookupOk,
+    tutorExists,
+    authMetaRole,
   });
   return { code: 403, message: 'هذا الحساب ليس حساب مدرس صالحًا لاستخدام واتساب المدرس.' };
 }
@@ -87,8 +114,31 @@ async function requireTeacher(req) {
    لمسار المعلم بدل إهدار طلبات Green API كل 4 ثوانٍ على معلم بلا ربط */
 export async function teacherCaller(req) {
   try {
-    const access = await internalOrUser(req, ['teacher']);
-    return access && !access.internal ? access : null;
+    const access = await internalOrUser(req);
+    if (!access || access.internal) return null;
+    if (access.profile?.role === 'teacher') return access;
+
+    const tutorResult = await dbSelect('tutor_profiles', {
+      select: 'user_id',
+      user_id: `eq.${access.user.id}`,
+      limit: '1',
+    }).catch(() => null);
+    if (tutorResult?.ok && tutorResult?.data?.[0]?.user_id === access.user.id) {
+      access.profile = { ...access.profile, role: 'teacher' };
+      return access;
+    }
+
+    try {
+      const authResult = await getUserById(access.user.id);
+      const authUser = authResult?.ok ? authResult.data : null;
+      const role = authUser?.app_metadata?.role || authUser?.user_metadata?.role || authUser?.user_metadata?.account_role || null;
+      if (role === 'teacher') {
+        access.profile = { ...access.profile, role: 'teacher' };
+        return access;
+      }
+    } catch {}
+
+    return null;
   } catch {
     return null;
   }
