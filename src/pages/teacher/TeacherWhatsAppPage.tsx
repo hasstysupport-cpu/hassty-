@@ -143,11 +143,14 @@ export const TeacherWhatsAppPage: React.FC<{ onNavigate?: (path: string) => void
 
   /* ============ عدّاد انتهاء QR + تحديث تلقائي ============ */
   useEffect(() => {
-    if (!qrModalOpen || !qr) return;
+    // Pairing codes are intentionally NOT refreshed with the QR timer.
+    // Refreshing /instance/connect every 25s can invalidate the visible code
+    // before the teacher finishes entering it in WhatsApp.
+    if (!qrModalOpen || !qr || pairingCode) return;
     setQrCountdown(qrTtl);
     const id = setInterval(() => setQrCountdown((c) => (c > 0 ? c - 1 : 0)), 1000);
     return () => clearInterval(id);
-  }, [qr, qrNonce, qrModalOpen, qrTtl]);
+  }, [qr, qrNonce, qrModalOpen, qrTtl, pairingCode]);
 
   const refreshQr = useCallback(async (auto = false) => {
     if (refreshingQrRef.current) return;
@@ -178,10 +181,12 @@ export const TeacherWhatsAppPage: React.FC<{ onNavigate?: (path: string) => void
 
   /* انتهاء العدّاد → تحديث تلقائي للرمز (طالما المودال مفتوحًا وفيه QR) */
   useEffect(() => {
-    if (qrModalOpen && qr && qrCountdown === 0 && !linking && !refreshingQrRef.current) {
+    // In phone-number mode the pairing code should remain stable for the
+    // pending session; do not auto-request a new code every 25 seconds.
+    if (qrModalOpen && qr && !pairingCode && qrCountdown === 0 && !linking && !refreshingQrRef.current) {
       void refreshQr(true);
     }
-  }, [qrCountdown, qrModalOpen, qr, linking, refreshQr]);
+  }, [qrCountdown, qrModalOpen, qr, pairingCode, linking, refreshQr]);
 
   /* ============ استكمال جلسة ربط سابقة (تظل 3 دقائق على السيرفر) ============ */
   const pendingLinkActive = Boolean(
