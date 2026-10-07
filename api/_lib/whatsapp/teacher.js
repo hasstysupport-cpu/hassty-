@@ -24,7 +24,7 @@ import { internalOrUser } from '../green.js';
 import { dbSelect, dbUpsert, dbUpdate } from '../supabase.js';
 import {
   evolutionConfigured, serviceUnavailableError, describeEvolutionError, evolutionHttpStatus, EvolutionError,
-  createInstance, connectInstance, connectionState, fetchInstances, sendTextMessage, logoutInstance, deleteInstance,
+  createInstance, connectInstance, connectionState, fetchInstances, sendTextMessage, logoutInstance,
   parseQrImage, parsePairingCode, parseInstanceState, mapInstanceState, parsePhoneNumber,
   parseInstanceToken, findInstanceInList,
 } from '../evolution.js';
@@ -236,18 +236,24 @@ export async function create(req, res) {
         }
 
         if (pendingLinkActive(row)) {
-          const resumeNumber = requestedNumber || row.pending_phone_number || '';
-          const conn = await connectInstance(name, resumeNumber);
-          const qr = parseQrImage(conn);
-          const pairingCode = parsePairingCode(conn);
+          // IMPORTANT: keep the existing Evolution/Baileys session alive.
+          // Do not call /connect here: it can restart the socket and invalidate
+          // a pairing code that is already visible on the teacher's phone.
+          // An explicit "استكمال الربط" / "تحديث الرمز" action can request a
+          // fresh payload when the teacher actually needs one.
           const values = {
-            status: qr ? 'qr_pending' : 'connecting',
-            pending_expires_at: row.pending_expires_at,
+            status: row.status,
+            pending_expires_at: null,
             pending_phone_number: row.pending_phone_number || requestedNumber || null,
             last_status_check: new Date().toISOString(),
           };
           await saveRow(teacherId, values);
-          return jsonOk(res, statusPayload({ ...row, ...values, instance_name: name }, { qr, pairingCode, qrTtlSeconds: QR_TTL_SECONDS }));
+          return jsonOk(res, statusPayload({ ...row, ...values, instance_name: name }, {
+            qr: null,
+            pairingCode: null,
+            qrTtlSeconds: QR_TTL_SECONDS,
+            pending: true,
+          }));
         }
       } catch (err) {
         if (err?.status === 404) row = null;
@@ -365,6 +371,9 @@ export async function connect(req, res) {
       }
     }
 
+    // This endpoint is an explicit resume/refresh action. It is allowed to
+    // request a fresh QR/pairing payload on demand. Automatic polling never
+    // calls this endpoint, so the background session stays untouched.
     const resumeNumber = requestedNumber || row?.pending_phone_number || '';
     const conn = await connectInstance(name, resumeNumber);
     const qr = parseQrImage(conn);
@@ -404,9 +413,11 @@ export async function status(req, res) {
   let row = await getRow(teacherId);
   if (!row) return jsonOk(res, statusPayload(null));
 
-  if (row.pending_expires_at && !pendingLinkActive(row) && row.status !== 'connected') {
-    await expirePendingLink(teacherId, row);
-    row = await getRow(teacherId);
+  // Pending-link sessions are intentionally persistent. The legacy
+  // pending_expires_at column is ignored and cleared for backward compatibility.
+  if (row.pending_expires_at && pendingLinkActive(row)) {
+    await saveRow(teacherId, { pending_expires_at: null });
+    row = { ...row, pending_expires_at: null };
   }
 
   if (!evolutionConfigured()) {
