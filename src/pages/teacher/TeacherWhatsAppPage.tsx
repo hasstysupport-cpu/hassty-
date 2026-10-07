@@ -188,12 +188,8 @@ export const TeacherWhatsAppPage: React.FC<{ onNavigate?: (path: string) => void
     }
   }, [qrCountdown, qrModalOpen, qr, pairingCode, linking, refreshQr]);
 
-  /* ============ استكمال جلسة ربط سابقة (تظل 3 دقائق على السيرفر) ============ */
-  const pendingLinkActive = Boolean(
-    st?.pendingExpiresAt &&
-    new Date(st.pendingExpiresAt).getTime() > Date.now() &&
-    (st.status === 'connecting' || st.status === 'qr_pending')
-  );
+  /* ============ استكمال جلسة ربط سابقة (تبقى على السيرفر حتى يكتمل الربط) ============ */
+  const pendingLinkActive = st?.status === 'connecting' || st?.status === 'qr_pending';
 
   const resumePendingLink = useCallback(async () => {
     if (resumeBusy) return;
@@ -478,7 +474,7 @@ export const TeacherWhatsAppPage: React.FC<{ onNavigate?: (path: string) => void
                   <div className="w-full max-w-2xl rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-right" dir="rtl">
                     <div className="text-xs font-black text-blue-900">🔵 جلسة ربط سابقة ما زالت مفتوحة</div>
                     <div className="text-[11px] text-blue-700 mt-1 leading-5">
-                      الجلسة محفوظة على السيرفر لمدة 3 دقائق من بداية الربط، حتى لو أغلقت الموقع. استكمل الربط قبل انتهاء المهلة.
+                      الجلسة محفوظة ومستمرة على السيرفر حتى يكتمل الربط، حتى لو أغلقت الموقع أو رجعت له لاحقًا. لن تُحذف تلقائيًا.
                     </div>
                     <div className="mt-2">
                       <Btn variant="primary" size="sm" onClick={() => void resumePendingLink()} disabled={resumeBusy}>
