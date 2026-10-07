@@ -28,11 +28,26 @@ async function post(path: string, body?: any, method = 'POST') {
        so /api/whatsapp/* serverless functions can verify the caller. */
     try {
       if (supabase) {
-        const { data } = await supabase.auth.getSession();
-        const token = data?.session?.access_token;
+        // Refresh first so role/session changes are reflected in the access token.
+        const refreshed = await supabase.auth.refreshSession();
+        const token = refreshed.data?.session?.access_token;
         if (token) headers.Authorization = `Bearer ${token}`;
+        else {
+          const { data } = await supabase.auth.getSession();
+          const fallbackToken = data?.session?.access_token;
+          if (fallbackToken) headers.Authorization = `Bearer ${fallbackToken}`;
+        }
       }
-    } catch { /* anonymous calls stay allowed for the webhook side */ }
+    } catch {
+      /* If refresh is temporarily unavailable, fall back to the current session. */
+      try {
+        if (supabase) {
+          const { data } = await supabase.auth.getSession();
+          const token = data?.session?.access_token;
+          if (token) headers.Authorization = `Bearer ${token}`;
+        }
+      } catch { /* anonymous calls stay allowed for the webhook side */ }
+    }
     const res = await fetch(path, { method, headers, body: method === 'GET' ? undefined : JSON.stringify(body || {}) });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) return { success: false, error: json?.error || `WhatsApp API ${res.status}`, data: json };
