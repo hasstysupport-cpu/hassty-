@@ -378,8 +378,13 @@ export async function status(req, res) {
   const access = guard.access;
 
   const teacherId = access.user.id;
-  const row = await getRow(teacherId);
+  let row = await getRow(teacherId);
   if (!row) return jsonOk(res, statusPayload(null));
+
+  if (row.pending_expires_at && !pendingLinkActive(row) && row.status !== 'connected') {
+    await expirePendingLink(teacherId, row);
+    row = await getRow(teacherId);
+  }
 
   if (!evolutionConfigured()) {
     return jsonOk(res, statusPayload(row, { configured: false }));
@@ -391,6 +396,10 @@ export async function status(req, res) {
     const shown = real === 'connecting' && (row.status === 'qr_pending') ? 'qr_pending' : real;
     const updated = await persistStatus(teacherId, row, real, phone);
     const finalPhone = updated.phone_number || phone;
+    if (shown === 'connected') {
+      await saveRow(teacherId, { pending_expires_at: null, pending_phone_number: null });
+      return jsonOk(res, statusPayload({ ...updated, status: shown, phone_number: finalPhone, pending_expires_at: null, pending_phone_number: null }, { configured: true }));
+    }
     return jsonOk(res, statusPayload({ ...updated, status: shown, phone_number: finalPhone }, { configured: true }));
   } catch (err) {
     /* السيرفر البعيد غير متاح: نعيد آخر حالة محفوظة + علم degraded
@@ -483,6 +492,8 @@ export async function disconnect(req, res) {
       status_message: 'تم فصل واتساب بواسطة المعلم.',
       connected_at: null,
       phone_number: null,
+      pending_expires_at: null,
+      pending_phone_number: null,
       last_status_check: new Date().toISOString(),
     });
     return jsonOk(res, { success: true, status: 'disconnected' });
