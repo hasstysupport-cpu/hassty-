@@ -378,6 +378,25 @@ async function tryFetchPhone(name, teacherId, row) {
 }
 
 /* ============================================================
+   getConnectedTeacherInstance — لإشعارات النظام من رقم المدرس
+   ------------------------------------------------------------
+   إشعارات ولي الأمر (حضور/غياب/مدفوعات/إزالة من مجموعة ...)
+   تُرسل من رقم المدرس الشخصي متى كان مربوطًا ومتصلًا، بدل
+   إهدار الباقة المجانية لـ Green API. تُعاد null (ويكمل المرسل
+   على Green) إذا لم يكن هناك مثيل متصل.
+   ============================================================ */
+export async function getConnectedTeacherInstance(teacherId) {
+  try {
+    if (!teacherId || !evolutionConfigured()) return null;
+    const row = await getRow(String(teacherId));
+    if (!row?.instance_name || row.status !== 'connected') return null;
+    return row.instance_name;
+  } catch {
+    return null;
+  }
+}
+
+/* ============================================================
    POST /api/whatsapp/connect — QR جديد / استكمال الربط
    يعمل على نفس المثيل دائمًا (لا ينشئ واحدًا جديدًا).
    ============================================================ */

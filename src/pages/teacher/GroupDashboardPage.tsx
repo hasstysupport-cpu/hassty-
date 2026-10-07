@@ -21,6 +21,8 @@ import { Badge } from '../../components/common/Badge';
 import { Modal } from '../../components/common/Modal';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/AuthContext';
+import { resolveParentContacts } from '../../lib/parentNotify';
+import { whatsappService } from '../../lib/whatsappService';
 import { formatTimeArabic } from '../../lib/scheduleSync';
 import type { StudentGroup, GroupScheduleSlot } from '../../types';
 import { ChangeSlotModal, TransferStudentModal, AddSessionModal, AddExamModal, SlotRow } from '../../components/teacher/GroupScheduleControls';
@@ -122,7 +124,7 @@ export const GroupDashboardPage: React.FC<{ groupId: string; onNavigate?: (path:
     return sessions.filter(s => s.status !== 'scheduled' || s.starts_at < nowIso).sort((a, b) => b.starts_at.localeCompare(a.starts_at)).slice(0, 8);
   }, [sessions]);
 
-  /* إزالة طالب (تحويل الحالة إلى left + تحديث العدد) */
+  /* إزالة طالب (تحويل الحالة إلى left + تحديث العدد + إشعار ولي الأمر من رقم المدرس) */
   const doRemoveStudent = async () => {
     if (!removeStudent || !supabase) return;
     setRemoving(true);
@@ -132,7 +134,34 @@ export const GroupDashboardPage: React.FC<{ groupId: string; onNavigate?: (path:
       const { count } = await supabase.from('group_enrollments').select('*', { count: 'exact', head: true }).eq('group_id', groupId).eq('status', 'active');
       if (count !== null) await supabase.from('student_groups').update({ current_count: count, updated_at: new Date().toISOString() }).eq('id', groupId);
       toast.push('success', `تم إزالة ${removeStudent.student_name} من المجموعة.`);
+
+      /* إشعار ولي الأمر بالإزالة — واتساب (من رقم المدرس إن كان مربوطًا) + Web Push + الجرس.
+         يعمل بالتوازي ولا يعطل العملية أبدًا. */
+      const removed = removeStudent;
+      const groupNameAtRemove = group?.name || '';
       setRemoveStudent(null);
+      void (async () => {
+        try {
+          const contacts = await resolveParentContacts(removed.student_id, groupId);
+          if (!contacts.parentPhone && !contacts.parentUserId) return;
+          if (contacts.parentPhone) {
+            await whatsappService.notifyEvent('student_removed', {
+              studentName: removed.student_name || 'الطالب',
+              groupName: groupNameAtRemove,
+              teacherName: user?.name || '',
+              date: new Date().toLocaleDateString('ar-EG'),
+            }, contacts.parentUserId || undefined, contacts.parentPhone);
+          } else if (contacts.parentUserId) {
+            await whatsappService.notifyEvent('student_removed', {
+              studentName: removed.student_name || 'الطالب',
+              groupName: groupNameAtRemove,
+              teacherName: user?.name || '',
+              date: new Date().toLocaleDateString('ar-EG'),
+            }, contacts.parentUserId, undefined);
+          }
+        } catch { /* الإشعار احتياطي — لا يعطل الإزالة */ }
+      })();
+
       void load();
       window.dispatchEvent(new Event('hassty_teacher_groups_updated'));
     } catch (e: any) { toast.push('error', e?.message || 'تعذرت الإزالة.'); }
