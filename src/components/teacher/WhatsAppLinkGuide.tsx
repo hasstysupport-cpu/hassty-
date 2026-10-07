@@ -7,19 +7,19 @@ const QR_STEPS = [
   {
     title: 'افتح الأجهزة المرتبطة',
     text: 'افتح واتساب على هاتفك، واضغط على القائمة ⋮ ثم اختر «الأجهزة المرتبطة».',
-    image: 'https://i.ibb.co/pvRH8Kcf/1-menu-linked-devices.png',
+    image: '/whatsapp-link-guide/1-menu-linked-devices.webp',
     alt: 'واتساب مع قائمة الأجهزة المرتبطة',
   },
   {
     title: 'اضغط ربط جهاز',
     text: 'من شاشة الأجهزة المرتبطة اضغط على «ربط جهاز» لفتح أداة مسح رمز QR.',
-    image: 'https://i.ibb.co/dJff9zqg/2-link-a-device.png',
+    image: '/whatsapp-link-guide/2-link-a-device.webp',
     alt: 'زر ربط جهاز في واتساب',
   },
   {
     title: 'امسح رمز QR الظاهر في Hassty',
     text: 'وجّه كاميرا واتساب إلى رمز QR الموجود في نافذة الربط داخل Hassty، وانتظر حتى يتم الاتصال.',
-    image: 'https://i.ibb.co/PG0D2dKF/3-scan-qr.png',
+    image: '/whatsapp-link-guide/3-scan-qr.webp',
     alt: 'شاشة مسح رمز QR في واتساب',
   },
 ];
@@ -28,19 +28,19 @@ const CODE_STEPS = [
   {
     title: 'افتح الأجهزة المرتبطة',
     text: 'افتح واتساب على هاتفك، ثم من القائمة ⋮ اختر «الأجهزة المرتبطة» واضغط «ربط جهاز».',
-    image: 'https://i.ibb.co/pvRH8Kcf/1-menu-linked-devices.png',
+    image: '/whatsapp-link-guide/1-menu-linked-devices.webp',
     alt: 'واتساب مع قائمة الأجهزة المرتبطة',
   },
   {
     title: 'اختر الربط برقم الهاتف',
     text: 'بعد فتح شاشة مسح QR، اضغط «الربط برقم الهاتف بدلًا من ذلك».',
-    image: 'https://i.ibb.co/8nspSkb9/4-link-with-phone-number.png',
+    image: '/whatsapp-link-guide/4-link-with-phone-number.webp',
     alt: 'خيار الربط برقم الهاتف بدلًا من QR',
   },
   {
     title: 'استخدم الرمز الذي يظهر في Hassty',
     text: 'سيظهر لك رمز ربط في Hassty. استخدمه في شاشة إدخال الرمز داخل واتساب لإكمال ربط الجهاز.',
-    image: 'https://i.ibb.co/bMQBr5SG/5-enter-code.png',
+    image: '/whatsapp-link-guide/5-enter-code.webp',
     alt: 'شاشة إدخال رمز الربط في واتساب',
   },
 ];
