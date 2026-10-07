@@ -21,34 +21,39 @@ export type InteractiveButton =
   | { type: 'cta_call'; text: string; phone_number: string };
 export interface InteractiveListSection { title: string; rows: Array<{ header?: string; title: string; description?: string; id: string }>; }
 
-async function post(path: string, body?: any, method = 'POST') {
+/* آخر محاولة تجديد جلسة بعد 401 — منع «عاصفة تجديد التوكنات»:
+   توكنات Supabase أحادية الاستخدام، واستدعاء refreshSession() مع كل طلب
+   (خصوصًا مع polling كل 4 ثوانٍ) يُلغي التوكن القديم قبل أن تعرفه بقية
+   التبويبات/الطلبات، فيكشف Supabase «إعادة استخدام» ويلغي عائلة الجلسة
+   بالكامل — فيُخرَج المعلم من الموقع. التجديد الآن يحدث فقط عند 401
+   صريح، وبحد أقصى مرة واحدة كل 30 ثانية على مستوى الوحدة كلها. */
+let lastAuthRefreshAttemptAt = 0;
+const AUTH_REFRESH_COOLDOWN_MS = 30000;
+
+async function currentAccessToken(): Promise<string | null> {
+  try {
+    if (!supabase) return null;
+    /* getSession فقط — بلا refreshSession استباقي أبدًا:
+       supabase-js يجدّد الـ access token تلقائيًا في الخلفية (autoRefreshToken). */
+    const { data } = await supabase.auth.getSession();
+    return data?.session?.access_token || null;
+  } catch { return null; }
+}
+
+async function post(path: string, body?: any, method = 'POST', retried = false): Promise<any> {
   try {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     /* Best-effort auth: attach the Supabase access token when a session exists,
        so /api/whatsapp/* serverless functions can verify the caller. */
-    try {
-      if (supabase) {
-        // Refresh first so role/session changes are reflected in the access token.
-        const refreshed = await supabase.auth.refreshSession();
-        const token = refreshed.data?.session?.access_token;
-        if (token) headers.Authorization = `Bearer ${token}`;
-        else {
-          const { data } = await supabase.auth.getSession();
-          const fallbackToken = data?.session?.access_token;
-          if (fallbackToken) headers.Authorization = `Bearer ${fallbackToken}`;
-        }
-      }
-    } catch {
-      /* If refresh is temporarily unavailable, fall back to the current session. */
-      try {
-        if (supabase) {
-          const { data } = await supabase.auth.getSession();
-          const token = data?.session?.access_token;
-          if (token) headers.Authorization = `Bearer ${token}`;
-        }
-      } catch { /* anonymous calls stay allowed for the webhook side */ }
-    }
+    const token = await currentAccessToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
     const res = await fetch(path, { method, headers, body: method === 'GET' ? undefined : JSON.stringify(body || {}) });
+    /* 401 = access token منتهي فعلًا: تجديد واحد مقيّد ثم إعادة محاولة واحدة */
+    if (res.status === 401 && !retried && Date.now() - lastAuthRefreshAttemptAt > AUTH_REFRESH_COOLDOWN_MS) {
+      lastAuthRefreshAttemptAt = Date.now();
+      try { if (supabase) await supabase.auth.refreshSession(); } catch { /* نُعيد المحاولة بالتوكن المتاح */ }
+      return post(path, body, method, true);
+    }
     const json = await res.json().catch(() => ({}));
     if (!res.ok) return { success: false, error: json?.error || `WhatsApp API ${res.status}`, data: json };
     return json;
