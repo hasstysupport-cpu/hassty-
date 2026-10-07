@@ -24,8 +24,8 @@ import { internalOrUser } from '../green.js';
 import { getUserById } from '../supabase.js';
 import { dbSelect, dbUpsert, dbUpdate } from '../supabase.js';
 import {
-  evolutionConfigured, serviceUnavailableError, describeEvolutionError, evolutionHttpStatus, EvolutionError,
-  createInstance, connectInstance, connectionState, fetchInstances, sendTextMessage, logoutInstance,
+  evolutionConfigured, describeEvolutionError, evolutionHttpStatus, EvolutionError,
+  createInstance, connectInstance, connectionState, fetchInstances, sendTextMessage, logoutInstance, deleteInstance,
   parseQrImage, parsePairingCode, parseInstanceState, mapInstanceState, parsePhoneNumber,
   parseInstanceToken, findInstanceInList,
 } from '../evolution.js';
@@ -254,8 +254,16 @@ function pendingLinkActive(row) {
 }
 
 /* ============================================================
-   POST /api/whatsapp/create — ربط واتساب (إنشاء/إعادة استخدام)
-   لا ينشئ مثيلًا جديدًا أبدًا إن كان للمدرس واحد.
+   POST /api/whatsapp/create — ربط واتساب (QR أو رمز ربط برقم الهاتف)
+   سلوك Evolution v2.3.6 المُتحقق منه عمليًا على السيرفر:
+   - create على اسم موجود مسبقًا → 403 دائمًا؛ لذا لا يُستدعى
+     إلا لمثيل غائب عن السيرفر (أول ربط، أو ضاع، أو نعيد
+     تهيئته برقم ربط مختلف).
+   - connect آمن ومتكرر: يُرجع QR الجلسة الحالية كما هو، لا
+     يعيد تشغيل الجلسة، لا يبطل رمز الربط، ويعيد إحياء
+     الجلسات المقفولة (بعد مهلة QR أو بعد logout).
+   - رمز الربط يصدر فقط للمثيل المُنشأ بحقل number في الـ body؛
+     الاستعلام ?number= في connect تتجاهله هذه النسخة تمامًا.
    ============================================================ */
 
 export async function create(req, res) {
@@ -274,7 +282,9 @@ export async function create(req, res) {
   try {
     const name = buildInstanceName(teacherId);
     let row = await getRow(teacherId);
+    let instanceExists = Boolean(row);
 
+    /* 1) متصل بالفعل؟ → نعرض الحالة مباشرة بدون أي إنشاء */
     if (row) {
       try {
         const stateRaw = parseInstanceState(await connectionState(name));
@@ -284,49 +294,52 @@ export async function create(req, res) {
           await saveRow(teacherId, { pending_expires_at: null, pending_phone_number: null });
           return jsonOk(res, statusPayload({ ...updated, phone_number: phone, pending_expires_at: null, pending_phone_number: null }, { qr: null, pairingCode: null }));
         }
-
-        if (pendingLinkActive(row)) {
-          // IMPORTANT: keep the existing Evolution/Baileys session alive.
-          // Do not call /connect here: it can restart the socket and invalidate
-          // a pairing code that is already visible on the teacher's phone.
-          // An explicit "استكمال الربط" / "تحديث الرمز" action can request a
-          // fresh payload when the teacher actually needs one.
-          const values = {
-            status: row.status,
-            pending_expires_at: null,
-            pending_phone_number: row.pending_phone_number || requestedNumber || null,
-            last_status_check: new Date().toISOString(),
-          };
-          await saveRow(teacherId, values);
-          return jsonOk(res, statusPayload({ ...row, ...values, instance_name: name }, {
-            qr: null,
-            pairingCode: null,
-            qrTtlSeconds: QR_TTL_SECONDS,
-            pending: true,
-          }));
-        }
       } catch (err) {
-        if (err?.status === 404) row = null;
+        if (err?.status === 404) instanceExists = false; /* المثيل ضاع من السيرفر → نعيد إنشائه أدناه */
         else throw err;
       }
     }
 
-    let instanceToken = null;
-    const created = await createInstance(name, requestedNumber || '');
-    instanceToken = parseInstanceToken(created);
+    /* 2) طلب رمز ربط برقم هاتف: الرمز يصدر فقط للمثيل المُنشأ بنفس الرقم.
+       لو اختلف المطلوب عن المخزن (أو أُنشئ المثيل بلا رقم) نعيد إنشاءه
+       بالرقم — الجلسة غير متصلة بعد فلا نفقد شيئًا. */
+    const effectiveNumber = requestedNumber || row?.pending_phone_number || null;
+    if (requestedNumber && instanceExists && row?.pending_phone_number !== requestedNumber) {
+      try { await deleteInstance(name); } catch { /* غير موجود — ممتاز */ }
+      instanceExists = false;
+    }
 
-    // Evolution's /instance/create with qrcode=true + number already starts the
-    // WhatsApp connection and may return the QR/pairing code. Calling /connect
-    // immediately again can restart the Baileys socket and invalidate the
-    // freshly generated pairing code.
-    let conn = created;
+    /* 3) إنشاء المثيل عند الحاجة فقط (أول ربط / ضاع من السيرفر / رقم جديد) */
+    let created = null;
+    let instanceToken = null;
+    if (!instanceExists) {
+      created = await createInstance(name, effectiveNumber || '');
+      instanceToken = parseInstanceToken(created);
+    }
+
+    /* 4) بيانات الربط: من استجابة الإنشاء إن وُجدت، وإلا عبر connect */
     let qr = parseQrImage(created);
     let pairingCode = parsePairingCode(created);
     if (!qr && !pairingCode) {
-      conn = await connectInstance(name, requestedNumber || '');
+      const conn = await connectInstance(name, effectiveNumber || '');
       qr = parseQrImage(conn);
       pairingCode = parsePairingCode(conn);
     }
+
+    /* شبكة أمان: جلسة سيرفر ميتة لا تصدر بيانات → إعادة إنشاء نظيفة */
+    if (!qr && !pairingCode && instanceExists) {
+      try { await deleteInstance(name); } catch { /* تجاهل */ }
+      created = await createInstance(name, effectiveNumber || '');
+      instanceToken = parseInstanceToken(created) || instanceToken;
+      qr = parseQrImage(created);
+      pairingCode = parsePairingCode(created);
+      if (!qr && !pairingCode) {
+        const retry = await connectInstance(name, effectiveNumber || '');
+        qr = parseQrImage(retry);
+        pairingCode = parsePairingCode(retry);
+      }
+    }
+
     const status = qr ? 'qr_pending' : 'connecting';
     const values = {
       instance_name: name,
@@ -334,7 +347,7 @@ export async function create(req, res) {
       status_message: null,
       connected_at: null,
       pending_expires_at: null,
-      pending_phone_number: requestedNumber || null,
+      pending_phone_number: effectiveNumber,
       last_status_check: new Date().toISOString(),
     };
     if (instanceToken) values.instance_token = instanceToken;

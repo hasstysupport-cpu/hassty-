@@ -145,8 +145,8 @@ export const TeacherWhatsAppPage: React.FC<{ onNavigate?: (path: string) => void
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [poll]);
 
-  /* ============ QR ثابت + جلسة سيرفر مستمرة ============ */
-  const refreshQr = useCallback(async (_auto = false) => {
+  /* ============ تحديث QR — connect آمن ومتكرر في Evolution v2.3.6 ============ */
+  const refreshQr = useCallback(async (auto = false) => {
     if (refreshingQrRef.current) return;
     refreshingQrRef.current = true;
     try {
@@ -158,12 +158,14 @@ export const TeacherWhatsAppPage: React.FC<{ onNavigate?: (path: string) => void
           toast.push('success', 'تم ربط واتساب بنجاح 🎉');
           return;
         }
-        setQr(res.qr || null);
-        if (res.qr) setQrNonce((n) => n + 1);
-        setPairingCode(res.pairingCode || null);
+        /* نحافظ على الرمز الظاهر إن لم يرجع السيرفر واحدًا (الرمز مستقر
+           عبر طلبات connect المتكررة في هذه النسخة) */
+        if (res.qr) { setQr(res.qr); setQrNonce((n) => n + 1); }
+        if (res.pairingCode) setPairingCode(res.pairingCode);
+        else if (res.qr) setPairingCode(null);
         if (res.qrTtlSeconds) setQrTtl(res.qrTtlSeconds);
         setSt((p) => (p ? { ...p, ...res } : res));
-      } else if (res?.error) {
+      } else if (res?.error && !auto) {
         toast.push('error', res.error);
       }
     } catch {
@@ -172,6 +174,15 @@ export const TeacherWhatsAppPage: React.FC<{ onNavigate?: (path: string) => void
       refreshingQrRef.current = false;
     }
   }, [toast]);
+
+  /* تحديث تلقائي للـ QR كل 20 ثانية أثناء فتح المودال: يضمن أن المعروض
+     أحدث QR قابل للمسح، دون إعادة تشغيل الجلسة ودون إبطال رمز الربط
+     (تم التحقق من ذلك عمليًا على سيرفر Evolution v2.3.6). */
+  useEffect(() => {
+    if (!qrModalOpen) return;
+    const id = setInterval(() => { if (!document.hidden) void refreshQr(true); }, 20000);
+    return () => clearInterval(id);
+  }, [qrModalOpen, refreshQr]);
 
   /* ============ استكمال جلسة ربط سابقة (تبقى على السيرفر حتى يكتمل الربط) ============ */
   const pendingLinkActive = st?.status === 'connecting' || st?.status === 'qr_pending';
