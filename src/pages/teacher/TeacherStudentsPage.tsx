@@ -154,6 +154,11 @@ export const TeacherStudentsPage: React.FC<TeacherStudentsPageProps> = ({ onNavi
     setAddError('');
     if (!newStudentName) { setAddError('اكتب اسم الطالب.'); return; }
     if (!newStudentGrade) { setAddError('اختر المرحلة والصف الدراسي للطالب.'); return; }
+    /* لا قيد بلا مجموعة صريحة طالما توجد مجموعات من مرحلة الطالب */
+    if (availableGroups.some((g) => gradesMatch(newStudentGrade, g.grade)) && !newStudentGroup) {
+      setAddError('اختر مجموعة من مرحلة الطالب أولًا — القيد في مجموعة محددة يبقي متابعته وحضوره دقيقين.');
+      return;
+    }
     const chosen = availableGroups.find((g) => g.name === newStudentGroup);
     if (chosen && chosen.grade && !gradesMatch(newStudentGrade, chosen.grade)) {
       setAddError(gradeMismatchText(newStudentGrade, chosen.grade));
