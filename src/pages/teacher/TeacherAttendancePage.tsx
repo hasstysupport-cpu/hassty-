@@ -13,6 +13,7 @@ import { useAuth } from '../../lib/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { loadTeacherGroups } from '../../lib/teacherStore';
 import { StudentGroup } from '../../types';
+import { SectionExplainer } from '../../components/common/SectionExplainer';
 
 export const TeacherAttendancePage: React.FC = () => {
   const { user } = useAuth();
@@ -140,6 +141,13 @@ export const TeacherAttendancePage: React.FC = () => {
 
   return (
     <div className="space-y-5 text-right" dir="rtl">
+
+      <SectionExplainer
+              storageKey="teacher_attendance_v1"
+              title="إدارة الحضور"
+              text="سجل الحضور والغياب والتأخير لكل مجموعاتك مع الإحصائيات — ولو مسحت QR الحضور بيتسجل هنا فورًا."
+              steps={['اختر المجموعة والتاريخ لعرض سجلها.', 'ولي أمر الطالب يستلم إشعار واتساب فوري بحضور أو غياب ابنه.']}
+            />
       <section className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-7 shadow-sm">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>

@@ -16,6 +16,8 @@ import { useAuth } from '../../lib/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { Badge } from '../../components/common/Badge';
 import { StatusBadge } from '../../components/common/ui';
+import { SectionExplainer } from '../../components/common/SectionExplainer';
+import { CommissionTierRow } from '../../types';
 import {
   loadTeacherCollectionStatus, loadRecentCollections, collectStudentMonth,
   currentMonthKey, monthLabel, CollectionStatusRow,
@@ -46,6 +48,8 @@ export const TeacherPaymentsPageV2: React.FC<{ onNavigate?: (path: string) => vo
   const [invoices, setInvoices] = useState<PlatformInvoiceRow[]>([]);
   const [tier, setTier] = useState<{ active_students: number; rate_pct: number; tier_label?: string; next_tier_students?: number; students_to_next?: number } | null>(null);
   const [groupNames, setGroupNames] = useState<Record<string, string>>({});
+  /* سلّم الشرائح الكامل من لوحة الأدمن — يتحدث لحظيًا عند أي تعديل */
+  const [tierLadder, setTierLadder] = useState<CommissionTierRow[]>([]);
 
   const loadCommissions = useCallback(async () => {
     if (!supabase || !teacherId) return;
@@ -78,11 +82,11 @@ export const TeacherPaymentsPageV2: React.FC<{ onNavigate?: (path: string) => vo
     }
   }, [teacherId, monthKey]);
 
-  /* فواتير المنصة + الشريحة الفعالة (realtime) */
+  /* فواتير المنصة + الشريحة الفعالة + سلّم الشرائح (realtime) */
   const loadInvoices = useCallback(async () => {
     if (!supabase || !teacherId) return;
     try {
-      const [invRes, tierRes, groupsRes] = await Promise.all([
+      const [invRes, tierRes, groupsRes, ladderRes] = await Promise.all([
         supabase.from('platform_invoices')
           .select('id,teacher_id,group_id,billing_period,total_active_students,exempt_students,billable_students,paid_students,collection_rate_pct,gross_collected_egp,tier_rate_pct,invoice_amount_egp,status,threshold_met_at,paid_at,created_at')
           .eq('teacher_id', teacherId)
@@ -90,9 +94,11 @@ export const TeacherPaymentsPageV2: React.FC<{ onNavigate?: (path: string) => vo
           .limit(60),
         (supabase.rpc('get_effective_commission_rate', { p_teacher_id: teacherId }) as any),
         supabase.from('student_groups').select('id,name').eq('tutor_id', teacherId),
+        supabase.from('commission_tiers').select('*').order('min_students', { ascending: true }),
       ]);
       if (!invRes.error) setInvoices((invRes.data || []) as PlatformInvoiceRow[]);
       if (!tierRes.error && tierRes.data) setTier(tierRes.data as any);
+      if (!ladderRes.error) setTierLadder((ladderRes.data || []) as CommissionTierRow[]);
       const names: Record<string, string> = {};
       (groupsRes.data || []).forEach((g: any) => { names[g.id] = g.name; });
       setGroupNames(names);
@@ -116,6 +122,8 @@ export const TeacherPaymentsPageV2: React.FC<{ onNavigate?: (path: string) => vo
       .on('postgres_changes', { event: '*', schema: 'public', table: 'payment_records', filter: `tutor_id=eq.${teacherId}` }, () => { void loadCollections(); void loadInvoices(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'commission_tracking', filter: `tutor_id=eq.${teacherId}` }, () => void loadCommissions())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'platform_invoices', filter: `teacher_id=eq.${teacherId}` }, () => void loadInvoices())
+      /* لوحة الأدمن غيّرت الشرائح؟ تتحدث عندك فورًا بدون تحديث الصفحة */
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'commission_tiers' }, () => void loadInvoices())
       .subscribe();
     return () => { void supabase.removeChannel(ch); };
   }, [teacherId, loadCollections, loadCommissions, loadInvoices]);
@@ -186,6 +194,17 @@ export const TeacherPaymentsPageV2: React.FC<{ onNavigate?: (path: string) => vo
 
   return (
     <div className="space-y-6 text-right" dir="rtl">
+      {/* شرح القسم */}
+      <SectionExplainer
+        storageKey="teacher_payments_v3"
+        title="المدفوعات والأرباح"
+        text="قبض اشتراكات طلابك بضغطة أو مسح QR، وتابع فواتير المنصة وشريحة عمولتك — النسب تحدّث تلقائيًا لحظة ما الإدارة تعدلها."
+        steps={[
+          'زر «تحصيل» يسجل سداد الطالب ويرسل إشعارًا فوريًا لولي الأمر من واتسابك المرتبط.',
+          'سلّم الشرائح بالأسفل يوضح نسبك: كل ما طلابك يزيدوا، نسبة عمولتك تقل.',
+          'فاتورة كل مجموعة تنزل تلقائيًا عند سداد 75% من طلابها القابلين للتحصيل.',
+        ]}
+      />
       {/* ===== الترويسة ===== */}
       <section className="bg-white border border-slate-200 rounded-3xl p-6 flex justify-between">
         <div>
@@ -371,6 +390,47 @@ export const TeacherPaymentsPageV2: React.FC<{ onNavigate?: (path: string) => vo
             </div>
             <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
               <div className="h-full rounded-full bg-gradient-to-l from-violet-500 to-blue-500" style={{ width: `${Math.min(100, Math.round(tier.active_students / tier.next_tier_students * 100))}%` }} />
+            </div>
+          </div>
+        )}
+
+        {/* سلّم الشرائح الكامل — من لوحة الأدمن، يتحدث تلقائيًا */}
+        {tierLadder.length > 0 && (
+          <div className="rounded-2xl border border-violet-100 bg-white p-4 space-y-3">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="text-[11px] font-black text-violet-800 flex items-center gap-1.5">
+                <TrendingUp className="w-3.5 h-3.5" />
+                سلّم نسب العمولة — كل ما طلابك يزيدوا عمولتك تقل
+              </div>
+              <span className="text-[9.5px] font-bold text-slate-400 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                يتحدث تلقائيًا من الإدارة
+              </span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-right text-[11px] min-w-[420px]">
+                <thead>
+                  <tr className="text-slate-400 font-bold border-b border-slate-100">
+                    <th className="py-2 px-2">عدد الطلاب</th>
+                    <th className="py-2 px-2">نسبة العمولة</th>
+                    <th className="py-2 px-2 text-center">حالتك</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {tierLadder.map((t) => {
+                    const active = tier && Number(tier.rate_pct) === Number(t.rate_pct);
+                    return (
+                      <tr key={t.id} className={active ? 'bg-violet-50/70' : ''}>
+                        <td className="py-2 px-2 font-bold text-slate-700">{t.label || `من ${t.min_students}${t.max_students ? ` إلى ${t.max_students}` : '+'} طالب`}</td>
+                        <td className="py-2 px-2 font-black text-violet-800">{Number(t.rate_pct)}%</td>
+                        <td className="py-2 px-2 text-center">
+                          {active ? <Badge variant="success" size="sm">شريحتك الحالية ⭐</Badge> : <span className="text-slate-300">—</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
         )}

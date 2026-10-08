@@ -17,6 +17,7 @@ import { teacherWhatsApp, TeacherWhatsAppState } from '../../lib/whatsappService
 import { PageHeader, Card, Btn, ConfirmDialog, useToast, fmtDateTime } from '../../components/common/ui';
 import { Modal } from '../../components/common/Modal';
 import { WhatsAppLinkGuide } from '../../components/teacher/WhatsAppLinkGuide';
+import { SectionExplainer } from '../../components/common/SectionExplainer';
 
 /* أكواد الدول الشائعة (الافتراضي مصر +20) */
 const COUNTRY_CODES = [
@@ -376,6 +377,14 @@ export const TeacherWhatsAppPage: React.FC<{ onNavigate?: (path: string) => void
 
   return (
     <div className="space-y-5 text-right font-['IBM_Plex_Sans_Arabic',sans-serif]">
+
+      <SectionExplainer
+              storageKey="teacher_whatsapp_v1"
+              title="واتساب المدرس"
+              text="اربط رقم الواتساب الشخصي بتلات خطوات — كل إشعارات الحضور والغياب والتحصيل لأولياء الأمور تتبعت من رقمك أنت."
+              steps={['اضغط «إنشاء مثيل واتساب» ثم امسح الـ QR من واتساب موبايلك (الأجهزة المرتبطة).', 'أو استخدم «رمز ربط بالهاتف» لو الكاميرا مش متاحة.', 'مرة واحدة بس — الجلسة بتفضل شغالة لحد ما تختار الفصل بنفسك.']}
+              notes={['رقمك مش بيُشارك مع حد، والإشعارات بتخرج من رقمك الشخصي لولي الأمر مباشرة.']}
+            />
       <PageHeader
         title="واتساب المدرس"
         badge="جديد"

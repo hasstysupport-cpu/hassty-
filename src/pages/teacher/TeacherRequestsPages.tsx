@@ -15,6 +15,7 @@ import { Btn, Card, ConfirmDialog, DataTable, EmptyState, ErrorBlock, PageHeader
 import { getCleanAvatarUrl } from '../../lib/avatarHelper';
 import { notifyParentTransfer } from '../../lib/parentNotify';
 import { gradesMatch, gradeMismatchText } from '../../lib/gradeMatch';
+import { SectionExplainer } from '../../components/common/SectionExplainer';
 
 /* ================================================================
    طلبات الالتحاق (booking_requests) — قبول / رفض / إسناد لمجموعة
@@ -88,6 +89,13 @@ export const TeacherEnrollmentRequestsPage: React.FC<{ onNavigate?: (p: string) 
   const pendingCount = rows.filter((r) => r.status === 'pending').length;
 
   return <div className="space-y-5" dir="rtl">
+
+    <SectionExplainer
+            storageKey="requests_enrollment_v1"
+            title="طلبات الالتحاق"
+            text="طلبات الطلاب الراغبين في الانضمام لمجموعاتك — راجع بيانات كل طالب ومرحلته ثم اقبل أو ارفض."
+            steps={['القبول بيسجّل الطالب في المجموعة تلقائيًا ويبدأ متابعته بالـ QR.', 'الرفض بيوصل الطالب إشعارًا مهذبًا بلا أسباب.']}
+          />
     <PageHeader title="طلبات الالتحاق" description="كل طلبات الحجز والالتحاق الواردة من الطلاب وآبائهم، مع الإسناد المباشر للمجموعات." badge={`${pendingCount} قيد الانتظار`}
       actions={<Btn variant="secondary" size="sm" onClick={() => void load()}><RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />تحديث</Btn>} />
     <Tabs active={tab} onChange={setTab} tabs={[
@@ -227,6 +235,13 @@ export const TeacherTransfersPage: React.FC = () => {
   };
 
   return <div className="space-y-5" dir="rtl">
+
+    <SectionExplainer
+            storageKey="requests_transfers_v1"
+            title="طلبات التحويل"
+            text="طلبات الطلاب للتحويل بين مجموعاتك — المحصورة على المجموعات من نفس المرحلة."
+            steps={['راجع المرحلة والمجموعتين قبل الموافقة.', 'التحويل ينقل الطالب بمواعيده ومصاريفه للمجموعة الجديدة.']}
+          />
     <PageHeader title="طلبات التحويل بين المجموعات" description="طلبات انتقال الطلاب من مجموعة إلى أخرى مع فحص المقاعد المتاحة تلقائيًا."
       actions={<Btn variant="secondary" size="sm" onClick={() => void load()}><RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />تحديث</Btn>} />
     <DataTable rows={rows} loading={loading} error={error} onRetry={() => void load()} emptyText="لا توجد طلبات تحويل"
@@ -298,6 +313,13 @@ export const TeacherMakeupPage: React.FC = () => {
 
   const byTab = useMemo(() => rows.filter((r) => tab === 'all' ? true : r.status === tab), [rows, tab]);
   return <div className="space-y-5" dir="rtl">
+
+    <SectionExplainer
+            storageKey="requests_makeup_v1"
+            title="حصص التعويض"
+            text="طلبات الطلاب لحصص تعويض عن حصص غابوا عنها بعذر — حدد ميعاد التعويض المناسب."
+            steps={['الطلبات تأتي فقط من طلاب مسجلين في مجموعاتك.', 'بعد الموافقة حدد اليوم والوقت في جدولك.']}
+          />
     <PageHeader title="حصص التعويض" description="طلبات تعويض الحصص الغيابية المقدمة من أولياء الأمور والطلاب."
       actions={<Btn variant="secondary" size="sm" onClick={() => void load()}><RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />تحديث</Btn>} />
     <Tabs active={tab} onChange={setTab} tabs={[
@@ -371,6 +393,13 @@ export const TeacherDisputesPage: React.FC = () => {
 
   const byTab = useMemo(() => rows.filter((r) => tab === 'all' ? true : r.status === tab), [rows, tab]);
   return <div className="space-y-5" dir="rtl">
+
+    <SectionExplainer
+            storageKey="requests_disputes_v1"
+            title="نزاعات الحضور"
+            text="اعتراضات الطلاب على تسجيلات الحضور (حضر/غاب/متأخر) — راجع التفاصيل واحسمها بعدل."
+            steps={['افتح سجل الحضور الأصلي للتأكد قبل الحسم.', 'الحسم يرسل إشعارًا للطالب وولي الأمر بالقرار.']}
+          />
     <PageHeader title="نزاعات الحضور" description="اعتراضات أولياء الأمور والطلاب على تسجيلات الحضور، مع تصحيح الحالة تلقائيًا عند القبول." />
     <Tabs active={tab} onChange={setTab} tabs={[
       { key: 'pending', label: 'بانتظار المراجعة', count: rows.filter((r) => r.status === 'pending').length },

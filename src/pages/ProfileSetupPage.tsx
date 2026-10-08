@@ -11,12 +11,13 @@ import React, { useMemo, useState } from 'react';
 import { useSEO } from '../lib/useSEO';
 import {
   GraduationCap, Users, Briefcase, CheckCircle2, AlertCircle, Loader2, UserCheck, Phone, MapPin,
-  BookOpen, Award, Heart, ShieldCheck, Sparkles, ArrowRight,
+  BookOpen, Award, Heart, ShieldCheck, Sparkles, ArrowRight, Layers,
 } from 'lucide-react';
 import { AccountRole } from '../types';
 import { useAuth } from '../lib/AuthContext';
 import { authApi } from '../lib/authApi';
 import { LocationSelector } from '../components/common/LocationSelector';
+import { StageMultiPicker, StageGradeCascade } from '../components/common/StagePickers';
 import { SUBJECTS_DATA } from '../data/mockData';
 import { SIGNUP_CONSENT_KEY } from '../lib/legal';
 
@@ -24,13 +25,6 @@ interface ProfileSetupPageProps {
   onComplete: (role: AccountRole) => void;
   onLogout: () => void;
 }
-
-const GRADES = [
-  'الصف الأول الابتدائي', 'الصف الثاني الابتدائي', 'الصف الثالث الابتدائي',
-  'الصف الرابع الابتدائي', 'الصف الخامس الابتدائي', 'الصف السادس الابتدائي',
-  'الصف الأول الإعدادي', 'الصف الثاني الإعدادي', 'الصف الثالث الإعدادي',
-  'الصف الأول الثانوي', 'الصف الثاني الثانوي', 'الصف الثالث الثانوي',
-];
 
 const ROLE_CARDS: { role: AccountRole; icon: any; title: string; desc: string }[] = [
   { role: 'student', icon: GraduationCap, title: 'طالب', desc: 'احجز حصصك وتابع حضورك ودرجاتك' },
@@ -66,8 +60,12 @@ export const ProfileSetupPage: React.FC<ProfileSetupPageProps> = ({ onComplete, 
   const [phone, setPhone] = useState(user?.phone || '');
   const [governorate, setGovernorate] = useState(user?.governorate || 'القاهرة');
   const [city, setCity] = useState(user?.area || 'مدينة نصر');
+  /* الطالب: مرحلة ← صف */
+  const [stage, setStage] = useState('secondary');
   const [grade, setGrade] = useState('الصف الثالث الثانوي');
+  /* المعلم: مادة + مراحل */
   const [subject, setSubject] = useState('الرياضيات');
+  const [teacherStages, setTeacherStages] = useState<string[]>(['secondary']);
   const [experienceYears, setExperienceYears] = useState('3 - 5 سنوات');
   const [studentJoinCode, setStudentJoinCode] = useState('');
   const [agreeTerms, setAgreeTerms] = useState(false);
@@ -82,8 +80,14 @@ export const ProfileSetupPage: React.FC<ProfileSetupPageProps> = ({ onComplete, 
     if (!nameReady) return 'أدخل اسمك الكامل (3 أحرف على الأقل).';
     if (!/^01[0125][0-9]{8}$/.test(phone.trim())) return 'أدخل رقم هاتف مصري صحيح (مثال: 01012345678).';
     if (!governorate || !city) return 'اختر المحافظة والمدينة/المنطقة.';
-    if (role === 'student' && !grade) return 'اختر الصف الدراسي.';
-    if (role === 'teacher' && !subject) return 'اختر المادة الدراسية.';
+    if (role === 'student') {
+      if (!stage) return 'اختر المرحلة الرئيسية (ابتدائي / إعدادي / ثانوي).';
+      if (!grade) return 'اختر الصف الدراسي داخل مرحلتك.';
+    }
+    if (role === 'teacher') {
+      if (!subject) return 'اختر المادة الدراسية.';
+      if (!teacherStages.length) return 'اختر المراحل التي تدرّسها — عشان تقدر تنشئ مجموعاتك عليها.';
+    }
     if (!agreeTerms || !agreePrivacy) return 'يجب الموافقة على الشروط وسياسة الخصوصية.';
     return null;
   };
@@ -101,8 +105,10 @@ export const ProfileSetupPage: React.FC<ProfileSetupPageProps> = ({ onComplete, 
         phone: phone.trim(),
         governorate,
         city,
+        stage: role === 'student' ? stage : undefined,
         grade: role === 'student' ? grade : undefined,
         subject: role === 'teacher' ? subject : undefined,
+        stages: role === 'teacher' ? teacherStages : undefined,
         experienceYears: role === 'teacher' ? experienceYears : undefined,
         studentJoinCode: role === 'parent' && studentJoinCode.trim() ? studentJoinCode.trim() : undefined,
         consent: true,
@@ -213,27 +219,48 @@ export const ProfileSetupPage: React.FC<ProfileSetupPageProps> = ({ onComplete, 
               </div>
 
               {role === 'student' && (
-                <div className="relative">
-                  <GraduationCap className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                  <select value={grade} onChange={(e) => setGrade(e.target.value)} className="auth-input w-full p-3.5 pr-11 text-sm appearance-none cursor-pointer">
-                    {GRADES.map((g) => <option key={g} value={g}>{g}</option>)}
-                  </select>
+                <div className="space-y-3">
+                  <div className="text-[11px] font-black text-slate-600 flex items-center gap-1.5">
+                    <GraduationCap className="w-4 h-4 text-[#2563EB]" />
+                    المرحلة الرئيسية ثم الصف
+                  </div>
+                  <StageGradeCascade
+                    stage={stage}
+                    grade={grade}
+                    onStageChange={setStage}
+                    onGradeChange={setGrade}
+                    gradePlaceholder="اختر صفك داخل المرحلة..."
+                  />
                 </div>
               )}
 
               {role === 'teacher' && (
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div className="relative">
-                    <BookOpen className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                    <select value={subject} onChange={(e) => setSubject(e.target.value)} className="auth-input w-full p-3.5 pr-11 text-sm appearance-none cursor-pointer">
-                      {SUBJECTS_DATA.map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
-                    </select>
+                <div className="space-y-4">
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div className="relative">
+                      <BookOpen className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                      <select value={subject} onChange={(e) => setSubject(e.target.value)} className="auth-input w-full p-3.5 pr-11 text-sm appearance-none cursor-pointer">
+                        {SUBJECTS_DATA.map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="relative">
+                      <Award className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                      <select value={experienceYears} onChange={(e) => setExperienceYears(e.target.value)} className="auth-input w-full p-3.5 pr-11 text-sm appearance-none cursor-pointer">
+                        {['أقل من سنة', 'سنة - 3 سنوات', '3 - 5 سنوات', '5 - 10 سنوات', 'أكثر من 10 سنوات'].map((x) => <option key={x} value={x}>{x}</option>)}
+                      </select>
+                    </div>
                   </div>
-                  <div className="relative">
-                    <Award className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                    <select value={experienceYears} onChange={(e) => setExperienceYears(e.target.value)} className="auth-input w-full p-3.5 pr-11 text-sm appearance-none cursor-pointer">
-                      {['أقل من سنة', 'سنة - 3 سنوات', '3 - 5 سنوات', '5 - 10 سنوات', 'أكثر من 10 سنوات'].map((x) => <option key={x} value={x}>{x}</option>)}
-                    </select>
+                  <div className="rounded-2xl border border-slate-200 bg-[#F8FAFF] p-4 space-y-3">
+                    <div className="text-[11px] font-black text-slate-600 flex items-center gap-1.5">
+                      <Layers className="w-4 h-4 text-[#2563EB]" />
+                      المراحل التي تدرّسها <span className="text-[#EF4444]">*</span>
+                    </div>
+                    <StageMultiPicker
+                      value={teacherStages}
+                      onChange={setTeacherStages}
+                      compact
+                      hint="المجموعات اللي هتنشئها لازم تكون من مراحلك دي — والطلاب من نفس المرحلة هم اللي بيوصلولك."
+                    />
                   </div>
                 </div>
               )}

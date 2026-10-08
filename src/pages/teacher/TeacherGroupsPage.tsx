@@ -54,8 +54,15 @@ import { whatsappService } from '../../lib/whatsappService';
 import { GroupEditModal, GROUP_COLORS } from '../../components/teacher/GroupEditModal';
 import { StudentOptionsModal, StudentOptionsData } from '../../components/teacher/StudentOptionsModal';
 import { exportToExcel, exportToPdf } from '../../utils/exportData';
+import { SectionExplainer } from '../../components/common/SectionExplainer';
 
 const ALL_EGYPT_GRADES = [
+  'الصف الأول الابتدائي',
+  'الصف الثاني الابتدائي',
+  'الصف الثالث الابتدائي',
+  'الصف الرابع الابتدائي',
+  'الصف الخامس الابتدائي',
+  'الصف السادس الابتدائي',
   'الصف الأول الإعدادي',
   'الصف الثاني الإعدادي',
   'الصف الثالث الإعدادي',
@@ -358,6 +365,20 @@ export const TeacherGroupsPage: React.FC<{ onNavigate?: (path: string) => void }
 
   return (
     <div className="space-y-6 text-right">
+      <SectionExplainer
+        storageKey="teacher_groups_v1"
+        title="المجموعات"
+        text="إنشاء وإدارة مجموعاتك: مرحلة كل مجموعة ومواعيدها وأسعارها وطلابها — ومن هنا تدخل لوحة أي مجموعة."
+        steps={[
+          'اضغط «مجموعة جديدة» واختر المرحلة ثم الصف والمواعيد — المرحلة محكومة بالمراحل التي سجلتها في بروفايلك.',
+          'اضغط على أي مجموعة لفتح لوحتها: طلابها وحضورها وخيارات كل طالب.',
+          'زر «تعديل» يفتح الإعدادات الكاملة: اللون، الوصف، السعر، السعة، ومسموح تجاوز التعارض.',
+        ]}
+        notes={[
+          'مجموعات نفس المرحلة بتشتغل كمجموعات شقيقة — الطالب المرن يحضر أي ميعاد منها.',
+          'الطلاب بيتقيدوا فقط في مجموعة من مرحلتهم — عشان القوائم تفضل مرتبة.',
+        ]}
+      />
       {/* Header Card */}
       <div className="bg-white border border-gray-200 rounded-3xl p-6 sm:p-8 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

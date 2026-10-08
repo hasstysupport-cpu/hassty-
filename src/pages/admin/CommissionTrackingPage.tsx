@@ -59,19 +59,34 @@ export const CommissionTrackingPage: React.FC<CommissionTrackingPageProps> = ({
   const [deletingTier, setDeletingTier] = useState<number | null>(null);
   const [invoicesLoading, setInvoicesLoading] = useState(true);
   const [markingPaid, setMarkingPaid] = useState<string | null>(null);
+  /* إحصاءات حية لكل شريحة: كم مدرسًا وكم طالبًا عليها الآن */
+  const [tierUsage, setTierUsage] = useState<Record<number, { teachers: number; students: number }>>({});
 
   const loadRealData = useCallback(async () => {
     if (!supabase) return;
     setInvoicesLoading(true);
     try {
-      const [tiersRes, invoicesRes] = await Promise.all([
+      const [tiersRes, invoicesRes, usageRes] = await Promise.all([
         supabase.from('commission_tiers').select('*').order('min_students', { ascending: true }),
         supabase.from('platform_invoices')
           .select('id,teacher_id,group_id,billing_period,total_active_students,exempt_students,billable_students,paid_students,collection_rate_pct,gross_collected_egp,tier_rate_pct,invoice_amount_egp,status,threshold_met_at,paid_at,created_at')
           .order('billing_period', { ascending: false }).limit(40),
+        (supabase.rpc('get_commission_tier_usage') as any),
       ]);
       if (!tiersRes.error) setTiers((tiersRes.data || []) as CommissionTierRow[]);
       if (!invoicesRes.error) setInvoices((invoicesRes.data || []) as PlatformInvoiceRow[]);
+      /* خريطة الإحصاءات الحية لكل شريحة */
+      if (!usageRes.error && Array.isArray(usageRes.data)) {
+        const usage: Record<number, { teachers: number; students: number }> = {};
+        (usageRes.data as any[]).forEach((row) => {
+          const prev = usage[row.tier_id] || { teachers: 0, students: 0 };
+          usage[row.tier_id] = {
+            teachers: Math.max(prev.teachers, Number(row.teachers_count || 0)),
+            students: Math.max(prev.students, Number(row.students_count || 0)),
+          };
+        });
+        setTierUsage(usage);
+      }
 
       /* أسماء المدرسين والمجموعات للعرض */
       const tIds = Array.from(new Set((invoicesRes.data || []).map((i: any) => i.teacher_id)));
@@ -94,6 +109,17 @@ export const CommissionTrackingPage: React.FC<CommissionTrackingPageProps> = ({
   }, []);
 
   useEffect(() => { void loadRealData(); }, [loadRealData]);
+
+  /* تحديث فوري لأي تغيير في الشرائح أو الفواتير — ينعكس عند المدرسين في نفس اللحظة */
+  useEffect(() => {
+    if (!supabase) return;
+    const ch = supabase
+      .channel(`admin-commission-tiers-${Date.now().toString(36)}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'commission_tiers' }, () => { void loadRealData(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'platform_invoices' }, () => { void loadRealData(); })
+      .subscribe();
+    return () => { void supabase.removeChannel(ch); };
+  }, [loadRealData]);
 
   /* ===== إدارة الشرائح: النسب تُحدد من الأدمن تمامًا (إضافة/تعديل/حذف) ===== */
 
@@ -317,6 +343,11 @@ export const CommissionTrackingPage: React.FC<CommissionTrackingPageProps> = ({
             <div key={t.id} className={`bg-white/80 p-2.5 rounded-xl border ${editingTier === t.id ? 'border-blue-400 sm:col-span-3' : 'border-blue-100'} flex items-center justify-between gap-2`}>
               <div className="min-w-0 flex-1">
                 <div className="font-bold">{t.label || `من ${t.min_students}${t.max_students ? ` إلى ${t.max_students}` : '+'} طالب`}</div>
+                {/* إحصاءات حية: عدد المدرسين والطلاب على هذه النسبة الآن */}
+                <div className="mt-0.5 flex items-center gap-1.5 text-[10px] font-bold">
+                  <span className="bg-blue-600/10 text-blue-700 rounded-full px-2 py-0.5">{tierUsage[t.id]?.teachers ?? 0} مدرس</span>
+                  <span className="bg-violet-600/10 text-violet-700 rounded-full px-2 py-0.5">{tierUsage[t.id]?.students ?? 0} طالب</span>
+                </div>
                 {editingTier === t.id ? (
                   <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                     <span className="text-[10px] font-bold text-blue-500">من</span>
@@ -387,7 +418,7 @@ export const CommissionTrackingPage: React.FC<CommissionTrackingPageProps> = ({
             </div>
           )}
         </div>
-        <p className="text-[10px] text-blue-600 font-bold">الأدمن يتحكم في الشرائح بالكامل: عدّل الحدود والنسب، أضف شرائح جديدة أو احذفها — التعديلات تُطبق فورًا على كل حسابات المدرسين الجديدة.</p>
+        <p className="text-[10px] text-blue-600 font-bold">الأدمن يتحكم في الشرائح بالكامل: عدّل الحدود والنسب، أضف شرائح جديدة أو احذفها — التعديلات تُطبق فورًا وتظهر عند كل مدرس لحظيًا دون تحديث الصفحة.</p>
       </div>
 
       {/* 3.5 فواتير المنصة — لكل مجموعة (قاعدة 75%) */}

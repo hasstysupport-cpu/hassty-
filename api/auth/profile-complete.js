@@ -19,7 +19,9 @@ import {
   readJsonBody, jsonOk, jsonErr, ARABIC_ERRORS, PHONE_REGEX, ALLOWED_ROLES,
 } from '../_lib/config.js';
 import { getCallerUser, updateUserById, findProfileByEmail } from '../_lib/supabase.js';
-import { ensureProfile, createTutorProfile, createParentLinkRequest, isPhoneTaken } from '../_lib/profile.js';
+import { ensureProfile, createTutorProfile, createParentLinkRequest, isPhoneTaken, sanitizeStagesList } from '../_lib/profile.js';
+
+const ALLOWED_STAGES = ['ابتدائي', 'إعدادي', 'ثانوي'];
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return jsonErr(res, ARABIC_ERRORS.method, 405);
@@ -54,7 +56,10 @@ export default async function handler(req, res) {
     if (!PHONE_REGEX.test(phone)) return jsonErr(res, ARABIC_ERRORS.phone, 422);
     if (!governorate || !city) return jsonErr(res, 'يرجى اختيار المحافظة والمدينة/المنطقة.', 422);
     if (role === 'student' && !String(body.grade || '').trim()) return jsonErr(res, 'يرجى اختيار الصف الدراسي.', 422);
-    if (role === 'teacher' && !String(body.subject || '').trim()) return jsonErr(res, 'يرجى تحديد المادة الدراسية.', 422);
+    if (role === 'teacher') {
+      if (!String(body.subject || '').trim()) return jsonErr(res, 'يرجى تحديد المادة الدراسية.', 422);
+      if (!sanitizeStagesList(body.stages).length) return jsonErr(res, 'يرجى اختيار المراحل الدراسية التي تدرّسها (ابتدائي / إعدادي / ثانوي).', 422);
+    }
     if (body.consent !== true) return jsonErr(res, ARABIC_ERRORS.consent, 422);
 
     /* ---------- phone uniqueness ---------- */
@@ -67,8 +72,10 @@ export default async function handler(req, res) {
       phone,
       governorate,
       city,
+      stage: ALLOWED_STAGES.includes(String(body.stage || '').trim()) ? String(body.stage).trim() : null,
       grade: String(body.grade || '').trim() || null,
       subject: String(body.subject || '').trim() || null,
+      stages: role === 'teacher' ? sanitizeStagesList(body.stages) : [],
       experienceYears: String(body.experienceYears || '').trim() || null,
       parentPhone: String(body.parentPhone || '').trim() || null,
       studentJoinCode: String(body.studentJoinCode || '').trim() || null,
@@ -86,8 +93,10 @@ export default async function handler(req, res) {
         role,
         governorate,
         city,
+        stage: data.stage,
         grade: data.grade,
         subject: data.subject,
+        stages: data.stages,
       },
       app_metadata: { ...user.app_metadata, email_verified: true, role, signup_source: 'google' },
     });

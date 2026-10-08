@@ -12,6 +12,7 @@ import { BookOpen, CheckCircle2, ClipboardCheck, Clock3, GraduationCap, RefreshC
 import { useAuth } from '../../lib/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { Btn, Card, DataTable, EmptyState, ErrorBlock, PageHeader, StatCard, StatusBadge, Tabs, fmtDateTime, useToast } from '../../components/common/ui';
+import { SectionExplainer } from '../../components/common/SectionExplainer';
 
 /* ================================================================
    تسليمات الطلاب للواجبات — /teacher/assignment-submissions
@@ -67,6 +68,13 @@ export const TeacherSubmissionsPage: React.FC<{ onNavigate?: (p: string) => void
   const byTab = useMemo(() => tab === 'all' ? rows : tab === 'pending' ? pending : rows.filter((r) => r.status === tab), [rows, tab, pending]);
 
   return <div className="space-y-5" dir="rtl">
+
+    <SectionExplainer
+            storageKey="submissions_v1"
+            title="تسليمات الطلاب"
+            text="كل واجبات طلابك المسلَّمة — راجع الحلول وسجل درجة كل طالب."
+            steps={['الحل المتأخر يظهر بوسم مميز.', 'الدرجة تظهر للطالب في حسابه فورًا بعد التصحيح.']}
+          />
     <PageHeader title="تسليمات الطلاب" description="مراجعة تسليمات الواجبات وتصحيحها وتسجيل الدرجات تلقائيًا في سجل الدرجات."
       actions={<Btn variant="secondary" size="sm" onClick={() => void load()}><RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />تحديث</Btn>} />
 
@@ -165,6 +173,13 @@ export const TeacherGradebookPage: React.FC<{ onNavigate?: (p: string) => void }
   }, [rows]);
 
   return <div className="space-y-5" dir="rtl">
+
+    <SectionExplainer
+            storageKey="gradebook_v1"
+            title="سجل الدرجات"
+            text="كل درجات طلابك في الامتحانات والواجبات على مستوى المجموعة — متوسطات وأعلى وأدنى."
+            steps={['فلتر بالمجموعة أو الطالب لمتابعة تقدمه.', 'الدرجات تصل لولي الأمر فور تسجيلها.']}
+          />
     <PageHeader title="سجل الدرجات" description="ملخص درجات كل طالب في المجموعة — واجبات وامتحانات — مع المتوسط وأعلى درجة." />
     <div className="flex gap-2 overflow-x-auto pb-1">
       {groups.map((g) => <button key={g.id} onClick={() => setGroupId(g.id)} className={`px-4 py-2 rounded-xl text-xs font-black whitespace-nowrap border cursor-pointer ${groupId === g.id ? 'bg-[#2563EB] text-white border-[#2563EB]' : 'bg-white text-slate-600 border-slate-200'}`}>{g.name}</button>)}

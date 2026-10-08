@@ -11,6 +11,7 @@ import React, { useEffect, useState } from 'react';
 import { BookOpen, CalendarClock, CheckCircle2, Plus, Send } from 'lucide-react';
 import { useAuth } from '../../lib/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { SectionExplainer } from '../../components/common/SectionExplainer';
 
 export const TeacherAssignmentsPage: React.FC = () => {
   const { user } = useAuth();
@@ -52,6 +53,13 @@ export const TeacherAssignmentsPage: React.FC = () => {
   };
 
   return <div className="space-y-5 text-right font-['IBM_Plex_Sans_Arabic',sans-serif]" dir="rtl">
+
+    <SectionExplainer
+            storageKey="teacher_assignments_v1"
+            title="الواجبات"
+            text="إنشاء واجبات لمجموعاتك مع موعد تسليم — الطلاب يشوفونها في حساباتهم ويسلمون حلولهم من صفحة تسليمات الطلاب."
+            steps={['اختر المجموعة، اكتب الواجب، وحدد آخر موعد للتسليم.', 'تابع من يقّدم ومن تأخر من تبويب «تسليمات الطلاب».']}
+          />
     <div><h1 className="text-2xl font-black text-[#1E3A8A]">إدارة الواجبات 📚</h1><p className="text-sm text-gray-500 mt-1">أنشئ الواجبات وحدد موعد التسليم والدرجة، ثم تابع التسليمات والتصحيح.</p></div>
     <div className="bg-white border border-gray-200 rounded-3xl p-5 shadow-xs">
       <div className="flex items-center gap-2 mb-4"><div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center"><Plus className="w-5 h-5"/></div><div><h2 className="font-black">واجب جديد</h2><p className="text-xs text-gray-500">المرفقات يمكن ربطها لاحقًا من مساحة ملفات المنصة.</p></div></div>

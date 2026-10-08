@@ -11,7 +11,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import { useSEO } from '../lib/useSEO';
 import {
   GraduationCap, Users, Briefcase, CheckCircle2, AlertCircle, Loader2, Mail, Lock, Eye, EyeOff,
-  RefreshCw, ArrowRight, Phone, MapPin, BookOpen, Sparkles, ShieldCheck, UserCheck, Award, KeyRound, Heart, ChevronDown,
+  RefreshCw, ArrowRight, Phone, MapPin, BookOpen, Sparkles, ShieldCheck, UserCheck, Award, KeyRound, Heart, ChevronDown, Layers,
 } from 'lucide-react';
 import { AccountRole } from '../types';
 import { useAuth } from '../lib/AuthContext';
@@ -19,6 +19,7 @@ import { authApi, passwordStrength } from '../lib/authApi';
 import { AuthShell } from '../components/common/AuthShell';
 import { OtpCodeInput } from '../components/common/OtpCodeInput';
 import { LocationSelector } from '../components/common/LocationSelector';
+import { StageMultiPicker, StageGradeCascade } from '../components/common/StagePickers';
 import { SUBJECTS_DATA } from '../data/mockData';
 import { SIGNUP_CONSENT_KEY } from '../lib/legal';
 
@@ -27,14 +28,14 @@ interface SignupPageProps {
   onSignupSuccess: (role: AccountRole, email: string) => void;
 }
 
-const GRADES = [
-  'الصف الأول الابتدائي', 'الصف الثاني الابتدائي', 'الصف الثالث الابتدائي',
-  'الصف الرابع الابتدائي', 'الصف الخامس الابتدائي', 'الصف السادس الابتدائي',
-  'الصف الأول الإعدادي', 'الصف الثاني الإعدادي', 'الصف الثالث الإعدادي',
-  'الصف الأول الثانوي', 'الصف الثاني الثانوي', 'الصف الثالث الثانوي',
-];
-
 const EXPERIENCE_OPTIONS = ['أقل من سنة', 'سنة - 3 سنوات', '3 - 5 سنوات', '5 - 10 سنوات', 'أكثر من 10 سنوات'];
+
+/* المراحل الرئيسية الثلاث — الطالب يختار مرحلته ثم صفه داخلها */
+const STAGE_CARDS = [
+  { key: 'primary', label: 'ابتدائي', emoji: '🎒', desc: 'من الأول حتى السادس الابتدائي' },
+  { key: 'prep', label: 'إعدادي', emoji: '📘', desc: 'الأول / الثاني / الثالث الإعدادي' },
+  { key: 'secondary', label: 'ثانوي', emoji: '🎓', desc: 'الأول / الثاني / الثالث الثانوي' },
+];
 
 const ROLE_CARDS: { role: 'student' | 'parent' | 'teacher'; icon: any; title: string; desc: string; tag: string }[] = [
   { role: 'student', icon: GraduationCap, title: 'طالب', desc: 'احجز حصصك، وتابع حضورك بالـ QR ودرجاتك لحظيًا', tag: 'الأكثر استخدامًا' },
@@ -80,8 +81,12 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onNavigate, onSignupSucc
   const [phone, setPhone] = useState('');
   const [governorate, setGovernorate] = useState('القاهرة');
   const [city, setCity] = useState('مدينة نصر');
+  /* الطالب: مرحلة رئيسية ← صف */
+  const [stage, setStage] = useState('secondary');
   const [grade, setGrade] = useState('الصف الثالث الثانوي');
+  /* المعلم: مادة + كل المراحل التي يدرّسها */
   const [subject, setSubject] = useState('الرياضيات');
+  const [teacherStages, setTeacherStages] = useState<string[]>(['secondary']);
   const [experienceYears, setExperienceYears] = useState('3 - 5 سنوات');
   const [studentJoinCode, setStudentJoinCode] = useState('');
 
@@ -120,9 +125,15 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onNavigate, onSignupSucc
     if (fullName.trim().length < 3) return 'أدخل اسمك الكامل (3 أحرف على الأقل).';
     if (!/^01[0125][0-9]{8}$/.test(phone.trim())) return 'أدخل رقم هاتف مصري صحيح (مثال: 01012345678).';
     if (!governorate || !city) return 'اختر المحافظة والمدينة/المنطقة.';
-    if (role === 'student' && !grade) return 'اختر الصف الدراسي.';
+    if (role === 'student') {
+      if (!stage) return 'اختر المرحلة الرئيسية (ابتدائي / إعدادي / ثانوي).';
+      if (!grade) return 'اختر الصف الدراسي داخل مرحلتك.';
+    }
     if (role === 'student' && parentPhone.trim() && !/^01[0125][0-9]{8}$/.test(parentPhone.trim())) return 'رقم ولي الأمر غير صحيح (مثال: 01012345678) — أو اتركه فارغًا.';
-    if (role === 'teacher' && !subject) return 'اختر المادة الدراسية.';
+    if (role === 'teacher') {
+      if (!subject) return 'اختر المادة الدراسية.';
+      if (!teacherStages.length) return 'اختر المرحلة (أو المراحل) التي تدرّسها — عشان تقدر تنشئ مجموعات عليها.';
+    }
     return null;
   };
 
@@ -149,9 +160,11 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onNavigate, onSignupSucc
         phone: phone.trim(),
         governorate,
         city,
+        stage: role === 'student' ? stage : undefined,
         grade: role === 'student' ? grade : undefined,
         parentPhone: role === 'student' && parentPhone.trim() ? parentPhone.trim() : undefined,
         subject: role === 'teacher' ? subject : undefined,
+        stages: role === 'teacher' ? teacherStages : undefined,
         experienceYears: role === 'teacher' ? experienceYears : undefined,
         studentJoinCode: role === 'parent' && studentJoinCode.trim() ? studentJoinCode.trim() : undefined,
       });
@@ -387,13 +400,38 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onNavigate, onSignupSucc
 
             {role === 'student' && (
               <div className="space-y-3">
-                <div className="relative">
-                  <GraduationCap className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
-                  <ChevronDown className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400 pointer-events-none" />
-                  <select value={grade} onChange={(e) => setGrade(e.target.value)} className="auth-input w-full p-3.5 pr-11 pl-11 text-sm appearance-none cursor-pointer">
-                    {GRADES.map((g) => <option key={g} value={g}>{g}</option>)}
-                  </select>
+                {/* المرحلة الرئيسية — 3 كروت */}
+                <div>
+                  <div className="text-xs font-black text-slate-600 flex items-center gap-1.5 mb-2">
+                    <GraduationCap className="w-4 h-4 text-[#2563EB]" />
+                    المرحلة الرئيسية — مرحلتك من الأول ابتدائي لحد التالت ثانوي
+                  </div>
+                  <div className="grid grid-cols-3 gap-2.5">
+                    {STAGE_CARDS.map((s) => (
+                      <button
+                        key={s.key}
+                        type="button"
+                        onClick={() => { setStage(s.label); setGrade(''); }}
+                        className={`relative rounded-2xl border-2 p-3.5 text-center transition-all cursor-pointer select-none ${stage === s.label ? 'border-[#2563EB] bg-blue-50 shadow-sm' : 'border-slate-200 bg-white hover:border-blue-200'}`}
+                      >
+                        {stage === s.label && (
+                          <span className="absolute top-1.5 left-1.5 text-[#2563EB]"><CheckCircle2 className="w-4 h-4" /></span>
+                        )}
+                        <div className="text-lg">{s.emoji}</div>
+                        <div className="text-xs font-black text-slate-800 mt-1">{s.label}</div>
+                        <div className="text-[9.5px] font-bold text-slate-400 mt-0.5 leading-3">{s.desc}</div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
+                {/* الصف داخل المرحلة */}
+                <StageGradeCascade
+                  stage={stage}
+                  grade={grade}
+                  onStageChange={setStage}
+                  onGradeChange={setGrade}
+                  gradePlaceholder="اختر صفك داخل المرحلة..."
+                />
                 <div className="relative">
                   <Phone className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
                   <input
@@ -411,20 +449,34 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onNavigate, onSignupSucc
             )}
 
             {role === 'teacher' && (
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="relative">
-                  <BookOpen className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
-                  <ChevronDown className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400 pointer-events-none" />
-                  <select value={subject} onChange={(e) => setSubject(e.target.value)} className="auth-input w-full p-3.5 pr-11 pl-11 text-sm appearance-none cursor-pointer">
-                    {SUBJECTS_DATA.map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
-                  </select>
+              <div className="space-y-4">
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="relative">
+                    <BookOpen className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                    <ChevronDown className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400 pointer-events-none" />
+                    <select value={subject} onChange={(e) => setSubject(e.target.value)} className="auth-input w-full p-3.5 pr-11 pl-11 text-sm appearance-none cursor-pointer">
+                      {SUBJECTS_DATA.map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="relative">
+                    <Award className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                    <ChevronDown className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400 pointer-events-none" />
+                    <select value={experienceYears} onChange={(e) => setExperienceYears(e.target.value)} className="auth-input w-full p-3.5 pr-11 pl-11 text-sm appearance-none cursor-pointer">
+                      {EXPERIENCE_OPTIONS.map((x) => <option key={x} value={x}>{x}</option>)}
+                    </select>
+                  </div>
                 </div>
-                <div className="relative">
-                  <Award className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
-                  <ChevronDown className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400 pointer-events-none" />
-                  <select value={experienceYears} onChange={(e) => setExperienceYears(e.target.value)} className="auth-input w-full p-3.5 pr-11 pl-11 text-sm appearance-none cursor-pointer">
-                    {EXPERIENCE_OPTIONS.map((x) => <option key={x} value={x}>{x}</option>)}
-                  </select>
+                {/* المراحل التي يدرّسها — متعدد */}
+                <div className="rounded-2xl border border-slate-200 bg-[#F8FAFF] p-4 space-y-3">
+                  <div className="text-xs font-black text-slate-600 flex items-center gap-1.5">
+                    <Layers className="w-4 h-4 text-[#2563EB]" />
+                    المراحل التي تدرّسها <span className="text-[#EF4444]">*</span>
+                  </div>
+                  <StageMultiPicker
+                    value={teacherStages}
+                    onChange={setTeacherStages}
+                    hint="اختر كل المراحل اللي بتدرّسها — المجموعات اللي هتنشئها لازم تكون من مراحلك دي، والطالب المناسب لكل مرحلة هو اللي بيوصلك."
+                  />
                 </div>
               </div>
             )}

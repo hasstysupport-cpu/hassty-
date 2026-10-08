@@ -12,6 +12,7 @@ import { CalendarPlus, Clock3, MapPin, Pencil, Plus, RefreshCw, Trash2, Users } 
 import { useAuth } from '../../lib/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { Btn, Card, ConfirmDialog, DataTable, LoadingBlock, PageHeader, StatCard, StatusBadge, fmtDate, fmtDateTime, fmtTime, useToast } from '../../components/common/ui';
+import { SectionExplainer } from '../../components/common/SectionExplainer';
 
 interface SessionForm { id?: string; title: string; group_id: string; session_date: string; starts_at: string; ends_at: string; location: string; status: string; }
 
@@ -98,6 +99,13 @@ export const TeacherSessionsPage: React.FC = () => {
   const openEdit = (row: any) => setForm({ id: row.id, title: row.title || '', group_id: row.group_id || '', session_date: (row.session_date || '').slice(0, 10), starts_at: row.starts_at ? new Date(row.starts_at).toTimeString().slice(0, 5) : '', ends_at: row.ends_at ? new Date(row.ends_at).toTimeString().slice(0, 5) : '', location: row.location || '', status: row.status || 'scheduled' });
 
   return <div className="space-y-5" dir="rtl">
+
+    <SectionExplainer
+            storageKey="teacher_sessions_v1"
+            title="الحصص والدروس"
+            text="جدول حصصك القادمة والمنتهية لكل مجموعاتك مع ملاحظات كل حصة."
+            steps={['الحصص تتولد تلقائيًا من مواعيد مجموعاتك.', 'سجل ملاحظات الحصة لتتذكر ماتم شرحه.']}
+          />
     <PageHeader title="الحصص والدروس" description="جدولة الحصص وربطها بالمجموعات، مع مزامنة تلقائية لتقويم الطلاب وولاة الأمور."
       actions={<>
         <Btn variant="secondary" size="sm" onClick={() => void load()}><RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />تحديث</Btn>

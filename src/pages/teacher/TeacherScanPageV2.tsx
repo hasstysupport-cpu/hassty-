@@ -18,6 +18,7 @@ import { gradesMatch, gradeMismatchText } from '../../lib/gradeMatch';
 import { collectStudentMonth, currentMonthKey, monthLabel } from '../../lib/studentPaymentService';
 import { bestParentPhoneForEnrollment } from '../../lib/parentNotify';
 import { StudentGroup } from '../../types';
+import { SectionExplainer } from '../../components/common/SectionExplainer';
 
 const dayNames: Record<number, string> = { 0: 'Sunday', 1: 'Monday', 2: 'Tuesday', 3: 'Wednesday', 4: 'Thursday', 5: 'Friday', 6: 'Saturday' };
 const arDays: Record<string, string> = { Saturday: 'السبت', Sunday: 'الأحد', Monday: 'الإثنين', Tuesday: 'الثلاثاء', Wednesday: 'الأربعاء', Thursday: 'الخميس', Friday: 'الجمعة' };
@@ -190,6 +191,14 @@ export const TeacherScanPage: React.FC = () => {
   const BannerIcon=banner.icon;
 
   return <div className="space-y-5 text-right max-w-5xl mx-auto">
+
+    <SectionExplainer
+            storageKey="teacher_scan_v1"
+            title="ماسح QR"
+            text="قيد الحضور وتحصيل الاشتراكات بمسح كارت الطالب — نقرة واحدة تسجل كل شيء وتبعت إشعارًا فوريًا لولي الأمر."
+            steps={['اختر وضع الماسح: تسجيل حضور، تحصيل مالي، أو قيد طالب جديد.', 'وجّه الكاميرا على كارت الطالب — النظام يتعرف عليه ويظهر بياناته قبل التأكيد.']}
+            notes={['لو الكاميرا مش شغالة في المتصفح، اكتب كود الطالب يدويًا في خانة الإدخال.']}
+          />
     <section className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-7 shadow-sm">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4"><div><div className="inline-flex items-center gap-2 text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-full"><QrCode className="w-4 h-4"/>مسح حضور QR حقيقي</div><h2 className="text-xl sm:text-2xl font-black text-slate-900 mt-2">تسجيل حضور الطلاب بالوقت الفعلي</h2><p className="text-xs text-slate-500 mt-1">الحالة تُحسب تلقائيًا من موعد المجموعة ووقت المسح — مع ربط السجل بالحصة الفعلية إن وُجدت.</p></div><div className="flex items-center gap-2 text-xs font-bold text-slate-600 bg-slate-50 px-3 py-2 rounded-2xl border border-slate-200"><Clock3 className="w-4 h-4 text-blue-600"/>{now.toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}</div></div>
       <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-3"><select value={selectedGroupId} onChange={e=>setSelectedGroupId(e.target.value)} className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold"><option value="">اختر المجموعة</option>{groups.map(g=><option key={g.id} value={g.id}>{g.name} — {g.grade||'عام'} — {g.schedule}</option>)}</select><div className="flex gap-2"><button type="button" onClick={()=>{setMode('attendance');setMessage(null)}} className={`flex-1 rounded-2xl border-2 px-3 py-3 text-sm font-black ${mode==='attendance'?'border-emerald-500 bg-emerald-50 text-emerald-800':'border-slate-200 bg-slate-50 text-slate-600'}`}><CheckCircle2 className="w-4 h-4 inline ml-1"/>حضور</button><button type="button" onClick={()=>{setMode('enroll');setMessage(null)}} className={`flex-1 rounded-2xl border-2 px-3 py-3 text-sm font-black ${mode==='enroll'?'border-blue-500 bg-blue-50 text-blue-800':'border-slate-200 bg-slate-50 text-slate-600'}`}><UserPlus className="w-4 h-4 inline ml-1"/>قيد طالب</button><button type="button" onClick={()=>{setMode('payment');setMessage(null)}} className={`flex-1 rounded-2xl border-2 px-3 py-3 text-sm font-black ${mode==='payment'?'border-amber-500 bg-amber-50 text-amber-800':'border-slate-200 bg-slate-50 text-slate-600'}`}><Banknote className="w-4 h-4 inline ml-1"/>تحصيل شهر</button></div></div>

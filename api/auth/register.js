@@ -21,8 +21,10 @@ import {
 } from '../_lib/supabase.js';
 import { issueCode } from '../_lib/codes.js';
 import { sendAuthEmail } from '../_lib/mailer.js';
-import { isPhoneTaken, resetProfileForRole } from '../_lib/profile.js';
+import { isPhoneTaken, resetProfileForRole, sanitizeStagesList } from '../_lib/profile.js';
 import { sendText } from '../_lib/green.js';
+
+const ALLOWED_STAGES = ['ابتدائي', 'إعدادي', 'ثانوي'];
 
 const isGoogleAccount = (user) =>
   user?.app_metadata?.provider === 'google' ||
@@ -49,14 +51,19 @@ export default async function handler(req, res) {
     if (!PHONE_REGEX.test(phone)) return jsonErr(res, ARABIC_ERRORS.phone, 422);
     if (!governorate || !city) return jsonErr(res, 'يرجى اختيار المحافظة والمدينة/المنطقة.', 422);
     if (role === 'student' && !String(body.grade || '').trim()) return jsonErr(res, 'يرجى اختيار الصف الدراسي.', 422);
-    if (role === 'teacher' && !String(body.subject || '').trim()) return jsonErr(res, 'يرجى تحديد المادة الدراسية.', 422);
+    if (role === 'teacher') {
+      if (!String(body.subject || '').trim()) return jsonErr(res, 'يرجى تحديد المادة الدراسية.', 422);
+      if (!sanitizeStagesList(body.stages).length) return jsonErr(res, 'يرجى اختيار المراحل الدراسية التي تدرّسها (ابتدائي / إعدادي / ثانوي).', 422);
+    }
     if (body.consent !== true) return jsonErr(res, ARABIC_ERRORS.consent, 422);
     if (await isPhoneTaken(phone, email)) return jsonErr(res, 'رقم الهاتف مسجل بالفعل لحساب آخر.', 422, { code: 'phone_taken' });
 
     const signupData = {
       fullName, phone, governorate, city, role,
+      stage: role === 'student' && ALLOWED_STAGES.includes(String(body.stage || '').trim()) ? String(body.stage).trim() : null,
       grade: String(body.grade || '').trim() || null,
       subject: String(body.subject || '').trim() || null,
+      stages: role === 'teacher' ? sanitizeStagesList(body.stages) : [],
       experienceYears: String(body.experienceYears || '').trim() || null,
       parentPhone: String(body.parentPhone || '').trim() || null,
       studentJoinCode: String(body.studentJoinCode || '').trim() || null,
@@ -87,7 +94,7 @@ export default async function handler(req, res) {
       if (current.email_confirmed_at) return jsonErr(res, 'هذا البريد الإلكتروني مسجل بالفعل. يمكنك تسجيل الدخول مباشرة.', 409, { code: 'email_taken' });
       await updateUserById(userId, {
         password,
-        user_metadata: { ...(current.user_metadata || {}), full_name: fullName, phone, role, governorate, city, grade: signupData.grade, subject: signupData.subject, experience_years: signupData.experienceYears, parent_phone: signupData.parentPhone, avatar_url: signupData.avatarUrl, signup_data: signupData },
+        user_metadata: { ...(current.user_metadata || {}), full_name: fullName, phone, role, governorate, city, stage: signupData.stage, grade: signupData.grade, subject: signupData.subject, stages: signupData.stages, experience_years: signupData.experienceYears, parent_phone: signupData.parentPhone, avatar_url: signupData.avatarUrl, signup_data: signupData },
         app_metadata: { ...(current.app_metadata || {}), role, signup_source: recovered ? 'web_recovery' : 'web' },
       });
       await resetProfileForRole({ userId, email, role, data: signupData });
@@ -95,13 +102,13 @@ export default async function handler(req, res) {
     } else if (recovered === 'orphan_profile') {
       const orphan = await findProfileByEmail(email);
       if (orphan?.id) await dbDelete('profiles', `id=eq.${orphan.id}`).catch(() => {});
-      const created = await createUser({ email, password, email_confirm: false, user_metadata: { full_name: fullName, phone, role, governorate, city, signup_data: signupData }, app_metadata: { role, signup_source: 'web' } });
+      const created = await createUser({ email, password, email_confirm: false, user_metadata: { full_name: fullName, phone, role, governorate, city, stage: signupData.stage, grade: signupData.grade, subject: signupData.subject, stages: signupData.stages, experience_years: signupData.experienceYears, parent_phone: signupData.parentPhone, avatar_url: signupData.avatarUrl, signup_data: signupData }, app_metadata: { role, signup_source: 'web' } });
       if (created.ok && created.data?.id) { userId = created.data.id; await dbInsert('auth_pending_users', [{ email, user_id: userId, role }]); }
       else return jsonErr(res, 'تعذر إنشاء الحساب. تأكد من صحة البيانات وحاول مجددًا.', 500);
     } else {
       const created = await createUser({
         email, password, email_confirm: false,
-        user_metadata: { full_name: fullName, phone, role, governorate, city, grade: signupData.grade, subject: signupData.subject, experience_years: signupData.experienceYears, parent_phone: signupData.parentPhone, avatar_url: signupData.avatarUrl, signup_data: signupData },
+        user_metadata: { full_name: fullName, phone, role, governorate, city, stage: signupData.stage, grade: signupData.grade, subject: signupData.subject, stages: signupData.stages, experience_years: signupData.experienceYears, parent_phone: signupData.parentPhone, avatar_url: signupData.avatarUrl, signup_data: signupData },
         app_metadata: { role, signup_source: 'web' },
       });
       if (created.ok && created.data?.id) { userId = created.data.id; await dbInsert('auth_pending_users', [{ email, user_id: userId, role }]); }
@@ -109,7 +116,7 @@ export default async function handler(req, res) {
         const legacy = await findAuthUserByEmail(email);
         if (legacy && !legacy.email_confirmed_at) {
           userId = legacy.id;
-          await updateUserById(userId, { password, user_metadata: { ...(legacy.user_metadata || {}), full_name: fullName, phone, role, governorate, city, grade: signupData.grade, subject: signupData.subject, experience_years: signupData.experienceYears, parent_phone: signupData.parentPhone, avatar_url: signupData.avatarUrl, signup_data: signupData }, app_metadata: { ...(legacy.app_metadata || {}), role, signup_source: 'web_recovery' } });
+          await updateUserById(userId, { password, user_metadata: { ...(legacy.user_metadata || {}), full_name: fullName, phone, role, governorate, city, stage: signupData.stage, grade: signupData.grade, subject: signupData.subject, stages: signupData.stages, experience_years: signupData.experienceYears, parent_phone: signupData.parentPhone, avatar_url: signupData.avatarUrl, signup_data: signupData }, app_metadata: { ...(legacy.app_metadata || {}), role, signup_source: 'web_recovery' } });
           await resetProfileForRole({ userId, email, role, data: signupData });
           await dbUpsert('auth_pending_users', [{ email, user_id: userId, role }], 'email');
         } else if (legacy && isGoogleAccount(legacy)) return jsonErr(res, 'هذا البريد مرتبط بحساب جوجل. سجّل الدخول عبر Google ثم أكمل بياناتك.', 409, { code: 'google_account' });

@@ -13,6 +13,7 @@ import { useAuth } from '../../lib/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { Btn, Card, ConfirmDialog, EmptyState, ErrorBlock, LoadingBlock, PageHeader, StatCard, StatusBadge, fmtDateTime, useToast } from '../../components/common/ui';
 import { getCleanAvatarUrl } from '../../lib/avatarHelper';
+import { SectionExplainer } from '../../components/common/SectionExplainer';
 
 /* ================================================================
    فريق المساعدين — /teacher/assistants
@@ -83,6 +84,13 @@ export const TeacherMyAssistantsPage: React.FC<{ onNavigate: (p: string) => void
   const activeAssignmentCount = assignments.length;
 
   return <div className="space-y-5" dir="rtl">
+
+    <SectionExplainer
+            storageKey="assistants_v1"
+            title="المساعدون"
+            text="مساعدوك المشاركون في إدارة مجموعاتك — لكل مساعد صلاحيات محددة منك."
+            steps={['أرسل دعوة لمساعد من صفحة البحث عن مساعدين.', 'الصلاحيات: تسجيل الحضور، التحصيل، أو المتابعة فقط.']}
+          />
     <PageHeader title="فريق المساعدين" description="المساعدون المتعاونون معك، الدعوات المعلقة، وصلاحيات كل مساعد لكل مجموعة."
       actions={<>
         <Btn variant="secondary" size="sm" onClick={() => onNavigate('/teacher/assistants/search')}><UserRoundSearch className="w-3.5 h-3.5" />البحث عن مساعدين</Btn>
@@ -251,6 +259,13 @@ export const TeacherAssistantSearchPage: React.FC<{ onNavigate: (p: string) => v
   };
 
   return <div className="space-y-5" dir="rtl">
+
+    <SectionExplainer
+            storageKey="assistants_search_v1"
+            title="البحث عن مساعدين"
+            text="ابحث عن مساعدين مؤهلين للعمل مع مجموعاتك وأرسل لهم دعوات مباشرة."
+            steps={['فلتر بالمرحلة والمادة والمنطقة.', 'المساعد يقبل الدعوة من حسابه ثم يظهر في قائمة مساعديك.']}
+          />
     <PageHeader title="البحث عن مساعدين" description="ابحث عن مساعدين حسب الموقع والخبرة والمؤهل وحالة التوثيق، ثم أرسل دعوة رسمية."
       actions={<Btn variant="secondary" size="sm" onClick={() => onNavigate('/teacher/assistants')}><ArrowRight className="w-3.5 h-3.5" />فريقي الحالي</Btn>} />
 

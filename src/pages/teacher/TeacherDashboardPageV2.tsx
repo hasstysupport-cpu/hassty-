@@ -13,6 +13,7 @@ import { useAuth } from '../../lib/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { loadTeacherGroups, loadTeacherStudents } from '../../lib/teacherStore';
 import { StudentGroup, TeacherStudentItem } from '../../types';
+import { SectionExplainer } from '../../components/common/SectionExplainer';
 
 interface Props { onNavigate: (path: string) => void; }
 
@@ -135,6 +136,13 @@ export const TeacherDashboardPageV2: React.FC<Props> = ({ onNavigate }) => {
 
   return (
     <div className="space-y-6 text-right" dir="rtl">
+
+      <SectionExplainer
+              storageKey="teacher_dashboard_v1"
+              title="لوحة التحكم"
+              text="نظرة سريعة على أرقامك اليوم: مجموعاتك وطلابك، نسب الحضور، تحصيلاتك المالية، وأحدث إشعاراتك المهمة."
+              steps={['من هنا تقدر تنتقل لأي قسم: الطلاب، المجموعات، ماسح QR، أو المدفوعات.', 'البطاقات الملونة فوق بتحدّث لحظيًا مع كل تغيير في بياناتك.']}
+            />
       {notice && (
         <div className="rounded-2xl border border-blue-200 bg-blue-50 text-blue-900 px-4 py-3 text-sm font-bold flex items-center justify-between gap-3">
           <span>{notice}</span>

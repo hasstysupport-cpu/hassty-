@@ -20,6 +20,22 @@ import { dbInsert, dbDelete, dbSelect, dbInsertIgnoreConflict, dbUpsert, dbUpdat
 
 const clean = (v) => (typeof v === 'string' ? v.trim() : v ?? null);
 
+/* المراحل الدراسية المسموحة (قائمة مغلقة) — تُستخدم للتحقق والتخزين */
+const ALLOWED_STAGES = ['ابتدائي', 'إعدادي', 'ثانوي'];
+
+/* تنظيف قائمة مراحل من أي مصدر: يرجّع القيم الصالحة فقط بلا تكرار */
+export function sanitizeStagesList(input) {
+  let list = [];
+  if (Array.isArray(input)) list = input;
+  else if (typeof input === 'string' && input.trim()) list = input.split(',');
+  const out = [];
+  for (const v of list) {
+    const s = String(v || '').trim();
+    if (ALLOWED_STAGES.includes(s) && !out.includes(s)) out.push(s);
+  }
+  return out;
+}
+
 export function buildStudentQr(userId) {
   return `HASSTY-${String(userId).replace(/-/g, '').slice(0, 10).toUpperCase()}`;
 }
@@ -27,6 +43,8 @@ export function buildStudentQr(userId) {
 const baseMetadata = (data, role) => ({
   authProvider: data.authProvider || 'email',
   subject: clean(data.subject) || '',
+  stages: sanitizeStagesList(data.stages),
+  stage: clean(data.stage) || '',
   experienceYears: clean(data.experienceYears) || '',
   parentPhone: clean(data.parentPhone) || '',
   onboardingComplete: true,
@@ -152,13 +170,20 @@ export async function ensureProfile({ userId, email, role, data }) {
 export async function createTutorProfile({ userId, data }) {
   const subject = clean(data.subject) || 'المادة';
   const grades = clean(data.grade) ? [clean(data.grade)] : [];
+  /* المراحل: من الاختيار الصريح، وإلا تُستنتج من الصف إن وُجد */
+  let stages = sanitizeStagesList(data.stages);
+  if (!stages.length && clean(data.grade)) {
+    const g = clean(data.grade);
+    stages = ALLOWED_STAGES.filter((s) => g.includes(s));
+  }
   await dbInsertIgnoreConflict('tutor_profiles', [{
     user_id: userId,
     title: `معلم ${subject}`,
-    headline: `معلم ${subject}`,
+    headline: `معلم ${subject}${stages.length ? ` — ${stages.join(' و')}` : ''}`,
     bio: '',
     subjects: [subject],
     grades,
+    stages,
     experience_years: Number(data.experienceYears) || 0,
     governorate: clean(data.governorate) || null,
     city: clean(data.city) || null,

@@ -12,6 +12,7 @@ import { ArrowRight, CalendarDays, CheckCircle2, ClipboardCheck, FileSpreadsheet
 import { useAuth } from '../../lib/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { Btn, Card, ConfirmDialog, EmptyState, ErrorBlock, LoadingBlock, PageHeader, StatCard, StatusBadge, Tabs, fmtDate, fmtDateTime, fmtTime, useToast } from '../../components/common/ui';
+import { SectionExplainer } from '../../components/common/SectionExplainer';
 
 /* ================================================================
    الامتحانات — /teacher/exams
@@ -65,6 +66,13 @@ export const TeacherExamsPage: React.FC<{ onNavigate: (p: string) => void; openE
   if (openExamId) return <TeacherExamDetailPage examId={openExamId} onNavigate={onNavigate} />;
 
   return <div className="space-y-5" dir="rtl">
+
+    <SectionExplainer
+            storageKey="exams_v1"
+            title="الامتحانات"
+            text="إنشاء امتحانات وتكليفات لمجموعاتك ومتابعة نتائج كل امتحان تفصيليًا."
+            steps={['اضغط على أي امتحان لفتح نتائجه تفصيلًا وإدارتها.', 'النتائج تُرصد في سجل الدرجات تلقائيًا.']}
+          />
     <PageHeader title="الامتحانات" description="دورة كاملة: إنشاء ← توزيع الطلاب على الفترات ← حضور يوم الامتحان ← التصحيح ← النشر."
       actions={<>
         <Btn variant="secondary" size="sm" onClick={() => void load()}><RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />تحديث</Btn>
@@ -319,6 +327,13 @@ export const TeacherExamDetailPage: React.FC<{ examId: string; onNavigate: (p: s
   if (!exam) return <div dir="rtl"><Card><EmptyState title="الامتحان غير موجود" action={<Btn size="sm" onClick={() => onNavigate('/teacher/exams')}>العودة للامتحانات</Btn>} /></Card></div>;
 
   return <div className="space-y-5" dir="rtl">
+
+    <SectionExplainer
+            storageKey="exam_detail_v1"
+            title="تفاصيل الامتحان"
+            text="صفحة إدارة امتحان واحد: نتائج الطلاب، الدرجة العظمى، والملاحظات."
+            steps={['سجل الدرجات من هنا أو عبر استيراد سريع.', 'الطلاب يشوفون درجاتهم لحظة رصدها.']}
+          />
     <div className="flex items-center gap-2"><Btn variant="ghost" size="sm" onClick={() => onNavigate('/teacher/exams')}><ArrowRight className="w-4 h-4" />العودة للامتحانات</Btn></div>
     <PageHeader title={exam.title} badge={exam.status} description={`${fmtDate(exam.exam_date)} • ${fmtTime(exam.starts_at)} • ${exam.duration_minutes || 60} دقيقة • ${exam.total_marks || 100} درجة${exam.location ? ` • ${exam.location}` : ''}`} />
 

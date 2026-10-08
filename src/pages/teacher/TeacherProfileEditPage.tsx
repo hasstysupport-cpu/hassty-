@@ -8,10 +8,13 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { User, Save, CheckCircle2, MapPin, BookOpen, DollarSign, GraduationCap, Sparkles, Camera, ShieldAlert } from 'lucide-react';
+import { User, Save, CheckCircle2, MapPin, BookOpen, DollarSign, GraduationCap, Sparkles, Camera, ShieldAlert, Layers, Loader2 } from 'lucide-react';
 import { Badge } from '../../components/common/Badge';
+import { SectionExplainer } from '../../components/common/SectionExplainer';
+import { StageMultiPicker } from '../../components/common/StagePickers';
 import { useAuth } from '../../lib/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { sanitizeStages } from '../../lib/stages';
 
 export const TeacherProfileEditPage: React.FC = () => {
   const { user, updateUserProfile } = useAuth();
@@ -24,6 +27,9 @@ export const TeacherProfileEditPage: React.FC = () => {
   const [governorate, setGovernorate] = useState(user?.governorate || '');
   const [area, setArea] = useState(user?.area || '');
   const [pricePerSession, setPricePerSession] = useState<number | ''>(user?.profileData?.pricePerSession || '');
+  /* المراحل التي يدرّسها المعلم */
+  const [stages, setStages] = useState<string[]>(sanitizeStages((user?.profileData as any)?.stages));
+  const [stagesLoading, setStagesLoading] = useState(true);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [verificationStatus, setVerificationStatus] = useState<'loading' | 'approved' | 'pending' | 'rejected' | 'not_submitted'>('loading');
@@ -36,7 +42,7 @@ export const TeacherProfileEditPage: React.FC = () => {
       if (!user?.uid) return;
       const { data, error } = await supabase
         .from('tutor_profiles')
-        .select('is_verified,verification_status')
+        .select('is_verified,verification_status,stages')
         .eq('user_id', user.uid)
         .maybeSingle();
       if (cancelled) return;
@@ -49,6 +55,10 @@ export const TeacherProfileEditPage: React.FC = () => {
       else if (data?.verification_status === 'pending') setVerificationStatus('pending');
       else if (data?.verification_status === 'rejected') setVerificationStatus('rejected');
       else setVerificationStatus('not_submitted');
+      /* المراحل من tutor_profiles — مصدرها الحقيقي في DB */
+      const dbStages = sanitizeStages(data?.stages);
+      if (dbStages.length) setStages(dbStages);
+      setStagesLoading(false);
     };
     void loadVerification();
     return () => { cancelled = true; };
@@ -56,6 +66,10 @@ export const TeacherProfileEditPage: React.FC = () => {
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (stages.length === 0) {
+      alert('اختر المرحلة (أو المراحل) التي تدرّسها — لا يمكن الحفظ بدون مرحلة واحدة على الأقل.');
+      return;
+    }
     setIsSaving(true);
     try {
       if (updateUserProfile) {
@@ -69,9 +83,19 @@ export const TeacherProfileEditPage: React.FC = () => {
             subject,
             headline,
             bio,
+            stages,
             pricePerSession: Number(pricePerSession) || 0,
           },
         });
+      }
+      /* المراحل تُحفظ في tutor_profiles مباشرة (المصدر الحقيقي للمجموعات والبحث) */
+      if (supabase && user?.uid) {
+        await supabase.from('tutor_profiles').upsert({
+          user_id: user.uid,
+          stages,
+          headline: headline || undefined,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' });
       }
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 3000);
@@ -86,6 +110,16 @@ export const TeacherProfileEditPage: React.FC = () => {
 
   return (
     <div className="space-y-8 text-right max-w-4xl mx-auto">
+      <SectionExplainer
+        storageKey="teacher_profile_edit_v1"
+        title="البروفايل العام"
+        text="بياناتك الظاهرة للطلاب وأولياء الأمور في البحث، وفيها تحدد مادتك والمراحل التي تدرّسها."
+        steps={[
+          '«المراحل التي تدرّسها» تحدد مجموعاتك المسموح بها (ابتدائي / إعدادي / ثانوي) — تعدلها هنا في أي وقت.',
+          'التوثيق يظهر ملفك في دليل المدرسين للطلاب.',
+          'سعر الحصة والعنوان التعريفي يظهران في نتائج البحث.',
+        ]}
+      />
       <div className="bg-white border border-[#E5E7EB] rounded-3xl p-6 sm:p-8 shadow-xs">
         <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#2563EB] bg-[#EFF6FF] px-3 py-1 rounded-full border border-blue-200 mb-2"><User className="w-3.5 h-3.5" /><span>الملف الشخصي والبيانات العامة</span></div>
         <h2 className="text-xl sm:text-2xl font-black text-[#1E3A8A]">تعديل الملف التعريفي للمعلم</h2>
@@ -124,6 +158,23 @@ export const TeacherProfileEditPage: React.FC = () => {
             <div><label className="block font-bold text-[#1F2937] mb-1">المادة الأساسية</label><input type="text" required value={subject} onChange={(e) => setSubject(e.target.value)} className="w-full px-3.5 py-2.5 bg-gray-50 border border-[#E5E7EB] rounded-xl text-right font-bold focus:bg-white focus:outline-none focus:border-[#2563EB]" /></div>
             <div className="sm:col-span-2"><label className="block font-bold text-[#1F2937] mb-1">العنوان التعريفي البارز</label><input type="text" required value={headline} onChange={(e) => setHeadline(e.target.value)} className="w-full px-3.5 py-2.5 bg-gray-50 border border-[#E5E7EB] rounded-xl text-right focus:bg-white focus:outline-none focus:border-[#2563EB]" /></div>
             <div className="sm:col-span-2"><label className="block font-bold text-[#1F2937] mb-1">نبذة عنك وخبرتك الأكاديمية</label><textarea rows={4} value={bio} onChange={(e) => setBio(e.target.value)} className="w-full px-3.5 py-2.5 bg-gray-50 border border-[#E5E7EB] rounded-xl text-right focus:bg-white focus:outline-none focus:border-[#2563EB]" /></div>
+          </div>
+
+          {/* المراحل التي يدرّسها */}
+          <div className="rounded-2xl border border-slate-200 bg-[#F8FAFF] p-4 space-y-3">
+            <div className="text-xs font-black text-slate-600 flex items-center gap-1.5">
+              <Layers className="w-4 h-4 text-[#2563EB]" />
+              المراحل التي تدرّسها <span className="text-[#EF4444]">*</span>
+            </div>
+            {stagesLoading ? (
+              <div className="py-4 text-center"><Loader2 className="w-4 h-4 animate-spin text-blue-600 mx-auto" /></div>
+            ) : (
+              <StageMultiPicker
+                value={stages}
+                onChange={setStages}
+                hint="المجموعات التي تنشئها يجب أن تكون من هذه المراحل — ويمكنك تعديلها في أي وقت وسيُحدّث ملفك للطلاب."
+              />
+            )}
           </div>
         </div>
 

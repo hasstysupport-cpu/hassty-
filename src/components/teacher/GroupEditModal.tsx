@@ -22,12 +22,17 @@ import {
 } from 'lucide-react';
 import { Modal } from '../../components/common/Modal';
 import { Badge } from '../../components/common/Badge';
+import { StageGradeCascade } from '../../components/common/StagePickers';
 import { supabase } from '../../lib/supabase';
 import { StudentGroup, GroupScheduleSlot, PricingBillingType } from '../../types';
 import { saveTeacherGroup } from '../../lib/teacherStore';
 import { calculateTeacherCommission, formatTimeArabic } from '../../lib/scheduleSync';
+import { stageOfGrade } from '../../lib/stages';
 
+/* كل صفوف المراحل الثلاث (ابتدائي + إعدادي + ثانوي) — مصدرها stages.ts الموحد */
 export const ALL_EGYPT_GRADES = [
+  'الصف الأول الابتدائي', 'الصف الثاني الابتدائي', 'الصف الثالث الابتدائي',
+  'الصف الرابع الابتدائي', 'الصف الخامس الابتدائي', 'الصف السادس الابتدائي',
   'الصف الأول الإعدادي', 'الصف الثاني الإعدادي', 'الصف الثالث الإعدادي',
   'الصف الأول الثانوي', 'الصف الثاني الثانوي', 'الصف الثالث الثانوي',
 ];
@@ -74,7 +79,8 @@ export const GroupEditModal: React.FC<Props> = ({ mode, group, teacherId, active
 
   const [name, setName] = useState(group?.name || '');
   const [subject, setSubject] = useState(group?.subject || TEACHER_SUBJECTS[0]);
-  const [grade, setGrade] = useState(group?.grade || ALL_EGYPT_GRADES[0]);
+  const [groupStage, setGroupStage] = useState(stageOfGrade(group?.grade) || 'secondary');
+  const [grade, setGrade] = useState(group?.grade || ALL_EGYPT_GRADES[9]);
   const [location, setLocation] = useState(group?.location || '');
   const [description, setDescription] = useState(group?.description || '');
   const [color, setColor] = useState(group?.color || 'blue');
@@ -221,12 +227,17 @@ export const GroupEditModal: React.FC<Props> = ({ mode, group, teacherId, active
             </select>
           </div>
           <div>
-            <label className="block text-[11px] font-black text-slate-500 mb-1.5">المرحلة والصف</label>
-            <select value={grade} onChange={e => setGrade(e.target.value)} disabled={isEdit}
-              title={isEdit ? 'المرحلة لا تتغير بعد الإنشاء لسلامة قيود الطلاب — أنشئ مجموعة جديدة لمرحلة أخرى' : ''}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3 text-xs font-bold cursor-pointer outline-none focus:border-blue-300 disabled:opacity-60">
-              {ALL_EGYPT_GRADES.map(g => <option key={g} value={g}>{g}</option>)}
-            </select>
+            <label className="block text-[11px] font-black text-slate-500 mb-1.5">المرحلة ثم الصف</label>
+            <div title={isEdit ? 'المرحلة لا تتغير بعد الإنشاء لسلامة قيود الطلاب — أنشئ مجموعة جديدة لمرحلة أخرى' : ''}>
+              <StageGradeCascade
+                stage={groupStage}
+                grade={grade}
+                onStageChange={setGroupStage}
+                onGradeChange={setGrade}
+                disabled={isEdit}
+                gradePlaceholder="اختر صف المجموعة..."
+              />
+            </div>
           </div>
           <div>
             <label className="block text-[11px] font-black text-slate-500 mb-1.5">المقر / السنتر</label>

@@ -8,11 +8,15 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowRight, Phone, QrCode, Receipt, Star, UserRound, CalendarDays, NotebookPen, GraduationCap } from 'lucide-react';
+import { ArrowRight, Phone, QrCode, Receipt, Star, UserRound, CalendarDays, NotebookPen, GraduationCap, UserCog, MessageCircle, Loader2, CheckCircle2, Shuffle, ShieldOff, CalendarClock } from 'lucide-react';
 import { useAuth } from '../../lib/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { Btn, Card, EmptyState, ErrorBlock, LoadingBlock, PageHeader, StatCard, StatusBadge, Tabs, fmtDate, fmtDateTime, fmtMoney, useToast } from '../../components/common/ui';
 import { getCleanAvatarUrl } from '../../lib/avatarHelper';
+import { SectionExplainer } from '../../components/common/SectionExplainer';
+import { StudentOptionsModal } from '../../components/teacher/StudentOptionsModal';
+import { StageGradeCascade } from '../../components/common/StagePickers';
+import { stageOfGrade } from '../../lib/stages';
 
 /* ================================================================
    بروفايل الطالب التفصيلي — /teacher/students/:id
@@ -31,12 +35,19 @@ export const TeacherStudentProfilePage: React.FC<{ studentId: string; onNavigate
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [tab, setTab] = useState('overview');
+  /* تخصيص الطالب (مودال الخيارات) */
+  const [optionsFor, setOptionsFor] = useState<any | null>(null);
+  /* تعديل بيانات القيد */
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({ parentPhone: '', studentPhone: '', stage: '', grade: '' });
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editMsg, setEditMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
 
   const load = useCallback(async () => {
     if (!supabase || !studentId) { setLoading(false); return; }
     setLoading(true); setError('');
     try {
-      const { data: myGroups } = await supabase.from('student_groups').select('id,name,tutor_id').eq('tutor_id', user?.uid || '');
+      const { data: myGroups } = await supabase.from('student_groups').select('id,name,tutor_id,grade,schedule_slots').eq('tutor_id', user?.uid || '');
       setGroups(myGroups || []);
       const myGroupIds = (myGroups || []).map((g: any) => g.id);
       const [{ data: prof, error: pe }, { data: enrolls }, { data: att }, { data: pays }, { data: gr }, { data: nt }] = await Promise.all([
@@ -62,6 +73,58 @@ export const TeacherStudentProfilePage: React.FC<{ studentId: string; onNavigate
   const avgGrade = grades.length ? Math.round(grades.reduce((s, g) => s + (Number(g.score) / Math.max(1, Number(g.max_score))) * 100, 0) / grades.length) : 0;
   const activeEnrollment = enrollments.find((e) => e.status === 'active');
 
+  /* بدء تعديل بيانات القيد للطالب داخل المجموعة الفعالة */
+  const startEdit = () => {
+    const e = activeEnrollment;
+    setEditForm({
+      parentPhone: e?.parent_phone || '',
+      studentPhone: e?.student_phone || '',
+      stage: stageOfGrade(e?.grade) || stageOfGrade(profile?.grade) || '',
+      grade: e?.grade || profile?.grade || '',
+    });
+    setEditMsg(null);
+    setEditing(true);
+  };
+
+  /* حفظ بيانات القيد: تحديث كل تسجيلات الطالب لدى مدرسي (مجموعاتي) + بروفايل الطالب */
+  const saveEnrollmentEdit = async () => {
+    if (!supabase || !activeEnrollment) return;
+    if (editForm.parentPhone && !/^01[0125][0-9]{8}$/.test(editForm.parentPhone.trim())) {
+      setEditMsg({ kind: 'err', text: 'رقم ولي الأمر غير صحيح (مثال: 01012345678).' }); return;
+    }
+    setSavingEdit(true);
+    try {
+      const myGroupIds = groups.map((g: any) => g.id);
+      const patch: Record<string, unknown> = {
+        parent_phone: editForm.parentPhone.trim() || null,
+        student_phone: editForm.studentPhone.trim() || null,
+      };
+      if (editForm.grade) patch.grade = editForm.grade;
+      const { error: upErr } = await supabase.from('group_enrollments').update(patch)
+        .eq('student_id', studentId).in('group_id', myGroupIds);
+      if (upErr) throw upErr;
+      /* المرحلة تتحدث أيضًا في بروفايل الطالب نفسه */
+      if (editForm.grade && editForm.grade !== profile?.grade) {
+        await supabase.from('profiles').update({ grade: editForm.grade, updated_at: new Date().toISOString() }).eq('id', studentId);
+      }
+      setEditMsg({ kind: 'ok', text: 'تم حفظ بيانات القيد بنجاح ✅' });
+      setEditing(false);
+      await load();
+    } catch (e: any) {
+      setEditMsg({ kind: 'err', text: `تعذر الحفظ: ${String(e?.message || e).slice(0, 120)}` });
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  /* تحويل الرقم المصري لصيغة دولية لواتساب */
+  const waLink = (phone?: string) => {
+    const p = String(phone || '').replace(/\D/g, '');
+    if (!p) return '';
+    const intl = p.startsWith('0') ? `2${p}` : p;
+    return `https://wa.me/${intl}`;
+  };
+
   if (loading) return <div dir="rtl"><PageHeader title="ملف الطالب" /><Card><LoadingBlock rows={4} /></Card></div>;
   if (error) return <div dir="rtl"><PageHeader title="ملف الطالب" /><Card><ErrorBlock message={error} onRetry={() => void load()} /></Card></div>;
   if (!profile) return <div dir="rtl"><PageHeader title="ملف الطالب" /><Card><EmptyState title="الطالب غير موجود" /></Card></div>;
@@ -69,6 +132,17 @@ export const TeacherStudentProfilePage: React.FC<{ studentId: string; onNavigate
   const avatar = getCleanAvatarUrl(profile.avatar_url, 'student', profile.full_name);
 
   return <div className="space-y-5" dir="rtl">
+    <SectionExplainer
+      storageKey="teacher_student_profile_v1"
+      title="ملف الطالب"
+      text="كل بيانات الطالب في مكان واحد: قيوده في مجموعاتك، سجل حضوره الكامل، مدفوعاته، درجاته، وملاحظاته — وتقدر تخصصه وتعدل بيانات قيده من هنا."
+      steps={[
+        'زر «تخصيص الطالب» يفتح خياراته: حضور مرن بين مجموعات نفس المرحلة، جدول مخصص، إعفاء من المصاريف.',
+        '«تعديل بيانات القيد» يحدّث رقم ولي الأمر ورقم الطالب ومرحلته في كل مجموعاتك مرة واحدة.',
+        'أزرار الاتصال وواتساب توصلك بولي الأمر مباشرة من الملف.',
+        'التبويبات بالأسفل تفصّل: الحضور والمدفوعات والدرجات والملاحظات.',
+      ]}
+    />
     <div className="flex items-center gap-2">
       <Btn variant="ghost" size="sm" onClick={() => onNavigate('/teacher/students')}><ArrowRight className="w-4 h-4" />العودة للطلاب</Btn>
     </div>
@@ -93,6 +167,24 @@ export const TeacherStudentProfilePage: React.FC<{ studentId: string; onNavigate
             {activeEnrollment?.parent_phone && <span className="font-mono text-slate-500" dir="ltr">👨‍👩‍👦 {activeEnrollment.parent_phone}</span>}
           </div>
         </div>
+        {/* أزرار الإجراءات السريعة */}
+        <div className="flex flex-col gap-2 shrink-0">
+          {activeEnrollment && (
+            <Btn size="sm" onClick={() => setOptionsFor({ ...activeEnrollment, _group: groups.find((g: any) => g.id === activeEnrollment.group_id) })}>
+              <UserCog className="w-4 h-4" /> تخصيص الطالب
+            </Btn>
+          )}
+          {profile.phone && (
+            <a href={`tel:${profile.phone}`} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-black text-slate-600 hover:bg-slate-50 flex items-center justify-center gap-1.5 transition-colors">
+              <Phone className="w-3.5 h-3.5" /> اتصال بالطالب
+            </a>
+          )}
+          {activeEnrollment?.parent_phone && (
+            <a href={waLink(activeEnrollment.parent_phone)} target="_blank" rel="noreferrer" className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 text-[11px] font-black flex items-center justify-center gap-1.5 transition-colors">
+              <MessageCircle className="w-3.5 h-3.5" /> واتساب ولي الأمر
+            </a>
+          )}
+        </div>
       </div>
     </Card>
 
@@ -113,11 +205,93 @@ export const TeacherStudentProfilePage: React.FC<{ studentId: string; onNavigate
     ]} />
 
     {tab === 'overview' && <div className="grid lg:grid-cols-2 gap-4">
+      {/* بيانات القيد — عرض وتعديل */}
+      <Card
+        title="بيانات القيد (قابلة للتعديل)"
+        actions={
+          !editing ? (
+            <Btn size="sm" variant="secondary" onClick={startEdit} disabled={!activeEnrollment}>
+              <UserCog className="w-3.5 h-3.5" /> تعديل بيانات القيد
+            </Btn>
+          ) : (
+            <div className="flex gap-1.5">
+              <Btn size="sm" variant="ghost" onClick={() => setEditing(false)} disabled={savingEdit}>إلغاء</Btn>
+              <Btn size="sm" onClick={() => void saveEnrollmentEdit()} disabled={savingEdit}>
+                {savingEdit ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />} حفظ
+              </Btn>
+            </div>
+          )
+        }
+      >
+        {!activeEnrollment ? (
+          <EmptyState title="لا يوجد قيد نشط لمجموعاتك" description="أضف الطالب لإحدى مجموعاتك أولًا لتعديل بيانات قيده." />
+        ) : editing ? (
+          <div className="space-y-3">
+            <StageGradeCascade
+              stage={editForm.stage}
+              grade={editForm.grade}
+              onStageChange={(s) => setEditForm((p) => ({ ...p, stage: s }))}
+              onGradeChange={(g) => setEditForm((p) => ({ ...p, grade: g }))}
+              gradePlaceholder="اختر صف الطالب..."
+            />
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-black text-slate-500 mb-1">رقم هاتف الطالب</label>
+                <input dir="ltr" value={editForm.studentPhone} onChange={(e) => setEditForm((p) => ({ ...p, studentPhone: e.target.value }))}
+                  placeholder="01xxxxxxxxx" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-bold text-left outline-none focus:border-blue-300" />
+              </div>
+              <div>
+                <label className="block text-[11px] font-black text-slate-500 mb-1">رقم ولي الأمر (للإشعارات)</label>
+                <input dir="ltr" value={editForm.parentPhone} onChange={(e) => setEditForm((p) => ({ ...p, parentPhone: e.target.value }))}
+                  placeholder="01xxxxxxxxx" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-bold text-left outline-none focus:border-blue-300" />
+              </div>
+            </div>
+            {editMsg && (
+              <div className={`rounded-xl px-3 py-2 text-[11px] font-black flex items-center gap-2 ${editMsg.kind === 'ok' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'}`}>
+                {editMsg.kind === 'ok' ? <CheckCircle2 className="w-3.5 h-3.5" /> : <UserCog className="w-3.5 h-3.5" />}{editMsg.text}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100">
+              <div className="text-[10px] font-bold text-slate-400">المرحلة / الصف</div>
+              <div className="font-black text-slate-800 mt-0.5">{activeEnrollment.grade || profile.grade || '—'}</div>
+            </div>
+            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100">
+              <div className="text-[10px] font-bold text-slate-400">تاريخ القيد</div>
+              <div className="font-black text-slate-800 mt-0.5">{fmtDate(activeEnrollment.enrolled_at)}</div>
+            </div>
+            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100">
+              <div className="text-[10px] font-bold text-slate-400">هاتف الطالب</div>
+              <div className="font-mono font-black text-slate-800 mt-0.5" dir="ltr">{activeEnrollment.student_phone || profile.phone || '—'}</div>
+            </div>
+            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100">
+              <div className="text-[10px] font-bold text-slate-400">هاتف ولي الأمر</div>
+              <div className="font-mono font-black text-slate-800 mt-0.5" dir="ltr">{activeEnrollment.parent_phone || '—'}</div>
+            </div>
+          </div>
+        )}
+      </Card>
+
       <Card title="المجموعات المسجل بها">
         {enrollments.length === 0 ? <EmptyState title="غير مسجل بمجموعاتك حاليًا" /> : <div className="space-y-2">{enrollments.map((e) => (
           <div key={e.id} className="p-3 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between gap-2">
-            <div><div className="text-xs font-black">{groupName(e.group_id)}</div><div className="text-[10px] text-slate-400">انضم {fmtDate(e.enrolled_at)}</div></div>
-            <div className="flex gap-1.5"><StatusBadge status={e.status} /></div>
+            <div className="min-w-0">
+              <div className="text-xs font-black flex items-center gap-1.5 flex-wrap">
+                {groupName(e.group_id)}
+                {e.attendance_mode === 'flexible' && <span className="text-[9px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-1.5 py-0.5 flex items-center gap-0.5"><Shuffle className="w-2.5 h-2.5" />حضور مرن</span>}
+                {e.fee_exempt && <span className="text-[9px] font-black bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-1.5 py-0.5 flex items-center gap-0.5"><ShieldOff className="w-2.5 h-2.5" />معفو من المصاريف</span>}
+                {Array.isArray(e.custom_schedule_slots) && e.custom_schedule_slots.length > 0 && <span className="text-[9px] font-black bg-blue-50 text-blue-700 border border-blue-200 rounded-full px-1.5 py-0.5 flex items-center gap-0.5"><CalendarClock className="w-2.5 h-2.5" />جدول مخصص</span>}
+              </div>
+              <div className="text-[10px] text-slate-400">انضم {fmtDate(e.enrolled_at)}{e.grade ? ` · ${e.grade}` : ''}</div>
+            </div>
+            <div className="flex gap-1.5 shrink-0">
+              <Btn size="sm" variant="secondary" onClick={() => setOptionsFor({ ...e, _group: groups.find((g: any) => g.id === e.group_id) })}>
+                <UserCog className="w-3.5 h-3.5" /> تخصيص
+              </Btn>
+              <StatusBadge status={e.status} />
+            </div>
           </div>
         ))}</div>}
       </Card>
@@ -160,6 +334,29 @@ export const TeacherStudentProfilePage: React.FC<{ studentId: string; onNavigate
         </div>
       ))}</div>}
     </Card>}
+
+    {/* مودال تخصيص الطالب */}
+    {optionsFor && optionsFor.id && (
+      <StudentOptionsModal
+        data={{
+          enrollmentId: optionsFor.id,
+          studentId: optionsFor.student_id || studentId,
+          studentName: optionsFor.student_name || profile.full_name,
+          grade: optionsFor.grade || profile.grade,
+          groupId: optionsFor.group_id,
+          groupName: groupName(optionsFor.group_id),
+          groupSlots: Array.isArray(optionsFor._group?.schedule_slots) ? optionsFor._group.schedule_slots : [],
+          attendanceMode: optionsFor.attendance_mode === 'flexible' ? 'flexible' : 'fixed',
+          customScheduleSlots: Array.isArray(optionsFor.custom_schedule_slots) ? optionsFor.custom_schedule_slots : [],
+          feeExempt: optionsFor.fee_exempt === true,
+          feeExemptReason: optionsFor.fee_exempt_reason || undefined,
+          feeExemptUntil: optionsFor.fee_exempt_until || undefined,
+        }}
+        teacherId={user?.uid || ''}
+        onClose={() => setOptionsFor(null)}
+        onUpdated={() => { void load(); }}
+      />
+    )}
   </div>;
 };
 
@@ -220,6 +417,13 @@ export const TeacherStudentNotesPage: React.FC<{ onNavigate?: (p: string) => voi
   const cats = [['all', 'الكل'], ['behavior', 'سلوكي'], ['academic', 'أكاديمي'], ['attendance', 'حضور'], ['payment', 'مالي'], ['general', 'عام']];
 
   return <div className="space-y-5" dir="rtl">
+
+    <SectionExplainer
+            storageKey="student_notes_v1"
+            title="ملاحظات الطلاب"
+            text="توثيق ملاحظات سلوكية وأكاديمية ومالية عن كل طالب — تظهر في ملف الطالب للمتابعة."
+            steps={['اختر الطالب والتصنيف ثم اكتب الملاحظة.', 'حدد الخطورة: معلومة، إيجابية، تحذير، أو حرجة.']}
+          />
     <PageHeader title="ملاحظات الطلاب" description="توثيق السلوك والأداء الأكاديمي والملاحظات المالية لكل طالب — تظهر أيضًا في ملف الطالب." />
     <Card title="إضافة ملاحظة جديدة">
       <div className="grid sm:grid-cols-3 gap-3">

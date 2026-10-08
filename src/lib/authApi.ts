@@ -105,8 +105,12 @@ export interface RegisterPayload {
   phone: string;
   governorate: string;
   city: string;
+  /** الطالب: المرحلة الرئيسية (ابتدائي/إعدادي/ثانوي) */
+  stage?: string;
   grade?: string;
   subject?: string;
+  /** المعلم: المراحل التي يدرّسها (متعدد) */
+  stages?: string[];
   experienceYears?: string;
   parentPhone?: string;
   studentJoinCode?: string;

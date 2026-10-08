@@ -12,6 +12,7 @@ import { Calendar, CheckCircle2, Clock, Plus, Save, Trash2 } from 'lucide-react'
 import { useAuth } from '../../lib/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { GroupScheduleSlot } from '../../types';
+import { SectionExplainer } from '../../components/common/SectionExplainer';
 
 const days = [
   ['Saturday', 'السبت'], ['Sunday', 'الأحد'], ['Monday', 'الإثنين'], ['Tuesday', 'الثلاثاء'],
@@ -63,6 +64,13 @@ export const TeacherAvailabilityPage: React.FC = () => {
   };
 
   return <div className="space-y-5 text-right max-w-4xl mx-auto">
+
+    <SectionExplainer
+            storageKey="teacher_availability_v1"
+            title="المواعيد المتاحة"
+            text="حدد أوقات فراغك للطلاب — الطلاب يشوفون هذه المواعيد في صفحة الحجز ويقدرون يحجزوا معك فورًا."
+            steps={['اضغط على اليوم والوقت لإتاحته أو إلغاء إتاحته.', 'الحجوزات المؤكدة من الطلاب تظهر في تقويمك مباشرة.']}
+          />
     <section className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
       <div className="flex items-start justify-between gap-4">
         <div><div className="inline-flex items-center gap-2 text-xs font-black text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-full"><Calendar className="w-4 h-4" />مواعيد محفوظة في Supabase</div><h2 className="text-xl font-black text-slate-900 mt-2">إدارة المواعيد الأسبوعية</h2><p className="text-xs text-slate-500 mt-1">هذه المواعيد هي المصدر الذي تعتمد عليه صفحة مسح الحضور لتحديد الحصة والحالة تلقائيًا.</p></div>
