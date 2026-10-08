@@ -120,7 +120,8 @@ export const TeacherPaymentsPageV2: React.FC<{ onNavigate?: (path: string) => vo
     const ch = supabase
       .channel(`teacher-payments-${teacherId}-${Date.now().toString(36)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'payment_records', filter: `tutor_id=eq.${teacherId}` }, () => { void loadCollections(); void loadInvoices(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'commission_tracking', filter: `tutor_id=eq.${teacherId}` }, () => void loadCommissions())
+      /* commission_tracking عموده teacher_id — فلتر tutor_id القديم كان يقفل القناة كلها بصمت */
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'commission_tracking', filter: `teacher_id=eq.${teacherId}` }, () => void loadCommissions())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'platform_invoices', filter: `teacher_id=eq.${teacherId}` }, () => void loadInvoices())
       /* لوحة الأدمن غيّرت الشرائح؟ تتحدث عندك فورًا بدون تحديث الصفحة */
       .on('postgres_changes', { event: '*', schema: 'public', table: 'commission_tiers' }, () => void loadInvoices())
