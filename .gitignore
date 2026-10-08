@@ -7,3 +7,5 @@ coverage/
 .env*
 !.env.example
 .vercel
+qa_realtime_test.mjs
+qa_realtime_auth_test.mjs
