@@ -25,6 +25,7 @@ import send from '../_lib/whatsapp/send.js';
 import setup from '../_lib/whatsapp/setup.js';
 import notify from '../_lib/whatsapp/notify.js';
 import webhook from '../_lib/whatsapp/webhook.js';
+import queueWorker from '../_lib/whatsapp/queue-worker.js';
 import teacherWhatsApp, { teacherCaller, teacherWithInstance } from '../_lib/whatsapp/teacher.js';
 
 /* المعلم (بربط أو بدونه) → مسار واتساب المدرس دائمًا حتى لا يهدر polling
@@ -48,6 +49,7 @@ const handlers = {
   setup,
   notify,
   webhook,
+  'queue-worker': queueWorker,
   create: teacherWhatsApp.create,
   connect: teacherWhatsApp.connect,
   disconnect: teacherWhatsApp.disconnect,
