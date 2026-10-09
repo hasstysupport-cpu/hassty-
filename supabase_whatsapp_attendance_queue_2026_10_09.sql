@@ -90,8 +90,8 @@ BEGIN
      AND q.next_attempt_at <= v_now
      AND s.next_send_at <= v_now
    ORDER BY q.scheduled_at ASC, q.created_at ASC
-   FOR UPDATE OF q, s SKIP LOCKED
-   LIMIT 1;
+   LIMIT 1
+   FOR UPDATE OF q, s SKIP LOCKED;
 
   IF NOT FOUND THEN
     RETURN NULL;
