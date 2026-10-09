@@ -49,7 +49,7 @@ async function resolveResponsibleTeacher(body, access) {
 }
 
 /* إرسال واتساب: رقم المدرس المتصل أولًا، ثم Green API احتياطيًا */
-async function sendWhatsAppText(teacherId, phone, message) {
+async function sendWhatsAppText(teacherId, phone, message, requireTeacherInstance = false) {
   if (teacherId && evolutionConfigured()) {
     try {
       const instanceName = await getConnectedTeacherInstance(teacherId);
@@ -58,11 +58,15 @@ async function sendWhatsAppText(teacherId, phone, message) {
         const data = await sendTextMessage(instanceName, number, message);
         return { ok: true, via: 'teacher', data };
       }
+      if (requireTeacherInstance) throw new Error('رقم واتساب المدرس غير متصل.');
     } catch (err) {
-      /* رقم المدرس فشل (انقطع مؤقتًا؟) → نكمل على Green فورًا */
       console.error('[whatsapp/notify] teacher-instance send failed:', err?.message || err);
+      if (requireTeacherInstance) throw err;
     }
+  } else if (requireTeacherInstance) {
+    throw new Error('خدمة واتساب المدرس غير متاحة أو غير مهيأة.');
   }
+  if (requireTeacherInstance) throw new Error('رقم واتساب المدرس غير متصل.');
   const data = await sendText(phone, message);
   return { ok: true, via: 'green', data };
 }
@@ -117,7 +121,7 @@ export default async function handler(req, res) {
       : { ok: false, skipped: true, error: 'لا يوجد رقم واتساب للمستلم.' };
     if (phone) {
       try {
-        const result = await sendWhatsAppText(teacherId, phone, message);
+        const result = await sendWhatsAppText(teacherId, phone, message, body.requireTeacherWhatsApp === true);
         sent = result.data;
         whatsapp = { ok: true, via: result.via };
       } catch (waErr) {
@@ -141,7 +145,7 @@ export default async function handler(req, res) {
 
     /* 2) إشعارات المتصفح (Web Push) — تعمل دائمًا حتى لو فشل الواتساب */
     let push = { sent: 0, total: 0 };
-    if (pushUserId) {
+    if (pushUserId && body.skipPush !== true) {
       try {
         const pt = pushTemplates[event](data, access.profile?.role || data.role || '');
         push = await sendPushToUser(pushUserId, { ...pt, tag: `hassty-${event}` });
