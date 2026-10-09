@@ -15,6 +15,7 @@ const GREEN_API_INSTANCE_ID = String(process.env.GREEN_API_INSTANCE_ID || '');
 const GREEN_API_TOKEN = String(process.env.GREEN_API_TOKEN || '');
 const GREEN_API_WEBHOOK_TOKEN = String(process.env.GREEN_API_WEBHOOK_TOKEN || '');
 const INTERNAL_SECRET = String(process.env.WHATSAPP_INTERNAL_SECRET || '');
+const QUEUE_WORKER_SECRET = String(process.env.WHATSAPP_QUEUE_WORKER_SECRET || '');
 
 export function assertGreenConfig() {
   if (!GREEN_API_URL || !GREEN_API_INSTANCE_ID || !GREEN_API_TOKEN) throw new Error('GREEN API غير مهيأ: تحقق من GREEN_API_URL و GREEN_API_INSTANCE_ID و GREEN_API_TOKEN.');
@@ -149,7 +150,11 @@ export function validWebhookToken(req) {
 }
 
 export function internalOrUser(req, roles = []) {
-  if (INTERNAL_SECRET && req.headers['x-whatsapp-internal-secret'] === INTERNAL_SECRET) return { internal: true };
+  const internalSecretHeader = String(req.headers['x-whatsapp-internal-secret'] || '');
+  if (
+    (INTERNAL_SECRET && internalSecretHeader === INTERNAL_SECRET) ||
+    (QUEUE_WORKER_SECRET && internalSecretHeader === QUEUE_WORKER_SECRET)
+  ) return { internal: true };
   const auth = String(req.headers.authorization || '');
   const token = auth.replace(/^Bearer\s+/i, '');
   if (!token) return null;

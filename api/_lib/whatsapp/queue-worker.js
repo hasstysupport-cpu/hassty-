@@ -1,14 +1,14 @@
 /**
  * Internal worker endpoint for durable per-teacher WhatsApp attendance delivery.
- * Called only by the Railway queue worker using WHATSAPP_INTERNAL_SECRET.
+ * Called only by the Railway queue worker using WHATSAPP_QUEUE_WORKER_SECRET.
  */
 import { SUPABASE_URL, SERVICE_KEY, SITE_URL, jsonOk, jsonErr } from '../config.js';
 
-const INTERNAL_SECRET = String(process.env.WHATSAPP_INTERNAL_SECRET || '');
+const QUEUE_WORKER_SECRET = String(process.env.WHATSAPP_QUEUE_WORKER_SECRET || '');
 
 function isAuthorized(req) {
   const supplied = String(req.headers['x-whatsapp-internal-secret'] || '');
-  return Boolean(INTERNAL_SECRET && supplied && supplied === INTERNAL_SECRET);
+  return Boolean(QUEUE_WORKER_SECRET && supplied && supplied === QUEUE_WORKER_SECRET);
 }
 
 async function rpc(name, body) {
@@ -36,7 +36,7 @@ async function rpc(name, body) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return jsonErr(res, 'Method not allowed.', 405);
   if (!isAuthorized(req)) return jsonErr(res, 'Unauthorized.', 401);
-  if (!SERVICE_KEY || !INTERNAL_SECRET) return jsonErr(res, 'Queue worker is not configured.', 503);
+  if (!SERVICE_KEY || !QUEUE_WORKER_SECRET) return jsonErr(res, 'Queue worker is not configured.', 503);
 
   try {
     const claimed = await rpc('claim_parent_whatsapp_job', {});
@@ -54,7 +54,7 @@ export default async function handler(req, res) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-whatsapp-internal-secret': INTERNAL_SECRET,
+          'x-whatsapp-internal-secret': QUEUE_WORKER_SECRET,
         },
         body: JSON.stringify(job.payload),
         signal: AbortSignal.timeout(25000),
