@@ -79,9 +79,20 @@ interface HomePageProps {
   onOpenAuth?: (mode: 'login' | 'register', role?: AccountRole) => void;
   onSearchWithParams?: (subject: string, governorate: string, city?: string) => void;
   onSelectTutor?: (tutorId: string) => void;
+  authState?: 'loading' | 'guest' | 'unverified' | 'setup' | 'authenticated';
+  currentRole?: AccountRole;
+  onGoToDashboard?: () => void;
 }
 
-export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onOpenQRSimulator, onOpenAuth, onSearchWithParams }) => {
+export const HomePage: React.FC<HomePageProps> = ({
+  onNavigate,
+  onOpenQRSimulator,
+  onOpenAuth,
+  onSearchWithParams,
+  authState = 'guest',
+  currentRole = 'student',
+  onGoToDashboard,
+}) => {
   useSEO({
     title: 'الموقع الرسمي للدروس الخصوصية وحضور الطلاب بالـ QR في مصر',
     description: 'الموقع الرسمي لمنصة حِصّتي التعليمية (Hassty) في مصر: اعثر على أفضل المدرسين الخصوصيين المعتمدين في منطقتك، احجز الحصص أونلاين، وتابع حضور الطلاب بكود QR مع إشعارات فورية لولي الأمر.',
@@ -100,7 +111,16 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onOpenQRSimulato
 
   return (
     <div className="hs-home-shell flex flex-col bg-white overflow-hidden">
-      <ScrollReveal direction="up" delay={0} className="contents"><HeroSection onSearch={handleSearch} onOpenQRSimulator={handleQRSimulator} /></ScrollReveal>
+      <ScrollReveal direction="up" delay={0} className="contents"><HeroSection
+        onSearch={handleSearch}
+        onOpenQRSimulator={handleQRSimulator}
+        authState={authState}
+        currentRole={currentRole}
+        onOpenAuth={(mode) => handleAuth(mode)}
+        onGoToDashboard={onGoToDashboard}
+        onVerifyEmail={() => onNavigate('/verify-email')}
+        onSetupProfile={() => onNavigate('/setup-profile')}
+      /></ScrollReveal>
       <StatsBand />
       <ScrollReveal direction="up" delay={40}><DeferredSection delay={0}><ProblemSolutionSection /></DeferredSection></ScrollReveal>
       <ScrollReveal direction="up" delay={70}><DeferredSection delay={250}><HowItWorksSection onOpenAuth={handleAuth} onOpenTutorSearch={() => onNavigate('/search')} onOpenQRSimulator={handleQRSimulator} /></DeferredSection></ScrollReveal>
