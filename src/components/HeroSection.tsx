@@ -8,15 +8,30 @@
  */
 
 import React, { useState } from 'react';
-import { Search, QrCode, BookOpen, GraduationCap, CheckCircle2, Star, ShieldCheck, Sparkles, Compass, Atom, Award } from 'lucide-react';
+import { Search, QrCode, BookOpen, GraduationCap, CheckCircle2, Star, ShieldCheck, Sparkles, Compass, Atom, Award, LogIn, UserPlus, LayoutDashboard, MailCheck, ClipboardList } from 'lucide-react';
 import { LocationSelector } from './common/LocationSelector';
 
 interface HeroSectionProps {
   onSearch: (subject: string, governorate: string, city?: string) => void;
   onOpenQRSimulator: () => void;
+  authState?: 'loading' | 'guest' | 'unverified' | 'setup' | 'authenticated';
+  currentRole?: 'student' | 'parent' | 'teacher' | 'assistant' | 'admin';
+  onOpenAuth?: (mode: 'login' | 'register') => void;
+  onGoToDashboard?: () => void;
+  onVerifyEmail?: () => void;
+  onSetupProfile?: () => void;
 }
 
-export const HeroSection: React.FC<HeroSectionProps> = ({ onSearch, onOpenQRSimulator }) => {
+export const HeroSection: React.FC<HeroSectionProps> = ({
+  onSearch,
+  onOpenQRSimulator,
+  authState = 'guest',
+  currentRole = 'student',
+  onOpenAuth,
+  onGoToDashboard,
+  onVerifyEmail,
+  onSetupProfile,
+}) => {
   const [selectedSubject, setSelectedSubject] = useState('');
   const [selectedGovernorate, setSelectedGovernorate] = useState('');
   const [selectedCity, setSelectedCity] = useState('');
@@ -122,6 +137,67 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onSearch, onOpenQRSimu
             <p className="text-sm sm:text-base text-[#4B5563] leading-relaxed max-w-2xl mb-6 font-normal anim-up" style={{ animationDelay: '0ms', animationDuration: '0.45s' }}>
               منصة متكاملة تربطك بأفضل المدرسين المعتمدين في منطقتك، مع نظام تتبع عادل للحضور والواجبات لضمان التزام وتفوق الأبناء.
             </p>
+
+            {/* أزرار الحساب: ظاهرة في الصفحة الرئيسية على الموبايل والكمبيوتر */}
+            {authState !== 'loading' && (
+              <div className="w-full mb-4 anim-up" aria-label="خيارات الحساب">
+                {authState === 'guest' ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+                      <button
+                        type="button"
+                        onClick={() => onOpenAuth?.('register')}
+                        className="min-h-[48px] px-3 py-3 rounded-xl text-sm font-black text-white bg-gradient-to-l from-[#2563EB] via-[#4F46E5] to-[#7C3AED] shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-2 cursor-pointer focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200"
+                      >
+                        <UserPlus className="w-4 h-4 shrink-0" />
+                        <span>إنشاء حساب</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onOpenAuth?.('login')}
+                        className="min-h-[48px] px-3 py-3 rounded-xl text-sm font-extrabold text-[#1E3A8A] bg-white border border-blue-200 shadow-sm hover:bg-blue-50 hover:border-blue-300 hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-2 cursor-pointer focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100"
+                      >
+                        <LogIn className="w-4 h-4 shrink-0" />
+                        <span>تسجيل الدخول</span>
+                      </button>
+                    </div>
+                    <p className="mt-2 text-[11px] sm:text-xs text-[#64748B] text-center">
+                      انضم إلى حصتي أو ادخل إلى حسابك لمتابعة خدمات المنصة.
+                    </p>
+                  </>
+                ) : authState === 'authenticated' ? (
+                  <button
+                    type="button"
+                    onClick={onGoToDashboard}
+                    className="w-full min-h-[50px] px-4 py-3 rounded-xl text-sm sm:text-base font-black text-white bg-gradient-to-l from-[#2563EB] to-[#7C3AED] shadow-lg shadow-blue-500/25 hover:-translate-y-0.5 hover:shadow-blue-500/35 active:translate-y-0 transition-all flex items-center justify-center gap-2.5 cursor-pointer focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200"
+                  >
+                    <LayoutDashboard className="w-5 h-5 shrink-0" />
+                    <span>الدخول إلى لوحة التحكم</span>
+                    <span className="hidden sm:inline-block text-[10px] font-bold bg-white/15 border border-white/20 rounded-full px-2 py-1">
+                      {currentRole === 'teacher' ? 'المعلم' : currentRole === 'parent' ? 'ولي الأمر' : currentRole === 'assistant' ? 'المساعد' : currentRole === 'admin' ? 'الإدارة' : 'الطالب'}
+                    </span>
+                  </button>
+                ) : authState === 'unverified' ? (
+                  <button
+                    type="button"
+                    onClick={onVerifyEmail}
+                    className="w-full min-h-[50px] px-4 py-3 rounded-xl text-sm font-black text-[#1E3A8A] bg-white border border-blue-200 hover:bg-blue-50 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <MailCheck className="w-5 h-5" />
+                    <span>تأكيد البريد الإلكتروني لاستكمال الدخول</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={onSetupProfile}
+                    className="w-full min-h-[50px] px-4 py-3 rounded-xl text-sm font-black text-white bg-gradient-to-l from-[#2563EB] to-[#7C3AED] shadow-md shadow-blue-500/20 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <ClipboardList className="w-5 h-5" />
+                    <span>استكمال بيانات الحساب</span>
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Search Card — بدون تأخير دخول: التأخير كان يؤخر أول رسم للزر (LCP) ~240ms */}
             <form
