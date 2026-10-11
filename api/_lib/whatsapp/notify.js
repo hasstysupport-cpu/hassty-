@@ -18,7 +18,7 @@ const templates = {
   booking_confirmed: (d) => `*حِصّتي — تأكيد الحجز* ✅\n\nالطالب: *${d.studentName || 'طالب'}*\nالمادة: *${d.subject || 'حصة دراسية'}*\nالمدرس: *${d.teacherName || 'المدرس'}*\nالموعد: *${d.date || ''} ${d.time || ''}*\nرقم الحجز: *${d.bookingId || '—'}*`,
   parent_link: (d) => `*حِصّتي — طلب ربط ولي أمر* 👨‍👩‍👧\n\nيرغب *${d.parentName || 'ولي أمر'}* في ربط حسابك به لمتابعة تقدمك.\nيمكنك مراجعة الطلب من لوحة التحكم والموافقة أو الرفض.`,
   parent_link_approved: (d) => `*حِصّتي — تم الربط* ✅\n\nتم ربط حساب ولي الأمر *${d.parentName || ''}* بحساب الطالب *${d.studentName || ''}* بنجاح.`,
-  attendance: (d) => `*حِصّتي — إشعار حضور* ${d.status === 'late' ? '🟡' : d.status === 'absent' ? '🔴' : '🟢'}\n\nالطالب: *${d.studentName || 'طالب'}*\nالمجموعة: *${d.groupName || 'المجموعة'}*\nالحالة: *${d.statusLabel || 'حاضر'}*\nالوقت: *${d.time || ''}*${d.lateMinutes ? `\nالتأخير: *${d.lateMinutes} دقيقة*` : ''}`,
+  attendance: (d) => `*حِصّتي — إشعار حضور* ${d.status === 'late' ? '🟡' : d.status === 'absent' ? '🔴' : '🟢'}\n\nالطالب: *${d.studentName || 'طالب'}*\nالمجموعة: *${d.groupName || 'المجموعة'}*\n${d.teacherName ? `المدرس: *${d.teacherName}*\n` : ''}الحالة: *${d.statusLabel || 'حاضر'}*\nالوقت: *${d.time || ''}*${d.lateMinutes ? `\nالتأخير: *${d.lateMinutes} دقيقة*` : ''}`,
   payment: (d) => `*حِصّتي — تأكيد الدفع* 🧾✅\n\nالطالب: *${d.studentName || 'طالب'}*\n${d.groupName ? `المجموعة: *${d.groupName}*\n` : ''}المبلغ: *${Number(d.amount || 0).toLocaleString('ar-EG')} ج.م*\nرقم العملية: *${d.invoiceNumber || d.transactionId || '—'}*\nالتاريخ: *${d.date || new Date().toLocaleDateString('ar-EG')}*`,
   teacher_invoice: (d) => `*حِصّتي — فاتورة مستحقات المدرس* 💰🧾\n\nالمدرس: *${d.teacherName || 'المدرس'}*\nالفترة: *${d.period || 'الفترة الحالية'}*\nإجمالي الإيراد: *${Number(d.gross || 0).toLocaleString('ar-EG')} ج.م*\nالعمولة: *${Number(d.commission || 0).toLocaleString('ar-EG')} ج.م*\nالصافي المستحق: *${Number(d.net || 0).toLocaleString('ar-EG')} ج.م*\nرقم الفاتورة: *${d.invoiceNumber || '—'}*`,
   support: (d) => `*حِصّتي — تحديث طلب الدعم* 🎧\n\nرقم الطلب: *${d.ticketNumber || '—'}*\nالحالة: *${d.status || 'جديد'}*\n\n${d.message || 'تم تحديث طلب الدعم الخاص بك.'}`,
@@ -109,7 +109,9 @@ export default async function handler(req, res) {
 
     if (!phone && !pushUserId) return jsonErr(res, 'لا يوجد رقم واتساب ولا معرّف مستخدم للمستلم.', 422);
 
-    const message = templates[event](data.role || access.profile?.role || '', data.name || access.profile?.full_name || '', data);
+    const message = event === 'welcome'
+      ? templates[event](data.role || access.profile?.role || '', data.name || access.profile?.full_name || '', data)
+      : templates[event](data);
 
     /* المدرس المسؤول (رقم المرسل في الواتساب) */
     const teacherId = await resolveResponsibleTeacher(body, access);
