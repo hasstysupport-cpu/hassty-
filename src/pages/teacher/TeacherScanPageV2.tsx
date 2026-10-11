@@ -90,7 +90,7 @@ export const TeacherScanPage: React.FC = () => {
       if (saved === 'manual' || saved === 'auto') preference = saved;
     } catch { /* التخزين المحلي غير متاح */ }
     setScanInputMode(preference);
-    setScannerOpen(preference === 'auto');
+    setScannerOpen(true);
     setScanModeLoadedFor(teacherId);
   }, [teacherId]);
 
@@ -230,36 +230,30 @@ export const TeacherScanPage: React.FC = () => {
           <div className="text-[11px] font-bold text-slate-500">اختيارك محفوظ لحسابك — الوضع الافتراضي يدوي</div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2" role="group" aria-label="اختيار طريقة مسح QR">
-          <button type="button" aria-pressed={scanInputMode === 'manual'} onClick={() => { setScanInputMode('manual'); setScannerOpen(false); setManualCode(''); }} className={scanInputMode === 'manual' ? 'rounded-2xl border-2 border-blue-500 bg-blue-50 text-blue-900 px-4 py-3 text-sm font-black flex items-center justify-center gap-2' : 'rounded-2xl border-2 border-slate-200 bg-white text-slate-600 px-4 py-3 text-sm font-bold flex items-center justify-center gap-2'}>
-            <QrCode className="w-4 h-4" /> المسح اليدوي
+          <button type="button" aria-pressed={scanInputMode === 'manual'} onClick={() => { setScanInputMode('manual'); setScannerOpen(true); setManualCode(''); }} className={scanInputMode === 'manual' ? 'rounded-2xl border-2 border-blue-500 bg-blue-50 text-blue-900 px-4 py-3 text-sm font-black flex items-center justify-center gap-2' : 'rounded-2xl border-2 border-slate-200 bg-white text-slate-600 px-4 py-3 text-sm font-bold flex items-center justify-center gap-2'}>
+            <QrCode className="w-4 h-4" /> يدوي بالكاميرا
           </button>
           <button type="button" aria-pressed={scanInputMode === 'auto'} onClick={() => { setScanInputMode('auto'); setScannerOpen(true); setManualCode(''); }} className={scanInputMode === 'auto' ? 'rounded-2xl border-2 border-emerald-500 bg-emerald-50 text-emerald-900 px-4 py-3 text-sm font-black flex items-center justify-center gap-2' : 'rounded-2xl border-2 border-slate-200 bg-white text-slate-600 px-4 py-3 text-sm font-bold flex items-center justify-center gap-2'}>
-            <RefreshCw className="w-4 h-4" /> المسح التلقائي بالكاميرا
+            <RefreshCw className="w-4 h-4" /> تلقائي بالكاميرا
           </button>
         </div>
       </div>
       <div className={`mt-4 rounded-2xl border px-4 py-3 flex items-center gap-3 ${banner.label.includes('الموعد')?'bg-emerald-50 border-emerald-200 text-emerald-900':banner.label.includes('تأخير')?'bg-amber-50 border-amber-200 text-amber-900':banner.label.includes('غياب')||banner.label.includes('انتهت')?'bg-red-50 border-red-200 text-red-900':'bg-slate-50 border-slate-200 text-slate-700'}`}><BannerIcon className="w-5 h-5"/><div><div className="font-black text-sm">{banner.label}</div><div className="text-[11px] opacity-80">{activeSlot?`موعد المجموعة: ${activeSlot.dayArabic} ${activeSlot.startTime} → ${activeSlot.endTime}`:'الحالة تتحدث تلقائيًا كل 5 ثوانٍ'}</div></div></div>
     </section>
     <section className="bg-white border border-gray-200 rounded-3xl p-5 shadow-sm">
-      {scanInputMode === 'auto' ? (
-        <>
-          <RealQRCameraScanner isActive={scannerOpen} isPaused={busy} onScanSuccess={processCode} />
-          <div className="mt-3 flex justify-center">
-            <button type="button" onClick={() => setScannerOpen(v => !v)} className="text-xs font-bold text-slate-500 hover:text-blue-700">{scannerOpen ? 'إيقاف الكاميرا' : 'تشغيل الكاميرا'}</button>
-          </div>
-        </>
-      ) : (
-        <div className="max-w-md mx-auto">
-          <div className="text-center mb-3">
-            <div className="font-black text-sm text-slate-800">أدخل كود QR يدويًا</div>
-            <p className="text-xs text-slate-500 mt-1">الوضع اليدوي لا يشغّل الكاميرا، ولن يتم تسجيل أي شيء إلا بعد الضغط على زر المسح.</p>
-          </div>
-          <div className="flex gap-2">
-            <input value={manualCode} onChange={e => setManualCode(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') void processCode(manualCode); }} placeholder="اكتب أو الصق كود QR" className="flex-1 min-w-0 rounded-2xl border border-slate-300 px-4 py-3 text-sm font-mono text-left focus:outline-none focus:border-blue-500" dir="ltr" />
-            <button type="button" disabled={busy || !manualCode.trim()} onClick={() => void processCode(manualCode)} className="px-5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-black disabled:opacity-50 flex items-center justify-center gap-2"><QrCode className="w-4 h-4" />{busy ? 'جاري...' : 'مسح الكود'}</button>
-          </div>
+      <div className="mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-black text-slate-800">{scanInputMode === 'manual' ? 'المسح اليدوي بالكاميرا' : 'المسح التلقائي بالكاميرا'}</h3>
+          <p className="text-[11px] text-slate-500 mt-1">{scanInputMode === 'manual' ? 'الكاميرا تكتشف الكود، لكن التسجيل لن يبدأ إلا بعد ضغط زر «امسح الكود».' : 'بمجرد ما الكاميرا تتعرف على QR، تبدأ معالجة الكود تلقائيًا.'}</p>
         </div>
-      )}
+        <button type="button" onClick={() => setScannerOpen(v => !v)} className="shrink-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100">{scannerOpen ? 'إيقاف الكاميرا' : 'تشغيل الكاميرا'}</button>
+      </div>
+      <RealQRCameraScanner
+        isActive={scannerOpen}
+        isPaused={busy}
+        scanMode={scanInputMode === 'auto' ? 'automatic' : 'manual'}
+        onScanSuccess={processCode}
+      />
     </section>
     <button type="button" onClick={()=>void reloadGroups()} className="w-full py-3 rounded-2xl border border-slate-200 bg-white text-slate-700 font-black text-xs flex items-center justify-center gap-2"><RefreshCw className="w-4 h-4"/>تحديث المجموعات</button>
   </div>;
