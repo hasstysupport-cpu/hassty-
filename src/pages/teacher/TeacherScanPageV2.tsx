@@ -48,7 +48,9 @@ export const TeacherScanPage: React.FC = () => {
   const [groups, setGroups] = useState<StudentGroup[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState('');
   const [manualCode, setManualCode] = useState('');
-  const [scannerOpen, setScannerOpen] = useState(true);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scanInputMode, setScanInputMode] = useState<'manual'|'auto'>('manual');
+  const [scanModeLoadedFor, setScanModeLoadedFor] = useState('');
   const [mode, setMode] = useState<ScanMode>(() => {
     // الأولوية: ?mode=payment في الرابط (دخول مباشر)، ثم علامة sessionStorage من صفحة المدفوعات
     try {
@@ -78,6 +80,24 @@ export const TeacherScanPage: React.FC = () => {
 
   useEffect(() => { void reloadGroups(); }, [reloadGroups]);
   useEffect(() => { const id=window.setInterval(()=>setNow(new Date()),5000); return()=>window.clearInterval(id); }, []);
+
+  // تفضيل طريقة مسح QR محفوظ لكل مدرس؛ الوضع اليدوي هو الافتراضي دائمًا.
+  useEffect(() => {
+    if (!teacherId) return;
+    let preference: 'manual'|'auto' = 'manual';
+    try {
+      const saved = localStorage.getItem('hassty_qr_scan_input_mode:' + teacherId);
+      if (saved === 'manual' || saved === 'auto') preference = saved;
+    } catch { /* التخزين المحلي غير متاح */ }
+    setScanInputMode(preference);
+    setScannerOpen(preference === 'auto');
+    setScanModeLoadedFor(teacherId);
+  }, [teacherId]);
+
+  useEffect(() => {
+    if (!teacherId || scanModeLoadedFor !== teacherId) return;
+    try { localStorage.setItem('hassty_qr_scan_input_mode:' + teacherId, scanInputMode); } catch { /* تجاهل فشل التخزين */ }
+  }, [teacherId, scanInputMode, scanModeLoadedFor]);
 
   const auto = useMemo(()=>getActiveGroup(groups,now),[groups,now]);
   const selectedGroup = groups.find(g=>g.id===selectedGroupId)||null;
@@ -199,14 +219,48 @@ export const TeacherScanPage: React.FC = () => {
             steps={['اختر وضع الماسح: تسجيل حضور، تحصيل مالي، أو قيد طالب جديد.', 'وجّه الكاميرا على كارت الطالب — النظام يتعرف عليه ويظهر بياناته قبل التأكيد.']}
             notes={['لو الكاميرا مش شغالة في المتصفح، اكتب كود الطالب يدويًا في خانة الإدخال.']}
           />
+    {message&&<section className={`rounded-3xl border p-5 flex gap-3 ${message.kind==='success'?'bg-emerald-50 border-emerald-200 text-emerald-950':message.kind==='warning'?'bg-amber-50 border-amber-200 text-amber-950':message.kind==='error'?'bg-red-50 border-red-200 text-red-950':'bg-blue-50 border-blue-200 text-blue-950'}`}><div className="w-10 h-10 rounded-2xl bg-white border border-current/10 flex items-center justify-center shrink-0">{message.kind==='success'?<CheckCircle2 className="w-5 h-5"/>:message.kind==='error'?<XCircle className="w-5 h-5"/>:message.kind==='warning'?<AlertCircle className="w-5 h-5"/>:<ShieldCheck className="w-5 h-5"/>}</div><div><h3 className="font-black text-sm">{message.title}</h3><p className="text-xs mt-1 leading-6 opacity-80">{message.body}</p></div></section>}
     <section className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-7 shadow-sm">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4"><div><div className="inline-flex items-center gap-2 text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-full"><QrCode className="w-4 h-4"/>مسح حضور QR حقيقي</div><h2 className="text-xl sm:text-2xl font-black text-slate-900 mt-2">تسجيل حضور الطلاب بالوقت الفعلي</h2><p className="text-xs text-slate-500 mt-1">الحالة تُحسب تلقائيًا من موعد المجموعة ووقت المسح — مع ربط السجل بالحصة الفعلية إن وُجدت.</p></div><div className="flex items-center gap-2 text-xs font-bold text-slate-600 bg-slate-50 px-3 py-2 rounded-2xl border border-slate-200"><Clock3 className="w-4 h-4 text-blue-600"/>{now.toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}</div></div>
       <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-3"><select value={selectedGroupId} onChange={e=>setSelectedGroupId(e.target.value)} className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold"><option value="">اختر المجموعة</option>{groups.map(g=><option key={g.id} value={g.id}>{g.name} — {g.grade||'عام'} — {g.schedule}</option>)}</select><div className="flex gap-2"><button type="button" onClick={()=>{setMode('attendance');setMessage(null)}} className={`flex-1 rounded-2xl border-2 px-3 py-3 text-sm font-black ${mode==='attendance'?'border-emerald-500 bg-emerald-50 text-emerald-800':'border-slate-200 bg-slate-50 text-slate-600'}`}><CheckCircle2 className="w-4 h-4 inline ml-1"/>حضور</button><button type="button" onClick={()=>{setMode('enroll');setMessage(null)}} className={`flex-1 rounded-2xl border-2 px-3 py-3 text-sm font-black ${mode==='enroll'?'border-blue-500 bg-blue-50 text-blue-800':'border-slate-200 bg-slate-50 text-slate-600'}`}><UserPlus className="w-4 h-4 inline ml-1"/>قيد طالب</button><button type="button" onClick={()=>{setMode('payment');setMessage(null)}} className={`flex-1 rounded-2xl border-2 px-3 py-3 text-sm font-black ${mode==='payment'?'border-amber-500 bg-amber-50 text-amber-800':'border-slate-200 bg-slate-50 text-slate-600'}`}><Banknote className="w-4 h-4 inline ml-1"/>تحصيل شهر</button></div></div>
       {mode==='payment'&&<div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[11px] font-bold text-amber-900 flex items-start gap-2"><Banknote className="w-4 h-4 shrink-0 mt-0.5"/><span>امسح QR الطالب لتحصيل اشتراك الشهر الحالي ({monthLabel(currentMonthKey())}) — القيمة من اشتراك المجموعة، وتُسجل فورًا في سجل الطلاب وصفحات مدفوعات الطالب وولي الأمر مع إشعار واتساب + إشعارات فورية.</span></div>}
+      <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+          <div className="font-black text-sm text-slate-800">طريقة مسح QR</div>
+          <div className="text-[11px] font-bold text-slate-500">اختيارك محفوظ لحسابك — الوضع الافتراضي يدوي</div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2" role="group" aria-label="اختيار طريقة مسح QR">
+          <button type="button" aria-pressed={scanInputMode === 'manual'} onClick={() => { setScanInputMode('manual'); setScannerOpen(false); setManualCode(''); }} className={scanInputMode === 'manual' ? 'rounded-2xl border-2 border-blue-500 bg-blue-50 text-blue-900 px-4 py-3 text-sm font-black flex items-center justify-center gap-2' : 'rounded-2xl border-2 border-slate-200 bg-white text-slate-600 px-4 py-3 text-sm font-bold flex items-center justify-center gap-2'}>
+            <QrCode className="w-4 h-4" /> المسح اليدوي
+          </button>
+          <button type="button" aria-pressed={scanInputMode === 'auto'} onClick={() => { setScanInputMode('auto'); setScannerOpen(true); setManualCode(''); }} className={scanInputMode === 'auto' ? 'rounded-2xl border-2 border-emerald-500 bg-emerald-50 text-emerald-900 px-4 py-3 text-sm font-black flex items-center justify-center gap-2' : 'rounded-2xl border-2 border-slate-200 bg-white text-slate-600 px-4 py-3 text-sm font-bold flex items-center justify-center gap-2'}>
+            <RefreshCw className="w-4 h-4" /> المسح التلقائي بالكاميرا
+          </button>
+        </div>
+      </div>
       <div className={`mt-4 rounded-2xl border px-4 py-3 flex items-center gap-3 ${banner.label.includes('الموعد')?'bg-emerald-50 border-emerald-200 text-emerald-900':banner.label.includes('تأخير')?'bg-amber-50 border-amber-200 text-amber-900':banner.label.includes('غياب')||banner.label.includes('انتهت')?'bg-red-50 border-red-200 text-red-900':'bg-slate-50 border-slate-200 text-slate-700'}`}><BannerIcon className="w-5 h-5"/><div><div className="font-black text-sm">{banner.label}</div><div className="text-[11px] opacity-80">{activeSlot?`موعد المجموعة: ${activeSlot.dayArabic} ${activeSlot.startTime} → ${activeSlot.endTime}`:'الحالة تتحدث تلقائيًا كل 5 ثوانٍ'}</div></div></div>
     </section>
-    <section className="bg-white border border-gray-200 rounded-3xl p-5 shadow-sm"><RealQRCameraScanner isActive={scannerOpen} isPaused={busy} onScanSuccess={processCode}/><div className="max-w-md mx-auto mt-4 flex gap-2"><input value={manualCode} onChange={e=>setManualCode(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')void processCode(manualCode)}} placeholder="أدخل كود QR يدويًا" className="flex-1 rounded-2xl border border-slate-300 px-4 py-3 text-sm font-mono text-left focus:outline-none focus:border-blue-500" dir="ltr"/><button type="button" disabled={busy} onClick={()=>void processCode(manualCode)} className="px-5 rounded-2xl bg-blue-600 text-white text-sm font-black disabled:opacity-50">{busy?'جاري...':'مسح'}</button></div><div className="mt-3 flex justify-center"><button type="button" onClick={()=>setScannerOpen(v=>!v)} className="text-xs font-bold text-slate-500 hover:text-blue-700">{scannerOpen?'إيقاف الكاميرا':'تشغيل الكاميرا'}</button></div></section>
-    {message&&<section className={`rounded-3xl border p-5 flex gap-3 ${message.kind==='success'?'bg-emerald-50 border-emerald-200 text-emerald-950':message.kind==='warning'?'bg-amber-50 border-amber-200 text-amber-950':message.kind==='error'?'bg-red-50 border-red-200 text-red-950':'bg-blue-50 border-blue-200 text-blue-950'}`}><div className="w-10 h-10 rounded-2xl bg-white border border-current/10 flex items-center justify-center shrink-0">{message.kind==='success'?<CheckCircle2 className="w-5 h-5"/>:message.kind==='error'?<XCircle className="w-5 h-5"/>:message.kind==='warning'?<AlertCircle className="w-5 h-5"/>:<ShieldCheck className="w-5 h-5"/>}</div><div><h3 className="font-black text-sm">{message.title}</h3><p className="text-xs mt-1 leading-6 opacity-80">{message.body}</p></div></section>}
+    <section className="bg-white border border-gray-200 rounded-3xl p-5 shadow-sm">
+      {scanInputMode === 'auto' ? (
+        <>
+          <RealQRCameraScanner isActive={scannerOpen} isPaused={busy} onScanSuccess={processCode} />
+          <div className="mt-3 flex justify-center">
+            <button type="button" onClick={() => setScannerOpen(v => !v)} className="text-xs font-bold text-slate-500 hover:text-blue-700">{scannerOpen ? 'إيقاف الكاميرا' : 'تشغيل الكاميرا'}</button>
+          </div>
+        </>
+      ) : (
+        <div className="max-w-md mx-auto">
+          <div className="text-center mb-3">
+            <div className="font-black text-sm text-slate-800">أدخل كود QR يدويًا</div>
+            <p className="text-xs text-slate-500 mt-1">الوضع اليدوي لا يشغّل الكاميرا، ولن يتم تسجيل أي شيء إلا بعد الضغط على زر المسح.</p>
+          </div>
+          <div className="flex gap-2">
+            <input value={manualCode} onChange={e => setManualCode(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') void processCode(manualCode); }} placeholder="اكتب أو الصق كود QR" className="flex-1 min-w-0 rounded-2xl border border-slate-300 px-4 py-3 text-sm font-mono text-left focus:outline-none focus:border-blue-500" dir="ltr" />
+            <button type="button" disabled={busy || !manualCode.trim()} onClick={() => void processCode(manualCode)} className="px-5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-black disabled:opacity-50 flex items-center justify-center gap-2"><QrCode className="w-4 h-4" />{busy ? 'جاري...' : 'مسح الكود'}</button>
+          </div>
+        </div>
+      )}
+    </section>
     <button type="button" onClick={()=>void reloadGroups()} className="w-full py-3 rounded-2xl border border-slate-200 bg-white text-slate-700 font-black text-xs flex items-center justify-center gap-2"><RefreshCw className="w-4 h-4"/>تحديث المجموعات</button>
   </div>;
 };
