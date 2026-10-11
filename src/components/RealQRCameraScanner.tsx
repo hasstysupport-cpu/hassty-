@@ -20,7 +20,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import jsQR from 'jsqr';
-import { Camera, CameraOff, RefreshCw, Upload, CheckCircle2, Flashlight, ZoomIn, Zap } from 'lucide-react';
+import { Camera, CameraOff, RefreshCw, Upload, CheckCircle2, Flashlight, ZoomIn, Zap, QrCode } from 'lucide-react';
 
 interface DetectedCode { rawValue?: string }
 interface BarcodeDetectorLike { detect: (source: HTMLVideoElement | HTMLImageElement | HTMLCanvasElement) => Promise<DetectedCode[]> }
@@ -29,6 +29,8 @@ interface RealQRCameraScannerProps {
   onScanSuccess: (qrCode: string) => void;
   isActive: boolean;
   isPaused?: boolean;
+  /** automatic: process as soon as QR is detected; manual: wait for the teacher to press Scan. */
+  scanMode?: 'automatic' | 'manual';
   /** فترة التهدئة بين المسح المتتالي بالمللي ثانية — قصيرة عشان السرعة */
   cooldownMs?: number;
 }
@@ -37,6 +39,7 @@ export const RealQRCameraScanner: React.FC<RealQRCameraScannerProps> = ({
   onScanSuccess,
   isActive,
   isPaused = false,
+  scanMode = 'automatic',
   cooldownMs = 600,
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -51,6 +54,9 @@ export const RealQRCameraScanner: React.FC<RealQRCameraScannerProps> = ({
   const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [lastScannedCode, setLastScannedCode] = useState<string | null>(null);
+  const [detectedCode, setDetectedCode] = useState<string | null>(null);
+  const [manualScanHint, setManualScanHint] = useState('وجّه الكاميرا نحو QR واضغط «امسح الكود» عند ظهوره.');
+  const detectedCodeRef = useRef<string | null>(null);
   const [torchSupported, setTorchSupported] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
   const [zoomCaps, setZoomCaps] = useState<{ min: number; max: number; step: number } | null>(null);
@@ -99,6 +105,9 @@ export const RealQRCameraScanner: React.FC<RealQRCameraScannerProps> = ({
     if (isCooldownRef.current) return;
     isCooldownRef.current = true;
     setLastScannedCode(code);
+    detectedCodeRef.current = null;
+    setDetectedCode(null);
+    setManualScanHint('تم التقاط الكود، جارٍ معالجة العملية...');
     playBeep();
     onScanSuccess(code);
     setTimeout(() => { isCooldownRef.current = false; }, cooldownMs);
@@ -321,7 +330,23 @@ export const RealQRCameraScanner: React.FC<RealQRCameraScannerProps> = ({
           }
         }
 
-        if (decoded && !isCooldownRef.current) emitCode(decoded);
+        if (scanMode === 'automatic') {
+          if (decoded && !isCooldownRef.current) emitCode(decoded);
+        } else if (scanMode === 'manual') {
+          // In manual mode the camera keeps detecting in the background, but
+          // nothing is submitted until the teacher presses the scan button.
+          if (decoded) {
+            if (detectedCodeRef.current !== decoded) {
+              detectedCodeRef.current = decoded;
+              setDetectedCode(decoded);
+              setManualScanHint('تم التعرف على QR. اضغط «امسح الكود» لتأكيد المسح.');
+            }
+          } else if (detectedCodeRef.current !== null) {
+            detectedCodeRef.current = null;
+            setDetectedCode(null);
+            setManualScanHint('وجّه الكاميرا نحو QR واضغط «امسح الكود» عند ظهوره.');
+          }
+        }
       }
 
       animationFrameRef.current = requestAnimationFrame(run);
@@ -335,9 +360,20 @@ export const RealQRCameraScanner: React.FC<RealQRCameraScannerProps> = ({
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [stream, isPaused, isCameraActive, onScanSuccess]);
+  }, [stream, isPaused, isCameraActive, onScanSuccess, scanMode]);
+
+  const confirmManualScan = () => {
+    if (isPaused || isCooldownRef.current) return;
+    const code = detectedCodeRef.current;
+    if (!code) {
+      setManualScanHint('مش قادر أقرأ QR لسه. قرّب الكارت وخليه واضح داخل إطار الكاميرا ثم اضغط «امسح الكود».');
+      return;
+    }
+    emitCode(code);
+  };
 
   return (
+    <>
     <div className="relative w-full max-w-md mx-auto aspect-square rounded-3xl overflow-hidden bg-black shadow-2xl border-2 border-emerald-500/50 flex flex-col items-center justify-center">
 
       {/* Hidden File Input for QR Image Upload */}
@@ -366,7 +402,7 @@ export const RealQRCameraScanner: React.FC<RealQRCameraScannerProps> = ({
           {/* Top Header Badge */}
           <div className="bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 text-white text-[11px] font-bold flex items-center gap-1.5 shadow-md">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-            <span>كاميرا المسح المباشر نشطة</span>
+            <span>{scanMode === 'automatic' ? 'المسح التلقائي نشط' : 'الكاميرا جاهزة — المسح اليدوي'}</span>
           </div>
 
           {/* Laser Scanner Line */}
@@ -385,7 +421,7 @@ export const RealQRCameraScanner: React.FC<RealQRCameraScannerProps> = ({
             {lastScannedCode ? (
               <span className="text-emerald-300 font-mono font-bold">تم قراءة: {lastScannedCode}</span>
             ) : (
-              <span>ضع كود QR الطالب داخل المربع للمسح الفوري</span>
+              <span>{scanMode === 'automatic' ? 'ضع كود QR داخل المربع وسيتم التقاطه تلقائيًا' : (detectedCode ? 'تم اكتشاف الكود — اضغط «امسح الكود» أسفل الكاميرا' : 'وجّه الكاميرا إلى كود QR ثم اضغط زر المسح')}</span>
             )}
           </div>
         </div>
@@ -483,5 +519,22 @@ export const RealQRCameraScanner: React.FC<RealQRCameraScannerProps> = ({
       )}
 
     </div>
+    {scanMode === 'manual' && (
+      <div className="w-full max-w-md mx-auto mt-3 space-y-2">
+        <div className={`rounded-xl border px-3 py-2 text-xs text-center font-bold ${detectedCode ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-slate-50 border-slate-200 text-slate-600'}`} role="status" aria-live="polite">
+          {manualScanHint}
+        </div>
+        <button
+          type="button"
+          onClick={confirmManualScan}
+          disabled={isPaused || !isCameraActive}
+          className="w-full h-12 rounded-2xl bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white text-sm font-black flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <QrCode className="w-5 h-5" />
+          {isPaused ? 'جاري معالجة المسح...' : 'امسح الكود'}
+        </button>
+      </div>
+    )}
+    </>
   );
 };
