@@ -530,7 +530,7 @@ export const RealQRCameraScanner: React.FC<RealQRCameraScannerProps> = ({
           <div className="flex flex-col sm:flex-row gap-2.5 w-full max-w-xs pt-1">
             <button
               type="button"
-              onClick={startCamera}
+              onClick={() => void startCamera()}
               className="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg cursor-pointer active:scale-95 transition-all"
             >
               <Camera className="w-4 h-4" />
