@@ -57,7 +57,7 @@ export default async function handler(req, res) {
           'x-whatsapp-internal-secret': QUEUE_WORKER_SECRET,
         },
         body: JSON.stringify(job.payload),
-        signal: AbortSignal.timeout(25000),
+        signal: AbortSignal.timeout(35000),
       });
       const raw = await response.text();
       let result = null;
