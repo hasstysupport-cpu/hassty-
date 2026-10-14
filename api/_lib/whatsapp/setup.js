@@ -1,25 +1,33 @@
 /**
- * Hassty — منصة حِصّتي التعليمية
- * جميع الحقوق محفوظة لدي Tikzoom © | MCV_M
- * المبرمج: محمود على محمود مدكور
- * بصمة حقوق الملكية: هذا الموقع بجميع ملفاته وأكواده وتصاميمه ملك خاص للمالك Mahmoudmadkour وجميع الأملاك له فقط،
- * ويُمنع النسخ أو النقل أو إعادة استخدام أي جزء منه دون إذن كتابي مسبق من المالك.
- * Copyright (c) Mahmoudmadkour — All Rights Reserved.
+ * Admin health check for the Railway-hosted Evolution API.
+ * Teachers connect their own WhatsApp instance from their dashboard.
  */
+import { jsonErr, jsonOk } from '../config.js';
+import { internalOrUser } from './auth.js';
+import { evolutionConfigured, fetchInstances } from '../evolution.js';
 
-import { jsonErr, jsonOk, readJsonBody } from '../config.js';
-import { configureWebhook, internalOrUser } from '../green.js';
+function extractInstances(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.instances)) return payload.instances;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.response)) return payload.response;
+  return [];
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return jsonErr(res, 'طريقة الطلب غير مسموحة.', 405);
   const access = await internalOrUser(req, ['admin']);
   if (!access) return jsonErr(res, 'صلاحية الإدارة مطلوبة.', 403);
+  if (!evolutionConfigured()) return jsonErr(res, 'إعدادات Evolution API غير مكتملة في Vercel.', 503, { provider: 'evolution' });
   try {
-    await readJsonBody(req);
-    const data = await configureWebhook();
-    return jsonOk(res, { success: true, data, webhookPath: '/api/whatsapp/webhook' });
+    const instances = extractInstances(await fetchInstances());
+    return jsonOk(res, {
+      success: true, provider: 'evolution', service: 'railway', setupRequired: false,
+      totalInstances: instances.length,
+      message: 'تم الاتصال بخدمة واتساب على Railway. ربط الأرقام يتم من لوحة كل مدرس.'
+    });
   } catch (err) {
-    console.error('[whatsapp/setup]', err);
-    return jsonErr(res, err?.message || 'فشل إعداد Webhook.', err?.status || 500);
+    console.error('[whatsapp/setup] Evolution API check failed:', err?.message || 'unknown error');
+    return jsonErr(res, 'تعذر الاتصال بخدمة واتساب على Railway. تحقق من الخدمة ومفتاح Evolution API.', 503, { provider: 'evolution' });
   }
 }
