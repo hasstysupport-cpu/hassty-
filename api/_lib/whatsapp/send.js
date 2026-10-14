@@ -1,61 +1,18 @@
 /**
- * Hassty — منصة حِصّتي التعليمية
- * جميع الحقوق محفوظة لدي Tikzoom © | MCV_M
- * المبرمج: محمود على محمود مدكور
- * بصمة حقوق الملكية: هذا الموقع بجميع ملفاته وأكواده وتصاميمه ملك خاص للمالك Mahmoudmadkour وجميع الأملاك له فقط،
- * ويُمنع النسخ أو النقل أو إعادة استخدام أي جزء منه دون إذن كتابي مسبق من المالك.
- * Copyright (c) Mahmoudmadkour — All Rights Reserved.
+ * Legacy generic send route. Green API is retired.
+ * Teacher sends are routed to the authenticated teacher's Evolution instance.
  */
-
-import { readJsonBody, jsonOk, jsonErr } from '../config.js';
-import { describeWhatsAppError, internalOrUser, sendText, sendFile, sendLocation, sendInteractive, chatId } from '../green.js';
+import { jsonErr } from '../config.js';
+import { internalOrUser } from './auth.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return jsonErr(res, 'طريقة الطلب غير مسموحة.', 405);
-  try {
-    const body = await readJsonBody(req);
-    if (!body) return jsonErr(res, 'تعذر قراءة بيانات الطلب.', 400);
-    /* الأمان: الإرسال الحر بأي رقم/نص للطاقم فقط (أدمن/مدرس/مساعد).
-       ولي الأمر يُسمح له بالإرسال إلى رقم واتسابه هو فقط (اختبار الإعدادات).
-       الطلاب لا يرسلون رسائل حرة — إشعاراتهم القوالبية تمر عبر /notify
-       التي تتحقق من نوع الحدث وتجهز البيانات من الخادم. منع إساءة استخدام
-       رقم المنصة (سبام/تصيّد) واستنزاف حصة الباقة. */
-    const access = await internalOrUser(req, ['admin', 'teacher', 'assistant', 'parent']);
-    if (!access) return jsonErr(res, 'غير مصرح.', 401);
-
-    const kind = String(body.kind || 'text');
-    const number = body.number || body.phone;
-    if (!number) return jsonErr(res, 'رقم الهاتف مطلوب.', 422);
-
-    /* ولي الأمر: تقييد الوجهة برقم واتسابه المسجل نفسه */
-    if (!access.internal && access.profile?.role === 'parent') {
-      const own = String(access.profile.phone || '').replace(/\D/g, '');
-      const dest = String(number).replace(/\D/g, '');
-      const destLocal = dest.startsWith('20') ? '0' + dest.slice(2) : dest;
-      if (!own || destLocal !== own) return jsonErr(res, 'لا يمكن إرسال واتساب إلا إلى رقمك المسجل لاختبار الإشعارات.', 403);
-    }
-
-    let data;
-    if (kind === 'text') {
-      if (!body.message) return jsonErr(res, 'نص الرسالة مطلوب.', 422);
-      data = await sendText(number, body.message);
-    } else if (kind === 'file') {
-      data = await sendFile(number, body.url, body.fileName, body.caption || '');
-    } else if (kind === 'location') {
-      data = await sendLocation(number, body.latitude, body.longitude, body.name || '', body.address || '');
-    } else if (kind === 'interactive') {
-      data = await sendInteractive(number, { header: body.header, body: body.message || body.body, footer: body.footer, buttons: body.buttons });
-    } else {
-      return jsonErr(res, 'نوع رسالة غير مدعوم.', 422);
-    }
-
-    return jsonOk(res, { success: true, data, chatId: chatId(number) });
-  } catch (err) {
-    console.error('[whatsapp/send]', err);
-    const friendly = describeWhatsAppError(err);
-    const e = new Error(friendly);
-    e.status = err?.status || 500;
-    e.quotaExceeded = err?.status === 466 || /quota/i.test(String(err?.data?.invokeStatus?.description || err?.message || ''));
-    return jsonErr(res, friendly, e.status, { quotaExceeded: e.quotaExceeded });
-  }
+  const access = await internalOrUser(req, ['admin', 'teacher', 'assistant', 'parent']);
+  if (!access) return jsonErr(res, 'غير مصرح.', 401);
+  return jsonErr(
+    res,
+    'تم إيقاف الإرسال العام القديم. أرسل من مسار واتساب المدرس المتصل عبر Railway/Evolution حتى لا تُرسل الرسالة من رقم غير صحيح.',
+    409,
+    { provider: 'evolution', setupRequired: 'teacher_whatsapp_connection' }
+  );
 }
