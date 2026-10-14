@@ -21,7 +21,7 @@ async function rpc(name, body) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(body || {}),
-    signal: AbortSignal.timeout(15000),
+    signal: AbortSignal.timeout(10000),
   });
   const raw = await response.text();
   let data = null;
@@ -38,12 +38,14 @@ export default async function handler(req, res) {
   if (!isAuthorized(req)) return jsonErr(res, 'Unauthorized.', 401);
   if (!SERVICE_KEY || !QUEUE_WORKER_SECRET) return jsonErr(res, 'Queue worker is not configured.', 503);
 
+  let stage = 'claim';
   try {
     const claimed = await rpc('claim_parent_whatsapp_job', {});
     const job = Array.isArray(claimed) ? claimed[0] : claimed;
     if (!job || !job.id) return jsonOk(res, { processed: false });
 
     let sent = false;
+    stage = 'notify';
     let failure = '';
     let providerMessageId = null;
 
@@ -57,7 +59,7 @@ export default async function handler(req, res) {
           'x-whatsapp-internal-secret': QUEUE_WORKER_SECRET,
         },
         body: JSON.stringify(job.payload),
-        signal: AbortSignal.timeout(35000),
+        signal: AbortSignal.timeout(30000),
       });
       const raw = await response.text();
       let result = null;
@@ -78,6 +80,7 @@ export default async function handler(req, res) {
       failure = String(err?.message || 'Unknown WhatsApp delivery error').slice(0, 1000);
     }
 
+    stage = 'complete';
     const completed = await rpc('complete_parent_whatsapp_job', {
       p_job_id: job.id,
       p_success: sent,
@@ -92,7 +95,7 @@ export default async function handler(req, res) {
       status: sent ? 'sent' : (outcome || 'retry_scheduled'),
     });
   } catch (err) {
-    console.error('[whatsapp/queue-worker]', err?.message || 'Worker request failed.');
+    console.error(`[whatsapp/queue-worker] stage=${stage}:`, err?.message || 'Worker request failed.');
     return jsonErr(res, 'Queue processing failed; the job will be recovered safely.', 500);
   }
 }
