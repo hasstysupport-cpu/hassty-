@@ -14,8 +14,7 @@
 
    التوجيه الذكي (دون كسر أي نظام قائم):
    - status/send: المعلم الذي ربط رقمه الخاص (Evolution) تُخدم
-     طلباته من مثيله هو؛ كل الآخرين (أدمن/مساعد/ولي أمر/معلم بلا
-     ربط) يسيرون على مسار Green API كما كان تمامًا.
+     طلباته من مثيله هو؛ لا يوجد تحويل تلقائي إلى Green API.
    (Implementations live in api/_lib/whatsapp — not counted
    against the Hobby plan serverless function limit.)
    ============================================================ */
@@ -26,11 +25,10 @@ import setup from '../_lib/whatsapp/setup.js';
 import notify from '../_lib/whatsapp/notify.js';
 import webhook from '../_lib/whatsapp/webhook.js';
 import queueWorker from '../_lib/whatsapp/queue-worker.js';
-import teacherWhatsApp, { teacherCaller, teacherWithInstance } from '../_lib/whatsapp/teacher.js';
+import teacherWhatsApp, { teacherCaller } from '../_lib/whatsapp/teacher.js';
 
 /* المعلم (بربط أو بدونه) → مسار واتساب المدرس دائمًا حتى لا يهدر polling
-   طلبات Green API؛ كل الآخرين (أدمن/مساعد/ولي أمر/طالب) على Green كما كان.
-   الإرسال: فقط المعلم المرتبط فعليًا يُحوّل لمثيله الخاص. */
+   طلبات المزود القديم؛ كل عمليات الإرسال تستخدم Evolution API فقط. */
 async function routeStatus(req, res) {
   const t = await teacherCaller(req);
   if (t) return teacherWhatsApp.status(req, res);
@@ -38,7 +36,7 @@ async function routeStatus(req, res) {
 }
 
 async function routeSend(req, res) {
-  const t = await teacherWithInstance(req);
+  const t = await teacherCaller(req);
   if (t) return teacherWhatsApp.send(req, res);
   return send(req, res);
 }

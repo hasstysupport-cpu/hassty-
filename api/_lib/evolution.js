@@ -186,6 +186,21 @@ export function sendTextMessage(instanceName, number, text) {
   });
 }
 
+
+/* Send a document/file through the connected teacher instance. */
+export function sendMediaMessage(instanceName, number, url, fileName = 'hassty-file.pdf', caption = '') {
+  let parsed;
+  try { parsed = new URL(String(url || '')); } catch {}
+  if (!parsed || !['http:', 'https:'].includes(parsed.protocol)) {
+    throw new EvolutionError('رابط الملف يجب أن يكون رابط HTTP أو HTTPS عامًا.', 422);
+  }
+  return evoFetch(`/message/sendMedia/${encodeURIComponent(instanceName)}`, {
+    method: 'POST',
+    body: { number: String(number), mediatype: 'document', media: String(url), fileName: String(fileName || 'hassty-file.pdf'), caption: String(caption || '') },
+    timeoutMs: 30000,
+  });
+}
+
 export function logoutInstance(instanceName) {
   return evoFetch(`/instance/logout/${encodeURIComponent(instanceName)}`, { method: 'DELETE' });
 }

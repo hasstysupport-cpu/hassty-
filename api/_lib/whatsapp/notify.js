@@ -8,9 +8,9 @@
  */
 
 import { jsonErr, jsonOk, readJsonBody } from '../config.js';
-import { describeWhatsAppError, findProfile, findProfileByPhone, internalOrUser, sendFile, sendText } from '../green.js';
+import { findProfile, findProfileByPhone, internalOrUser } from './auth.js';
 import { sendPushToUser } from '../push.js';
-import { evolutionConfigured, sendTextMessage } from '../evolution.js';
+import { evolutionConfigured, describeEvolutionError, EvolutionError, serviceUnavailableError, sendTextMessage, sendMediaMessage } from '../evolution.js';
 import { getConnectedTeacherInstance, normalizeWhatsAppNumber } from './teacher.js';
 
 const templates = {
@@ -35,40 +35,27 @@ async function recipientFromBody(body) {
   return '';
 }
 
-/* المدرس المسؤول عن الإشعار — رسائل واتساب ولي الأمر تُرسل من رقمه
-   الشخصي متى كان مربوطًا ومتصلًا:
-   1) teacherUserId صريح في الحمولة (تريجر قاعدة البيانات / استدعاءات
-      النظام التي تحدد المدرس صاحب السياق).
-   2) المتصل نفسه مدرس (تسجيل حضور/تحصيل/تذكير من لوحة المدرس).
-   إن لم يتوفر مدرس مربوط ومتصل يكمل الإرسال على Green API كالمعتاد. */
 async function resolveResponsibleTeacher(body, access) {
   const explicit = String(body?.teacherUserId || '').trim();
-  if (explicit) return explicit;
-  if (!access?.internal && access?.profile?.role === 'teacher' && access?.user?.id) return access.user.id;
+  if (access?.internal) return explicit || null;
+  if (access?.profile?.role === 'admin') return explicit || null;
+  if (access?.profile?.role === 'teacher' && access?.user?.id) {
+    if (explicit && explicit !== access.user.id) return null;
+    return access.user.id;
+  }
   return null;
 }
 
-/* إرسال واتساب: رقم المدرس المتصل أولًا، ثم Green API احتياطيًا */
-async function sendWhatsAppText(teacherId, phone, message, requireTeacherInstance = false) {
-  if (teacherId && evolutionConfigured()) {
-    try {
-      const instanceName = await getConnectedTeacherInstance(teacherId);
-      const number = normalizeWhatsAppNumber(phone);
-      if (instanceName && number) {
-        const data = await sendTextMessage(instanceName, number, message);
-        return { ok: true, via: 'teacher', data };
-      }
-      if (requireTeacherInstance) throw new Error('رقم واتساب المدرس غير متصل.');
-    } catch (err) {
-      console.error('[whatsapp/notify] teacher-instance send failed:', err?.message || err);
-      if (requireTeacherInstance) throw err;
-    }
-  } else if (requireTeacherInstance) {
-    throw new Error('خدمة واتساب المدرس غير متاحة أو غير مهيأة.');
-  }
-  if (requireTeacherInstance) throw new Error('رقم واتساب المدرس غير متصل.');
-  const data = await sendText(phone, message);
-  return { ok: true, via: 'green', data };
+/* Send only through the responsible teacher's connected Railway/Evolution instance. */
+async function sendWhatsAppText(teacherId, phone, message) {
+  if (!evolutionConfigured()) throw serviceUnavailableError();
+  if (!teacherId) throw new EvolutionError('لا يوجد مدرس مسؤول محدد لهذا الإشعار، لذلك لم تُرسل رسالة واتساب.', 409);
+  const instanceName = await getConnectedTeacherInstance(teacherId);
+  if (!instanceName) throw new EvolutionError('رقم واتساب المدرس المسؤول غير مربوط أو غير متصل. لم يتم استخدام رقم بديل.', 409);
+  const number = normalizeWhatsAppNumber(phone);
+  if (!number) throw new EvolutionError('رقم واتساب المستلم غير صالح.', 422);
+  const data = await sendTextMessage(instanceName, number, message);
+  return { ok: true, via: 'teacher_evolution', data, instanceName };
 }
 
 /* نصوص إشعارات المتصفح (Web Push) — نفس أحداث الواتساب بدون تنسيق ماركداون */
@@ -118,6 +105,7 @@ export default async function handler(req, res) {
 
     /* 1) واتساب (إن وُجد رقم) — فشله لا يوقف بقية القنوات أبدًا */
     let sent = null;
+    let senderInstanceName = null;
     let whatsapp = phone
       ? { ok: false, error: 'لم يُحاول الإرسال.' }
       : { ok: false, skipped: true, error: 'لا يوجد رقم واتساب للمستلم.' };
@@ -125,10 +113,12 @@ export default async function handler(req, res) {
       try {
         const result = await sendWhatsAppText(teacherId, phone, message, body.requireTeacherWhatsApp === true);
         sent = result.data;
+        senderInstanceName = result.instanceName || null;
         whatsapp = { ok: true, via: result.via };
       } catch (waErr) {
         console.error('[whatsapp/notify] send failed:', waErr?.message);
-        whatsapp = { ok: false, error: describeWhatsAppError(waErr) };
+        const friendly = (waErr?.status === 409 || waErr?.status === 422) ? waErr.message : describeEvolutionError(waErr);
+        whatsapp = { ok: false, error: friendly };
       }
     }
 
@@ -137,10 +127,13 @@ export default async function handler(req, res) {
       const fileUrl = data.fileUrl;
       if (fileUrl && phone) {
         try {
-          invoice = await sendFile(phone, fileUrl, data.fileName || `hassty-${data.invoiceNumber || 'invoice'}.pdf`, 'فاتورة منصة حِصّتي 🧾');
+          if (!senderInstanceName) throw new EvolutionError('لا يمكن إرسال الفاتورة دون رقم واتساب مدرس متصل.', 409);
+          const number = normalizeWhatsAppNumber(phone);
+          if (!number) throw new EvolutionError('رقم واتساب المستلم غير صالح.', 422);
+          invoice = await sendMediaMessage(senderInstanceName, number, fileUrl, data.fileName || `hassty-${data.invoiceNumber || 'invoice'}.pdf`, 'فاتورة منصة حِصّتي 🧾');
         } catch (invErr) {
           console.error('[whatsapp/notify] invoice file failed:', invErr?.message);
-          whatsapp = whatsapp.ok ? { ok: false, error: describeWhatsAppError(invErr) } : whatsapp;
+          whatsapp = whatsapp.ok ? { ok: false, error: ((invErr?.status === 409 || invErr?.status === 422) ? invErr.message : describeEvolutionError(invErr)) } : whatsapp;
         }
       }
     }
