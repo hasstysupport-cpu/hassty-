@@ -7,7 +7,7 @@
  * Copyright (c) Mahmoudmadkour — All Rights Reserved.
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, CheckCircle2, Clock3, QrCode, RefreshCw, ShieldCheck, UserPlus, Banknote, XCircle } from 'lucide-react';
 import { useAuth } from '../../lib/AuthContext';
 import { RealQRCameraScanner } from '../../components/RealQRCameraScanner';
@@ -49,6 +49,7 @@ export const TeacherScanPage: React.FC = () => {
   const [selectedGroupId, setSelectedGroupId] = useState('');
   const [manualCode, setManualCode] = useState('');
   const [scannerOpen, setScannerOpen] = useState(false);
+  const cameraStartRef = useRef<(() => Promise<void>) | null>(null);
   const [scanInputMode, setScanInputMode] = useState<'manual'|'auto'>('manual');
   const [scanModeLoadedFor, setScanModeLoadedFor] = useState('');
   const [mode, setMode] = useState<ScanMode>(() => {
@@ -247,9 +248,15 @@ export const TeacherScanPage: React.FC = () => {
           <h3 className="text-sm font-black text-slate-800">{scanInputMode === 'manual' ? 'المسح اليدوي بالكاميرا' : 'المسح التلقائي بالكاميرا'}</h3>
           <p className="text-[11px] text-slate-500 mt-1">{scanInputMode === 'manual' ? 'الكاميرا تكتشف الكود، لكن التسجيل لن يبدأ إلا بعد ضغط زر «امسح الكود».' : 'بمجرد ما الكاميرا تتعرف على QR، تبدأ معالجة الكود تلقائيًا.'}</p>
         </div>
-        <button type="button" onClick={() => setScannerOpen(v => !v)} className="shrink-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100">{scannerOpen ? 'إيقاف الكاميرا' : 'تشغيل الكاميرا'}</button>
+        <button type="button" onClick={() => {
+          if (scannerOpen) { setScannerOpen(false); return; }
+          setScannerOpen(true);
+          // ابدأ getUserMedia مباشرة داخل حدث الضغط حتى يستطيع المتصفح عرض نافذة الإذن.
+          void cameraStartRef.current?.();
+        }} className="shrink-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100">{scannerOpen ? 'إيقاف الكاميرا' : 'تشغيل الكاميرا'}</button>
       </div>
       <RealQRCameraScanner
+        startCameraRef={cameraStartRef}
         isActive={scannerOpen}
         isPaused={busy}
         scanMode={scanInputMode === 'auto' ? 'automatic' : 'manual'}
