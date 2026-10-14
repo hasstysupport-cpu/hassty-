@@ -319,8 +319,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateUserProfile = async (updates: Partial<any>) => {
     if (!supabase || !user?.uid) throw new Error('لا يوجد مستخدم مسجل.');
-    const metadataPatch = { ...(user.profileData || {}), ...(updates.profileData || {}) };
-    delete (metadataPatch as any).role;
+    const { data: currentProfile, error: currentProfileError } = await supabase
+      .from('profiles')
+      .select('metadata')
+      .eq('id', user.uid)
+      .maybeSingle();
+    if (currentProfileError) throw currentProfileError;
+
+    const currentMetadata = (currentProfile?.metadata || {}) as Record<string, any>;
+    const metadataPatch: Record<string, any> = {
+      ...currentMetadata,
+      ...(user.profileData || {}),
+      ...(updates.profileData || {}),
+    };
+
+    // Verification state is server/admin-owned. Never overwrite it with a stale
+    // value from the teacher's cached session while saving ordinary profile edits.
+    for (const key of [
+      'isVerified',
+      'verificationStatus',
+      'verificationRequestId',
+      'verificationActionedAt',
+      'verificationRejectionReason',
+    ]) {
+      if (Object.prototype.hasOwnProperty.call(currentMetadata, key)) {
+        metadataPatch[key] = currentMetadata[key];
+      } else {
+        delete metadataPatch[key];
+      }
+    }
+    delete metadataPatch.role;
 
     const profilePatch: Record<string, any> = {
       ...(updates.name !== undefined ? { full_name: updates.name } : {}),
@@ -346,8 +374,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ...(updates.governorate !== undefined ? { governorate: updates.governorate } : {}),
         ...(updates.area !== undefined ? { city: updates.area } : {}),
       };
-      const { error } = await supabase.from('tutor_profiles').upsert(tutorPatch, { onConflict: 'user_id' });
-      if (error) throw error;
+      const { data: existingTutor, error: existingTutorError } = await supabase
+        .from('tutor_profiles')
+        .select('user_id')
+        .eq('user_id', user.uid)
+        .maybeSingle();
+      if (existingTutorError) throw existingTutorError;
+
+      if (existingTutor) {
+        const updatePatch: Record<string, any> = { ...tutorPatch };
+        delete updatePatch.user_id;
+        const { error } = await supabase
+          .from('tutor_profiles')
+          .update(updatePatch)
+          .eq('user_id', user.uid);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('tutor_profiles').insert(tutorPatch);
+        if (error) throw error;
+      }
     }
 
     if (updates.name !== undefined || updates.avatarUrl !== undefined) {
