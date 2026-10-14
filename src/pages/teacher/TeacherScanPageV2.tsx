@@ -90,7 +90,8 @@ export const TeacherScanPage: React.FC = () => {
       if (saved === 'manual' || saved === 'auto') preference = saved;
     } catch { /* التخزين المحلي غير متاح */ }
     setScanInputMode(preference);
-    setScannerOpen(true);
+    // لا نطلب إذن الكاميرا تلقائيًا عند فتح الصفحة؛ يجب أن يبدأ المدرس المسح بنفسه.
+    // زر «تشغيل الكاميرا» داخل الماسح يستدعي getUserMedia مباشرة من تفاعل المستخدم.
     setScanModeLoadedFor(teacherId);
   }, [teacherId]);
 
