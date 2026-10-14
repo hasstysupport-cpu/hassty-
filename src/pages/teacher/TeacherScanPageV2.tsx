@@ -255,6 +255,31 @@ export const TeacherScanPage: React.FC = () => {
           void cameraStartRef.current?.();
         }} className="shrink-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100">{scannerOpen ? 'إيقاف الكاميرا' : 'تشغيل الكاميرا'}</button>
       </div>
+      <div dir="rtl" className="mb-4 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-right">
+        <div className="flex items-center gap-2 text-sm font-black text-blue-950">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          لو الكاميرا مش بتطلب الإذن أو مش شغالة
+        </div>
+        <ol className="mt-2 list-decimal space-y-1 pr-5 text-xs leading-6 text-blue-900">
+          <li>افتح قائمة المتصفح من علامة الثلاث نقاط (⋮).</li>
+          <li>ادخل على «الإعدادات»، ثم «إعدادات الموقع الإلكتروني».</li>
+          <li>اضغط على «الكاميرا» واسمح لموقع Hassty باستخدامها.</li>
+          <li>ارجع للمنصة واضغط على «تشغيل الكاميرا» مرة أخرى.</li>
+        </ol>
+        <button
+          type="button"
+          onClick={() => {
+            setScannerOpen(true);
+            // إعادة المحاولة داخل نقرة المستخدم حتى يستطيع المتصفح طلب الإذن.
+            void cameraStartRef.current?.();
+          }}
+          className="mt-3 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-black text-white transition-colors hover:bg-blue-700 active:scale-[0.99]"
+        >
+          <RefreshCw className="w-4 h-4" />
+          حاول تشغيل الكاميرا مرة أخرى
+        </button>
+        <p className="mt-2 text-[10px] leading-5 text-blue-800/80">قد تختلف أسماء الإعدادات قليلًا حسب المتصفح ونوع الموبايل.</p>
+      </div>
       <RealQRCameraScanner
         startCameraRef={cameraStartRef}
         isActive={scannerOpen}
