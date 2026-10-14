@@ -20,7 +20,7 @@
    ============================================================ */
 
 import { jsonOk, jsonErr, readJsonBody } from '../config.js';
-import { internalOrUser } from '../green.js';
+import { internalOrUser } from './auth.js';
 import { getUserById } from '../supabase.js';
 import { dbSelect, dbUpsert, dbUpdate } from '../supabase.js';
 import {
