@@ -53,6 +53,8 @@ export const RealQRCameraScanner: React.FC<RealQRCameraScannerProps> = ({
   const nativeFailuresRef = useRef<number>(0);
 
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const cameraRequestIdRef = useRef(0);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
@@ -118,6 +120,7 @@ export const RealQRCameraScanner: React.FC<RealQRCameraScannerProps> = ({
 
   // Start Camera
   const startCamera = async (requestedFacingMode: 'environment' | 'user' = facingMode) => {
+    const requestId = ++cameraRequestIdRef.current;
     setCameraError(null);
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -125,8 +128,9 @@ export const RealQRCameraScanner: React.FC<RealQRCameraScannerProps> = ({
         return;
       }
 
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
       }
       setTorchOn(false);
       setTorchSupported(false);
@@ -143,7 +147,13 @@ export const RealQRCameraScanner: React.FC<RealQRCameraScannerProps> = ({
       }
 
       const newStream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: false });
+      // لو المدرس قفل الكاميرا أثناء ظهور نافذة الإذن، لا تترك بثًا يعمل بالخلفية.
+      if (requestId !== cameraRequestIdRef.current) {
+        newStream.getTracks().forEach((track) => track.stop());
+        return;
+      }
 
+      streamRef.current = newStream;
       setStream(newStream);
       setIsCameraActive(true);
 
@@ -171,6 +181,7 @@ export const RealQRCameraScanner: React.FC<RealQRCameraScannerProps> = ({
         }
       } catch { /* الكاميرا بدون قدرات إضافية */ }
     } catch (err: any) {
+      if (requestId !== cameraRequestIdRef.current) return;
       setIsCameraActive(false);
       const errMsg = err?.message || '';
       const errName = err?.name || '';
@@ -206,14 +217,17 @@ export const RealQRCameraScanner: React.FC<RealQRCameraScannerProps> = ({
 
   // Stop Camera
   const stopCamera = () => {
+    cameraRequestIdRef.current += 1;
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = null;
     }
-    if (stream) {
-      stream.getTracks().forEach((track) => track.stop());
-      setStream(null);
+    const activeStream = streamRef.current;
+    if (activeStream) {
+      activeStream.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
     }
+    setStream(null);
     setIsCameraActive(false);
     setTorchOn(false);
   };
@@ -296,8 +310,17 @@ export const RealQRCameraScanner: React.FC<RealQRCameraScannerProps> = ({
   useEffect(() => {
     // لا تطلب الإذن من effect عند فتح القسم. بدء الكاميرا يجب أن يكون من ضغطة مباشرة.
     if (!isActive) stopCamera();
-    return () => { stopCamera(); };
   }, [isActive]);
+
+  useEffect(() => {
+    return () => {
+      cameraRequestIdRef.current += 1;
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+      const activeStream = streamRef.current;
+      if (activeStream) activeStream.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    };
+  }, []);
 
   // QR Scanning Loop: BarcodeDetector الأصلي أولًا (سريع وقوي) ثم jsQR احتياطيًا
   useEffect(() => {
