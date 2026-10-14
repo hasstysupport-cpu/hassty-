@@ -35,6 +35,17 @@ async function recipientFromBody(body) {
   return '';
 }
 
+async function resolveResponsibleTeacher(body, access) {
+  const explicit = String(body?.teacherUserId || '').trim();
+  if (access?.internal) return explicit || null;
+  if (access?.profile?.role === 'admin') return explicit || null;
+  if (access?.profile?.role === 'teacher' && access?.user?.id) {
+    if (explicit && explicit !== access.user.id) return null;
+    return access.user.id;
+  }
+  return null;
+}
+
 /* Send only through the responsible teacher's connected Railway/Evolution instance. */
 async function sendWhatsAppText(teacherId, phone, message) {
   if (!evolutionConfigured()) throw serviceUnavailableError();
