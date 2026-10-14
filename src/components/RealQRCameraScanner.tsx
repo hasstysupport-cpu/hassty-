@@ -33,6 +33,8 @@ interface RealQRCameraScannerProps {
   scanMode?: 'automatic' | 'manual';
   /** فترة التهدئة بين المسح المتتالي بالمللي ثانية — قصيرة عشان السرعة */
   cooldownMs?: number;
+  /** Ref used by the parent so the initial camera request runs directly inside the user's click handler. */
+  startCameraRef?: React.MutableRefObject<(() => Promise<void>) | null>;
 }
 
 export const RealQRCameraScanner: React.FC<RealQRCameraScannerProps> = ({
@@ -41,6 +43,7 @@ export const RealQRCameraScanner: React.FC<RealQRCameraScannerProps> = ({
   isPaused = false,
   scanMode = 'automatic',
   cooldownMs = 600,
+  startCameraRef,
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -114,7 +117,7 @@ export const RealQRCameraScanner: React.FC<RealQRCameraScannerProps> = ({
   };
 
   // Start Camera
-  const startCamera = async () => {
+  const startCamera = async (requestedFacingMode: 'environment' | 'user' = facingMode) => {
     setCameraError(null);
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -131,11 +134,11 @@ export const RealQRCameraScanner: React.FC<RealQRCameraScannerProps> = ({
 
       // دقة أعلى + تركيز/تعريض مستمر عند الدعم — قراءة أقوى للكروت من مسافة
       const videoConstraints: any = {
-        facingMode,
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
+        facingMode: { ideal: requestedFacingMode },
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
       };
-      if (facingMode === 'environment') {
+      if (requestedFacingMode === 'environment') {
         videoConstraints.advanced = [{ focusMode: 'continuous' }, { exposureMode: 'continuous' }];
       }
 
@@ -178,7 +181,16 @@ export const RealQRCameraScanner: React.FC<RealQRCameraScannerProps> = ({
         errMsg.toLowerCase().includes('permission dismissed') ||
         errMsg.toLowerCase().includes('denied')
       ) {
-        setCameraError('تم رفض أو إغلاق إذن الكاميرا. اضغط على الزر أدناه لمنح الإذن مجدداً أو ارفع صورة الكود.');
+        let permissionState = 'unknown';
+        try {
+          const permission = await navigator.permissions?.query({ name: 'camera' as any });
+          if (permission?.state) permissionState = permission.state;
+        } catch { /* بعض المتصفحات لا تعرض حالة إذن الكاميرا */ }
+        setCameraError(
+          permissionState === 'denied'
+            ? 'المتصفح حافظ رفض إذن الكاميرا لهذا الموقع، لذلك لن تظهر نافذة الإذن مرة أخرى من الزر وحده. افتح إعدادات الموقع في Chrome > الكاميرا > سماح، ثم أعد تحميل الصفحة واضغط تشغيل الكاميرا.'
+            : 'رفض المتصفح طلب الكاميرا أو تم إغلاقه. تأكد أن إذن الكاميرا للموقع مضبوط على سماح من إعدادات Chrome، ثم أعد المحاولة.'
+        );
       } else if (errName === 'NotFoundError' || errName === 'DevicesNotFoundError') {
         setCameraError('لم يتم العثور على كاميرا في هذا الجهاز. يمكنك استخدام ميزة رفع صورة الكود.');
       } else {
@@ -186,6 +198,11 @@ export const RealQRCameraScanner: React.FC<RealQRCameraScannerProps> = ({
       }
     }
   };
+
+  // سلّم دالة التشغيل للأب حتى يبدأ طلب الإذن مباشرة من ضغطة الزر، لا من useEffect.
+  useEffect(() => {
+    if (startCameraRef) startCameraRef.current = startCamera;
+  });
 
   // Stop Camera
   const stopCamera = () => {
@@ -203,7 +220,9 @@ export const RealQRCameraScanner: React.FC<RealQRCameraScannerProps> = ({
 
   // Toggle Camera Facing
   const toggleFacingMode = () => {
-    setFacingMode((prev) => (prev === 'environment' ? 'user' : 'environment'));
+    const nextFacingMode = facingMode === 'environment' ? 'user' : 'environment';
+    setFacingMode(nextFacingMode);
+    void startCamera(nextFacingMode);
   };
 
   // الفلاش
@@ -275,16 +294,10 @@ export const RealQRCameraScanner: React.FC<RealQRCameraScannerProps> = ({
   };
 
   useEffect(() => {
-    if (isActive) {
-      startCamera();
-    } else {
-      stopCamera();
-    }
-
-    return () => {
-      stopCamera();
-    };
-  }, [isActive, facingMode]);
+    // لا تطلب الإذن من effect عند فتح القسم. بدء الكاميرا يجب أن يكون من ضغطة مباشرة.
+    if (!isActive) stopCamera();
+    return () => { stopCamera(); };
+  }, [isActive]);
 
   // QR Scanning Loop: BarcodeDetector الأصلي أولًا (سريع وقوي) ثم jsQR احتياطيًا
   useEffect(() => {
