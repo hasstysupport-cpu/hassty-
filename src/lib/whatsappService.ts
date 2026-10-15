@@ -9,7 +9,7 @@
 
 /**
  * Hassty WhatsApp client.
- * GREEN API credentials stay server-side in Vercel API functions.
+ * All WhatsApp sends go through Hassty's backend to the Railway-hosted Evolution API.
  */
 import { supabase } from './supabase';
 export interface WhatsAppSendResult { success: boolean; messageId?: string; formattedNumber?: string; data?: any; error?: string; }
@@ -133,8 +133,8 @@ export const whatsappService = {
   async sendDocument(number: string, url: string, fileName: string, _mimetype?: string) { return sendKind('file', { number, url, fileName, caption: '' }); },
   async sendAudio(number: string, url: string, _ptt = true) { return sendKind('file', { number, url, fileName: 'hassty-audio.mp3', caption: '' }); },
   async sendLocation(params: { number: string; latitude: number; longitude: number; name?: string; address?: string }) { return sendKind('location', params); },
-  async sendReaction(_params: { number: string; messageKey: { remoteJid: string; fromMe: boolean; id: string }; emoji: string }) { return { success: false, error: 'التفاعلات المباشرة غير مفعلة حاليًا في طبقة GREEN API.' }; },
-  async notifyEvent(event: string, data: any = {}, recipientUserId?: string, phone?: string) { return post('/api/whatsapp/notify', { event, data, recipientUserId, phone }); },
+  async sendReaction(_params: { number: string; messageKey: { remoteJid: string; fromMe: boolean; id: string }; emoji: string }) { return { success: false, error: 'التفاعلات المباشرة غير مفعلة حاليًا في طبقة Evolution API.' }; },
+  async notifyEvent(event: string, data: any = {}, recipientUserId?: string, phone?: string, teacherUserId?: string) { return post('/api/whatsapp/notify', { event, data, recipientUserId, phone, teacherUserId }); },
   async sendAttendanceNotice(params: { parentPhone: string; studentName: string; groupName: string; status: 'on_time' | 'late' | 'absent_cutoff'; offsetMinutes: number; timeString: string; recipientUserId?: string }) {
     const status = params.status === 'on_time' ? 'present' : params.status === 'late' ? 'late' : 'absent';
     const statusLabel = params.status === 'on_time' ? 'حاضر في الموعد' : params.status === 'late' ? 'حاضر متأخر' : 'غائب';
