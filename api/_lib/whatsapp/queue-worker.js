@@ -11,7 +11,7 @@ function isAuthorized(req) {
   return Boolean(QUEUE_WORKER_SECRET && supplied && supplied === QUEUE_WORKER_SECRET);
 }
 
-async function rpc(name, body) {
+async function rpc(name, body, timeoutMs = 10000) {
   if (!SERVICE_KEY) throw new Error('Supabase service key is not configured.');
   const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
     method: 'POST',
@@ -21,7 +21,7 @@ async function rpc(name, body) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(body || {}),
-    signal: AbortSignal.timeout(10000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   const raw = await response.text();
   let data = null;
@@ -40,7 +40,9 @@ export default async function handler(req, res) {
 
   let stage = 'claim';
   try {
-    const claimed = await rpc('claim_parent_whatsapp_job', {});
+    // Keep the claim call within this route's configured 60s budget without retrying
+    // an ambiguous, state-changing claim response.
+    const claimed = await rpc('claim_parent_whatsapp_job', {}, 15000);
     const job = Array.isArray(claimed) ? claimed[0] : claimed;
     if (!job || !job.id) return jsonOk(res, { processed: false });
 
