@@ -171,7 +171,7 @@ export interface ParentPaymentNotifyInput {
   studentName: string;
   groupName?: string;
   amount: number;
-  invoiceNumber:
+  invoiceNumber: string;
   billingType: 'monthly' | 'per_session';
   billingPeriod?: string;
   link?: string;
