@@ -16,7 +16,7 @@
  *   3) رقم ولي الأمر المحفوظ على مستوى القيد في المجموعة (group_enrollments.parent_phone)
  *
  * كل إشعار يُرسل بالتوازي عبر قناتين:
- *   - واتساب (GREEN API عبر /api/whatsapp/notify)
+ *   - واتساب عبر Railway-hosted Evolution API, using the responsible teacher's connected instance
  *   - Web Push لأجهزة ولي الأمر إن كان مربوطًا بحساب (أو رقمه مسجل بحساب)
  *   - إشعار داخلي في جدول notifications يظهر في جرس ولي الأمر
  * فشل أي قناة لا يوقف بقية القنوات أبدًا.
@@ -165,11 +165,13 @@ async function insertInApp(insert: InAppInsert): Promise<void> {
 
 export interface ParentPaymentNotifyInput {
   studentId: string;
+  /** Authenticated teacher whose connected Evolution instance is the sender. */
+  teacherUserId?: string;
   groupId?: string;
   studentName: string;
   groupName?: string;
   amount: number;
-  invoiceNumber: string;
+  invoiceNumber:
   billingType: 'monthly' | 'per_session';
   billingPeriod?: string;
   link?: string;
@@ -193,7 +195,7 @@ export async function notifyParentPayment(input: ParentPaymentNotifyInput): Prom
         billingPeriod: input.billingPeriod || '',
         date: new Date().toLocaleDateString('ar-EG'),
         link: input.link,
-      }, contacts.parentUserId || undefined, contacts.parentPhone);
+      }, contacts.parentUserId || undefined, contacts.parentPhone, input.teacherUserId);
       whatsapp = res?.success === true && (res as any)?.whatsapp?.ok === true;
     } catch (err) { console.warn('[parentNotify] payment whatsapp failed:', (err as any)?.message); }
   }
