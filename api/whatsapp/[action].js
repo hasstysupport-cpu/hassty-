@@ -54,7 +54,15 @@ const handlers = {
 };
 
 export default async function handler(req, res) {
-  const action = String(req.query?.action || '').replace(/\/+$/, '').toLowerCase();
+  // Parse the request URL directly to avoid Vercel's deprecated url.parse() adapter.
+  let action = '';
+  try {
+    const requestUrl = new URL(req.url || '/', `https://${req.headers.host || 'hassty.site'}`);
+    const routeAction = requestUrl.pathname.replace(/^\/api\/whatsapp\//, '').replace(/\/+$/, '');
+    action = String(routeAction && routeAction !== '[action]' ? routeAction : requestUrl.searchParams.get('action') || '').toLowerCase();
+  } catch {
+    action = '';
+  }
   const handle = handlers[action];
   if (!handle) return jsonErr(res, 'مسار واتساب غير معروف.', 404);
   return handle(req, res);
