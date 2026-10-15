@@ -47,7 +47,6 @@ export const TeacherScanPage: React.FC = () => {
   const teacherId = user?.uid || '';
   const [groups, setGroups] = useState<StudentGroup[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState('');
-  const [manualCode, setManualCode] = useState('');
   const [scannerOpen, setScannerOpen] = useState(false);
   const cameraStartRef = useRef<(() => Promise<void>) | null>(null);
   const [scanInputMode, setScanInputMode] = useState<'manual'|'auto'>('manual');
@@ -206,7 +205,7 @@ export const TeacherScanPage: React.FC = () => {
       else if(status==='late')setMessage({kind:'warning',title:'حاضر متأخر ⏰',body:`تم تسجيل ${student.full_name||'الطالب'} متأخرًا ${timing.minutesLate} دقيقة.`});
       else setMessage({kind:'error',title:'غياب ❌',body:'تم تسجيل الغياب تلقائيًا لأن وقت المسح تجاوز نصف مدة الحصة.'});
     } catch(e:any){setMessage({kind:'error',title:'فشل تنفيذ العملية',body:e?.message||'حدث خطأ غير متوقع.'});}
-    finally{setBusy(false);setManualCode('');}
+    finally{setBusy(false);}
   },[activeSlot,busy,mode,now,selectedGroup,selectedIsActive,timing,teacherId]);
 
   const banner = !selectedGroup ? {label:'اختر المجموعة',icon:AlertCircle} : !activeGroup ? {label:'لا توجد حصة جارية الآن',icon:AlertCircle} : activeGroup.id!==selectedGroup.id ? {label:'المجموعة المختارة ليست الحصة الحالية',icon:AlertCircle} : timing?.state==='on_time' ? {label:'حضور في الموعد',icon:CheckCircle2} : timing?.state==='late' ? {label:`تأخير ${timing.minutesLate} دقيقة`,icon:Clock3} : timing?.state==='absent' ? {label:'بعد نصف الحصة = غياب',icon:XCircle} : timing?.state==='ended' ? {label:'الحصة انتهت',icon:XCircle} : {label:'الحصة لم تبدأ بعد',icon:Clock3};
@@ -221,7 +220,7 @@ export const TeacherScanPage: React.FC = () => {
             steps={['اختر وضع الماسح: تسجيل حضور، تحصيل مالي، أو قيد طالب جديد.', 'وجّه الكاميرا على كارت الطالب — النظام يتعرف عليه ويظهر بياناته قبل التأكيد.']}
             notes={['لو الكاميرا مش شغالة في المتصفح، اكتب كود الطالب يدويًا في خانة الإدخال.']}
           />
-    {message&&<section className={`rounded-3xl border p-5 flex gap-3 ${message.kind==='success'?'bg-emerald-50 border-emerald-200 text-emerald-950':message.kind==='warning'?'bg-amber-50 border-amber-200 text-amber-950':message.kind==='error'?'bg-red-50 border-red-200 text-red-950':'bg-blue-50 border-blue-200 text-blue-950'}`}><div className="w-10 h-10 rounded-2xl bg-white border border-current/10 flex items-center justify-center shrink-0">{message.kind==='success'?<CheckCircle2 className="w-5 h-5"/>:message.kind==='error'?<XCircle className="w-5 h-5"/>:message.kind==='warning'?<AlertCircle className="w-5 h-5"/>:<ShieldCheck className="w-5 h-5"/>}</div><div><h3 className="font-black text-sm">{message.title}</h3><p className="text-xs mt-1 leading-6 opacity-80">{message.body}</p></div></section>}
+
     <section className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-7 shadow-sm">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4"><div><div className="inline-flex items-center gap-2 text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-full"><QrCode className="w-4 h-4"/>مسح حضور QR حقيقي</div><h2 className="text-xl sm:text-2xl font-black text-slate-900 mt-2">تسجيل حضور الطلاب بالوقت الفعلي</h2><p className="text-xs text-slate-500 mt-1">الحالة تُحسب تلقائيًا من موعد المجموعة ووقت المسح — مع ربط السجل بالحصة الفعلية إن وُجدت.</p></div><div className="flex items-center gap-2 text-xs font-bold text-slate-600 bg-slate-50 px-3 py-2 rounded-2xl border border-slate-200"><Clock3 className="w-4 h-4 text-blue-600"/>{now.toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}</div></div>
       <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-3"><select value={selectedGroupId} onChange={e=>setSelectedGroupId(e.target.value)} className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold"><option value="">اختر المجموعة</option>{groups.map(g=><option key={g.id} value={g.id}>{g.name} — {g.grade||'عام'} — {g.schedule}</option>)}</select><div className="flex gap-2"><button type="button" onClick={()=>{setMode('attendance');setMessage(null)}} className={`flex-1 rounded-2xl border-2 px-3 py-3 text-sm font-black ${mode==='attendance'?'border-emerald-500 bg-emerald-50 text-emerald-800':'border-slate-200 bg-slate-50 text-slate-600'}`}><CheckCircle2 className="w-4 h-4 inline ml-1"/>حضور</button><button type="button" onClick={()=>{setMode('enroll');setMessage(null)}} className={`flex-1 rounded-2xl border-2 px-3 py-3 text-sm font-black ${mode==='enroll'?'border-blue-500 bg-blue-50 text-blue-800':'border-slate-200 bg-slate-50 text-slate-600'}`}><UserPlus className="w-4 h-4 inline ml-1"/>قيد طالب</button><button type="button" onClick={()=>{setMode('payment');setMessage(null)}} className={`flex-1 rounded-2xl border-2 px-3 py-3 text-sm font-black ${mode==='payment'?'border-amber-500 bg-amber-50 text-amber-800':'border-slate-200 bg-slate-50 text-slate-600'}`}><Banknote className="w-4 h-4 inline ml-1"/>تحصيل شهر</button></div></div>
@@ -232,10 +231,10 @@ export const TeacherScanPage: React.FC = () => {
           <div className="text-[11px] font-bold text-slate-500">اختيارك محفوظ لحسابك — الوضع الافتراضي يدوي</div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2" role="group" aria-label="اختيار طريقة مسح QR">
-          <button type="button" aria-pressed={scanInputMode === 'manual'} onClick={() => { setScanInputMode('manual'); setScannerOpen(true); setManualCode(''); }} className={scanInputMode === 'manual' ? 'rounded-2xl border-2 border-blue-500 bg-blue-50 text-blue-900 px-4 py-3 text-sm font-black flex items-center justify-center gap-2' : 'rounded-2xl border-2 border-slate-200 bg-white text-slate-600 px-4 py-3 text-sm font-bold flex items-center justify-center gap-2'}>
+          <button type="button" aria-pressed={scanInputMode === 'manual'} onClick={() => { setScanInputMode('manual'); setScannerOpen(true);  }} className={scanInputMode === 'manual' ? 'rounded-2xl border-2 border-blue-500 bg-blue-50 text-blue-900 px-4 py-3 text-sm font-black flex items-center justify-center gap-2' : 'rounded-2xl border-2 border-slate-200 bg-white text-slate-600 px-4 py-3 text-sm font-bold flex items-center justify-center gap-2'}>
             <QrCode className="w-4 h-4" /> يدوي بالكاميرا
           </button>
-          <button type="button" aria-pressed={scanInputMode === 'auto'} onClick={() => { setScanInputMode('auto'); setScannerOpen(true); setManualCode(''); }} className={scanInputMode === 'auto' ? 'rounded-2xl border-2 border-emerald-500 bg-emerald-50 text-emerald-900 px-4 py-3 text-sm font-black flex items-center justify-center gap-2' : 'rounded-2xl border-2 border-slate-200 bg-white text-slate-600 px-4 py-3 text-sm font-bold flex items-center justify-center gap-2'}>
+          <button type="button" aria-pressed={scanInputMode === 'auto'} onClick={() => { setScanInputMode('auto'); setScannerOpen(true);  }} className={scanInputMode === 'auto' ? 'rounded-2xl border-2 border-emerald-500 bg-emerald-50 text-emerald-900 px-4 py-3 text-sm font-black flex items-center justify-center gap-2' : 'rounded-2xl border-2 border-slate-200 bg-white text-slate-600 px-4 py-3 text-sm font-bold flex items-center justify-center gap-2'}>
             <RefreshCw className="w-4 h-4" /> تلقائي بالكاميرا
           </button>
         </div>
@@ -255,36 +254,44 @@ export const TeacherScanPage: React.FC = () => {
           void cameraStartRef.current?.();
         }} className="shrink-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100">{scannerOpen ? 'إيقاف الكاميرا' : 'تشغيل الكاميرا'}</button>
       </div>
-      <div dir="rtl" className="mb-4 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-right">
-        <div className="flex items-center gap-2 text-sm font-black text-blue-950">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          لو الكاميرا مش بتطلب الإذن أو مش شغالة
+      <details dir="rtl" className="group mb-4 rounded-2xl border border-blue-200 bg-blue-50 p-3 sm:p-4 text-right">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2 text-sm font-black text-blue-950">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <div>
+              <span>لو الكاميرا مش بتطلب الإذن أو مش شغالة</span>
+              <p className="mt-1 text-[11px] font-medium text-blue-800">اضغط لعرض خطوات السماح بالكاميرا من إعدادات المتصفح.</p>
+            </div>
+          </div>
+          <span className="shrink-0 rounded-lg bg-white px-3 py-2 text-[11px] font-black text-blue-700 border border-blue-200 group-open:bg-blue-100">عرض الخطوات</span>
+        </summary>
+        <div className="mt-3 border-t border-blue-200 pt-3">
+          <ol className="list-decimal space-y-1 pr-5 text-xs leading-6 text-blue-900">
+            <li>افتح قائمة المتصفح من علامة الثلاث نقاط (⋮).</li>
+            <li>ادخل على «الإعدادات»، ثم «إعدادات الموقع الإلكتروني».</li>
+            <li>اضغط على «الكاميرا» واسمح لموقع Hassty باستخدامها.</li>
+            <li>ارجع للمنصة واضغط على «تشغيل الكاميرا» مرة أخرى.</li>
+          </ol>
+          <button
+            type="button"
+            onClick={() => {
+              setScannerOpen(true);
+              void cameraStartRef.current?.();
+            }}
+            className="mt-3 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-black text-white hover:bg-blue-700 active:scale-[0.99]"
+          >
+            <RefreshCw className="h-4 w-4" />
+            حاول تشغيل الكاميرا مرة أخرى
+          </button>
+          <p className="mt-2 text-[10px] leading-5 text-blue-800/80">قد تختلف أسماء الإعدادات قليلًا حسب المتصفح ونوع الموبايل.</p>
         </div>
-        <ol className="mt-2 list-decimal space-y-1 pr-5 text-xs leading-6 text-blue-900">
-          <li>افتح قائمة المتصفح من علامة الثلاث نقاط (⋮).</li>
-          <li>ادخل على «الإعدادات»، ثم «إعدادات الموقع الإلكتروني».</li>
-          <li>اضغط على «الكاميرا» واسمح لموقع Hassty باستخدامها.</li>
-          <li>ارجع للمنصة واضغط على «تشغيل الكاميرا» مرة أخرى.</li>
-        </ol>
-        <button
-          type="button"
-          onClick={() => {
-            setScannerOpen(true);
-            // إعادة المحاولة داخل نقرة المستخدم حتى يستطيع المتصفح طلب الإذن.
-            void cameraStartRef.current?.();
-          }}
-          className="mt-3 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-black text-white transition-colors hover:bg-blue-700 active:scale-[0.99]"
-        >
-          <RefreshCw className="w-4 h-4" />
-          حاول تشغيل الكاميرا مرة أخرى
-        </button>
-        <p className="mt-2 text-[10px] leading-5 text-blue-800/80">قد تختلف أسماء الإعدادات قليلًا حسب المتصفح ونوع الموبايل.</p>
-      </div>
+      </details>
       <RealQRCameraScanner
         startCameraRef={cameraStartRef}
         isActive={scannerOpen}
         isPaused={busy}
         scanMode={scanInputMode === 'auto' ? 'automatic' : 'manual'}
+        resultMessage={message}
         onScanSuccess={processCode}
       />
     </section>

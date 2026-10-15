@@ -20,12 +20,15 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import jsQR from 'jsqr';
-import { Camera, CameraOff, RefreshCw, Upload, CheckCircle2, Flashlight, ZoomIn, Zap, QrCode } from 'lucide-react';
+import { Camera, CameraOff, RefreshCw, Upload, CheckCircle2, Flashlight, ZoomIn, Zap, QrCode, AlertCircle, XCircle } from 'lucide-react';
 
 interface DetectedCode { rawValue?: string }
 interface BarcodeDetectorLike { detect: (source: HTMLVideoElement | HTMLImageElement | HTMLCanvasElement) => Promise<DetectedCode[]> }
 
+interface ScanResultMessage { kind: 'success' | 'warning' | 'error' | 'info'; title: string; body: string }
+
 interface RealQRCameraScannerProps {
+  resultMessage?: ScanResultMessage | null;
   onScanSuccess: (qrCode: string) => void;
   isActive: boolean;
   isPaused?: boolean;
@@ -38,6 +41,7 @@ interface RealQRCameraScannerProps {
 }
 
 export const RealQRCameraScanner: React.FC<RealQRCameraScannerProps> = ({
+  resultMessage = null,
   onScanSuccess,
   isActive,
   isPaused = false,
@@ -555,20 +559,49 @@ export const RealQRCameraScanner: React.FC<RealQRCameraScannerProps> = ({
       )}
 
     </div>
-    {scanMode === 'manual' && (
+    {(resultMessage || scanMode === 'manual') && (
       <div className="w-full max-w-md mx-auto mt-3 space-y-2">
-        <div className={`rounded-xl border px-3 py-2 text-xs text-center font-bold ${detectedCode ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-slate-50 border-slate-200 text-slate-600'}`} role="status" aria-live="polite">
-          {manualScanHint}
-        </div>
-        <button
-          type="button"
-          onClick={confirmManualScan}
-          disabled={isPaused || !isCameraActive}
-          className="w-full h-12 rounded-2xl bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white text-sm font-black flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <QrCode className="w-5 h-5" />
-          {isPaused ? 'جاري معالجة المسح...' : 'امسح الكود'}
-        </button>
+        {resultMessage ? (
+          <section
+            dir="rtl"
+            role="status"
+            aria-live="polite"
+            className={`rounded-2xl border p-3 sm:p-4 flex items-start gap-3 text-right ${
+              resultMessage.kind === 'success'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-950'
+                : resultMessage.kind === 'warning'
+                  ? 'bg-amber-50 border-amber-200 text-amber-950'
+                  : resultMessage.kind === 'error'
+                    ? 'bg-red-50 border-red-200 text-red-950'
+                    : 'bg-blue-50 border-blue-200 text-blue-950'
+            }`}
+          >
+            <div className="w-9 h-9 rounded-xl bg-white/80 border border-current/10 flex items-center justify-center shrink-0">
+              {resultMessage.kind === 'success' ? <CheckCircle2 className="w-5 h-5" /> : resultMessage.kind === 'warning' ? <AlertCircle className="w-5 h-5" /> : resultMessage.kind === 'error' ? <XCircle className="w-5 h-5" /> : <QrCode className="w-5 h-5" />}
+            </div>
+            <div className="min-w-0 flex-1">
+              <h4 className="text-sm font-black">{resultMessage.title}</h4>
+              <p className="text-xs mt-1 leading-6 opacity-90 whitespace-pre-line break-words">{resultMessage.body}</p>
+            </div>
+          </section>
+        ) : (
+          <div className={`rounded-xl border px-3 py-2 text-xs text-center font-bold ${
+            detectedCode ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-slate-50 border-slate-200 text-slate-600'
+          }`} role="status" aria-live="polite">
+            {manualScanHint}
+          </div>
+        )}
+        {scanMode === 'manual' && (
+          <button
+            type="button"
+            onClick={confirmManualScan}
+            disabled={isPaused || !isCameraActive}
+            className="w-full min-h-12 rounded-2xl bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white text-sm font-black flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <QrCode className="w-5 h-5" />
+            {isPaused ? 'جاري معالجة المسح...' : 'امسح الكود'}
+          </button>
+        )}
       </div>
     )}
     </>
