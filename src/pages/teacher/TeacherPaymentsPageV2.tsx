@@ -92,7 +92,7 @@ export const TeacherPaymentsPageV2: React.FC<{ onNavigate?: (path: string) => vo
           .eq('teacher_id', teacherId)
           .order('billing_period', { ascending: false })
           .limit(60),
-        (supabase.rpc('get_effective_commission_rate', { p_teacher_id: teacherId }) as any),
+        (supabase.rpc('get_my_effective_commission_rate') as any),
         supabase.from('student_groups').select('id,name').eq('tutor_id', teacherId),
         supabase.from('commission_tiers').select('*').order('min_students', { ascending: true }),
       ]);
