@@ -96,7 +96,7 @@ export const GroupDashboardPage: React.FC<{ groupId: string; onNavigate?: (path:
       const monthAgo = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
       const [sres, sessres, exres, hres, ares, mres] = await Promise.all([
         supabase.from('group_enrollments').select('*').eq('group_id', groupId).eq('status', 'active').order('enrolled_at', { ascending: false }),
-        supabase.from('lesson_sessions').select('id,title,session_date,starts_at,ends_at,location,status').eq('group_id', groupId).order('starts_at', { ascending: false }).limit(40),
+        supabase.from('lesson_sessions').select('id,title,session_date,starts_at,ends_at,location,status').eq('group_id', groupId).order('starts_at', { ascending: false }).limit(500),
         supabase.from('exams').select('id,title,exam_date,starts_at,duration_minutes,total_marks,location,status').eq('group_id', groupId).order('exam_date', { ascending: false }).limit(20),
         supabase.from('group_schedule_history').select('id,old_schedule,new_schedule,reason,sessions_updated,created_at').eq('group_id', groupId).order('created_at', { ascending: false }).limit(15),
         supabase.from('attendance_records').select('id,student_name,status,date,time').eq('group_id', groupId).order('date', { ascending: false }).limit(8),
@@ -483,8 +483,11 @@ export const GroupDashboardPage: React.FC<{ groupId: string; onNavigate?: (path:
           teacherId={teacherId}
           sessions={sessions}
           students={students}
+          scheduleSlots={slots}
+          subject={group.subject}
+          location={group.location}
           onNavigate={onNavigate}
-          onRefresh={() => { setLoading(true); void load(); }}
+          onRefresh={async () => { setLoading(true); await load(); }}
         />
       )}
 
