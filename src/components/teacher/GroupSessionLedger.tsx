@@ -70,6 +70,12 @@ const statusText: Record<AttendanceStatus, string> = {
 };
 
 const localClock = () => new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+const sessionClock = (value: string) => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? localClock()
+    : date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+};
 const weekdayAr = (value: string) => {
   const date = new Date(`${value}T12:00:00`);
   return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('ar-EG', { weekday: 'long' });
@@ -204,7 +210,7 @@ export const GroupSessionLedger: React.FC<Props> = ({ groupId, teacherId, sessio
         qr_code: qrCode,
         session_id: session.id,
         date: session.session_date,
-        time: existing?.time || localClock(),
+        time: existing?.time || sessionClock(session.starts_at),
         status,
         scanned_via_qr: existing?.scanned_via_qr ?? false,
         attendance_method: existing?.attendance_method || 'manual',
