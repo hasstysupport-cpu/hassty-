@@ -100,11 +100,11 @@ const toDateKey = (date: Date) => {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 };
 const normaliseClock = (value: string) => {
-  const match = String(value || '').match(/^(\\d{1,2}):(\\d{2})/);
+  const match = String(value || '').match(/^(\d{1,2}):(\d{2})/);
   return match ? `${match[1].padStart(2, '0')}:${match[2]}` : '';
 };
 const rawClock = (value: string) => {
-  const match = String(value || '').match(/[T ](\\d{2}:\\d{2})/);
+  const match = String(value || '').match(/[T ](\d{2}:\d{2})/);
   return match?.[1] || '';
 };
 const localClockFromInstant = (value: string) => {
@@ -412,7 +412,7 @@ export const GroupSessionLedger: React.FC<Props> = ({ groupId, teacherId, sessio
         calendarWarning = !!calendarError;
       }
 
-      toast.push(calendarWarning ? 'warning' : 'success',
+      toast.push(calendarWarning ? 'info' : 'success',
         `تم إنشاء ${inserted?.length || 0} سجل حصة جديد. ${calendarWarning ? 'سجلات الحصص محفوظة، لكن تعذرت مزامنة بعضها مع تقويم الطلاب.' : 'وتمت مزامنتها مع تقويم الطلاب.'}`
       );
       setShowGenerateConfirm(false);
