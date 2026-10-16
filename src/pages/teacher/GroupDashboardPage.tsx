@@ -46,7 +46,7 @@ interface ExamRow { id: string; title: string; exam_date: string; starts_at?: st
 interface HistoryRow { id: string; old_schedule?: string; new_schedule?: string; reason?: string; sessions_updated?: number; created_at: string; }
 interface AttendanceRow { id: string; student_name: string; status: string; date: string; time?: string; }
 
-type TabKey = 'overview' | 'students' | 'schedule' | 'exams' | 'history';
+type TabKey = 'overview' | 'students' | 'lessons' | 'schedule' | 'exams' | 'history';
 
 export const GroupDashboardPage: React.FC<{ groupId: string; onNavigate?: (path: string) => void }> = ({ groupId, onNavigate }) => {
   const { user } = useAuth();
@@ -334,7 +334,7 @@ export const GroupDashboardPage: React.FC<{ groupId: string; onNavigate?: (path:
           }))
         );
         const { error: calendarError } = await supabase.from('calendar_events').insert(events);
-        if (calendarError) toast.push('warning', 'تم إنشاء سجلات الحصص، لكن تعذرت مزامنة بعض المواعيد مع تقويم الطلاب.');
+        if (calendarError) toast.push('info', 'تم إنشاء سجلات الحصص، لكن تعذرت مزامنة بعض المواعيد مع تقويم الطلاب.');
       }
 
       toast.push('success', `تم إنشاء ${createdRows?.length || newSessions.length} سجل حصة للأربع أسابيع القادمة.`);
