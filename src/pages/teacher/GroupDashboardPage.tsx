@@ -15,6 +15,7 @@ import {
   ArrowRight, Users, CalendarClock, GraduationCap, History, LayoutDashboard, Clock,
   MapPin, DollarSign, Plus, Phone, UserX, ArrowLeftRight, CalendarDays, TrendingUp,
   ListChecks, Loader2, RefreshCw, UserCog, FileSpreadsheet, FileText,
+  ClipboardList, CheckCircle2, NotebookPen, UserRound,
 } from 'lucide-react';
 import { PageHeader, StatCard, Tabs, Card, Btn, DataTable, StatusBadge, LoadingBlock, ErrorBlock, EmptyState, ConfirmDialog, useToast, fmtMoney, fmtDate, fmtDateTime, Column } from '../../components/common/ui';
 import { Badge } from '../../components/common/Badge';
@@ -74,6 +75,16 @@ export const GroupDashboardPage: React.FC<{ groupId: string; onNavigate?: (path:
   const [cancelSession, setCancelSession] = useState<SessionRow | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [studentOptions, setStudentOptions] = useState<StudentOptionsData | null>(null);
+  const [selectedSession, setSelectedSession] = useState<SessionRow | null>(null);
+  const [sessionAttendance, setSessionAttendance] = useState<any[]>([]);
+  const [sessionAttendanceSummary, setSessionAttendanceSummary] = useState<any[]>([]);
+  const [sessionLoading, setSessionLoading] = useState(false);
+  const [sessionError, setSessionError] = useState('');
+  const [sessionBusyStudent, setSessionBusyStudent] = useState<string | null>(null);
+  const [generatingSessions, setGeneratingSessions] = useState(false);
+  const [noteTarget, setNoteTarget] = useState<EnrollmentRow | null>(null);
+  const [behaviorNote, setBehaviorNote] = useState({ category: 'behavior', severity: 'info', note: '' });
+  const [savingNote, setSavingNote] = useState(false);
 
   const load = useCallback(async () => {
     if (!supabase || !groupId) { setError('قاعدة البيانات غير متاحة.'); setLoading(false); return; }
@@ -103,6 +114,18 @@ export const GroupDashboardPage: React.FC<{ groupId: string; onNavigate?: (path:
       ]);
       setStudents((sres.data || []) as EnrollmentRow[]);
       setSessions((sessres.data || []) as SessionRow[]);
+      const sessionIds = (sessres.data || []).map((s: any) => s.id).filter(Boolean);
+      if (sessionIds.length) {
+        const { data: attendanceRows, error: summaryError } = await supabase
+          .from('attendance_records')
+          .select('session_id,student_id,status')
+          .eq('group_id', groupId)
+          .in('session_id', sessionIds)
+          .limit(5000);
+        setSessionAttendanceSummary(summaryError ? [] : (attendanceRows || []));
+      } else {
+        setSessionAttendanceSummary([]);
+      }
       setExams((exres.data || []) as ExamRow[]);
       setHistory((hres.data || []) as HistoryRow[]);
       setRecentAttendance((ares.data || []) as AttendanceRow[]);
@@ -114,6 +137,232 @@ export const GroupDashboardPage: React.FC<{ groupId: string; onNavigate?: (path:
   }, [groupId]);
 
   useEffect(() => { void load(); }, [load]);
+
+  const openSessionRecord = async (session: SessionRow) => {
+    setSelectedSession(session);
+    setSessionAttendance([]);
+    setSessionError('');
+    setSessionLoading(true);
+    setNoteTarget(null);
+    try {
+      if (!supabase) throw new Error('قاعدة البيانات غير متاحة.');
+      const { data, error: queryError } = await supabase
+        .from('attendance_records')
+        .select('id,student_id,student_name,status,date,time,notes,attendance_method,checked_in_at,created_at')
+        .eq('group_id', groupId)
+        .eq('session_id', session.id)
+        .order('created_at', { ascending: false })
+        .limit(1000);
+      if (queryError) throw queryError;
+      setSessionAttendance(data || []);
+    } catch (e: any) {
+      setSessionError(e?.message || 'تعذر تحميل كشف الحضور للحصة.');
+    } finally {
+      setSessionLoading(false);
+    }
+  };
+
+  const markSessionAttendance = async (student: EnrollmentRow, status: 'present' | 'late' | 'absent') => {
+    if (!supabase || !selectedSession || !teacherId || !student.student_id) return;
+    if (sessionBusyStudent === student.student_id) return;
+    const existing = sessionAttendance.find((row) => row.student_id === student.student_id);
+    if (existing?.status === status) {
+      toast.push('info', 'الحالة دي مسجلة بالفعل للطالب في الحصة.');
+      return;
+    }
+
+    setSessionBusyStudent(student.student_id);
+    setSessionError('');
+    try {
+      const now = new Date();
+      const nowIso = now.toISOString();
+      const cairoParts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit',
+      }).formatToParts(now);
+      const part = (type: string) => cairoParts.find((p) => p.type === type)?.value || '';
+      const cairoToday = `${part('year')}-${part('month')}-${part('day')}`;
+      const eventTime = selectedSession.session_date === cairoToday ? nowIso : selectedSession.starts_at;
+      const formattedTime = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Africa/Cairo', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+      }).format(new Date(eventTime));
+      const lateMinutes = status === 'late'
+        ? Math.max(0, Math.floor((new Date(eventTime).getTime() - new Date(selectedSession.starts_at).getTime()) / 60000))
+        : 0;
+      const payload = {
+        group_id: groupId,
+        tutor_id: teacherId,
+        student_id: student.student_id,
+        student_name: student.student_name,
+        qr_code: student.qr_code || `MANUAL-${student.student_id.slice(0, 8).toUpperCase()}`,
+        session_id: selectedSession.id,
+        date: selectedSession.session_date,
+        time: formattedTime,
+        status,
+        homework_status: 'not_completed',
+        notes: existing?.notes
+          ? `${existing.notes}\nتحديث يدوي للحالة من سجل الحصة.`
+          : 'تسجيل يدوي من سجل الحصة.',
+        scanned_via_qr: false,
+        attendance_method: 'manual',
+        checked_in_at: status === 'absent' ? null : eventTime,
+        late_minutes: lateMinutes,
+        updated_at: nowIso,
+      };
+      const result = existing?.id
+        ? await supabase.from('attendance_records').update(payload).eq('id', existing.id).eq('group_id', groupId).select('*').single()
+        : await supabase.from('attendance_records').insert({ ...payload, created_at: nowIso }).select('*').single();
+      if (result.error) throw result.error;
+
+      toast.push('success', status === 'present' ? 'تم تسجيل الطالب حاضرًا.' : status === 'late' ? 'تم تسجيل الطالب متأخرًا.' : 'تم تسجيل الطالب غائبًا.');
+      await load();
+      await openSessionRecord(selectedSession);
+    } catch (e: any) {
+      const message = e?.message || 'تعذر حفظ حالة حضور الطالب.';
+      setSessionError(message);
+      toast.push('error', message);
+    } finally {
+      setSessionBusyStudent(null);
+    }
+  };
+
+  const saveBehaviorNote = async () => {
+    if (!supabase || !teacherId || !noteTarget || !behaviorNote.note.trim()) {
+      toast.push('error', 'اكتب ملاحظة قصيرة قبل الحفظ.');
+      return;
+    }
+    setSavingNote(true);
+    try {
+      const sessionContext = selectedSession
+        ? `\n[الحصة: ${selectedSession.title} — ${fmtDate(selectedSession.session_date)}]`
+        : '';
+      const { error: noteError } = await supabase.from('student_notes').insert({
+        student_id: noteTarget.student_id,
+        teacher_id: teacherId,
+        assistant_id: null,
+        group_id: groupId,
+        category: behaviorNote.category,
+        severity: behaviorNote.severity,
+        note: `${behaviorNote.note.trim()}${sessionContext}`,
+        is_pinned: false,
+      });
+      if (noteError) throw noteError;
+      toast.push('success', 'اتحفظ التقييم في سجل الطالب.');
+      setBehaviorNote({ category: 'behavior', severity: 'info', note: '' });
+      setNoteTarget(null);
+    } catch (e: any) {
+      toast.push('error', e?.message || 'تعذر حفظ التقييم.');
+    } finally {
+      setSavingNote(false);
+    }
+  };
+
+  const generateRecurringSessions = async () => {
+    if (!supabase || !group || !teacherId) return;
+    const currentSlots: GroupScheduleSlot[] = group.scheduleSlots || [];
+    if (!currentSlots.length) {
+      toast.push('error', 'المجموعة ليس لها مواعيد أسبوعية محفوظة.');
+      return;
+    }
+    setGeneratingSessions(true);
+    try {
+      const now = new Date();
+      const today = new Date(now);
+      today.setHours(0, 0, 0, 0);
+      const horizon = new Date(today);
+      horizon.setDate(horizon.getDate() + 28);
+      const { data: existingRows, error: existingError } = await supabase
+        .from('lesson_sessions')
+        .select('id,starts_at')
+        .eq('group_id', groupId)
+        .gte('starts_at', today.toISOString())
+        .lt('starts_at', horizon.toISOString());
+      if (existingError) throw existingError;
+
+      const existingStarts = (existingRows || []).map((row: any) => new Date(row.starts_at).getTime());
+      const newSessions: any[] = [];
+      const dateString = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      for (let offset = 0; offset < 28; offset += 1) {
+        const day = new Date(today);
+        day.setDate(day.getDate() + offset);
+        const isoDate = dateString(day);
+        const englishDay = DAY_ORDER[(day.getDay() + 1) % 7];
+        for (const slot of currentSlots) {
+          if (slot.day !== englishDay && slot.dayArabic !== dayAr(englishDay)) continue;
+          if (!slot.startTime || !slot.endTime || slot.endTime === slot.startTime) continue;
+          const starts = new Date(`${isoDate}T${slot.startTime}:00`);
+          const ends = new Date(`${isoDate}T${slot.endTime}:00`);
+          if (!Number.isFinite(starts.getTime()) || !Number.isFinite(ends.getTime())) continue;
+          if (ends <= starts) ends.setDate(ends.getDate() + 1);
+          if (starts <= now || ends <= starts) continue;
+          if (existingStarts.some((stamp) => Math.abs(stamp - starts.getTime()) < 90000)) continue;
+          if (newSessions.some((session) => Math.abs(new Date(session.starts_at).getTime() - starts.getTime()) < 90000)) continue;
+          newSessions.push({
+            tutor_id: teacherId,
+            group_id: groupId,
+            title: `${group.name} — ${slot.dayArabic || dayAr(englishDay)}`,
+            subject: group.subject || null,
+            session_date: isoDate,
+            starts_at: starts.toISOString(),
+            ends_at: ends.toISOString(),
+            location: group.location || null,
+            status: 'scheduled',
+            updated_at: now.toISOString(),
+          });
+        }
+      }
+
+      if (!newSessions.length) {
+        toast.push('info', 'سجلات الأسابيع الأربعة القادمة موجودة بالفعل أو لا توجد حصص مستقبلية في هذه الفترة.');
+        return;
+      }
+      const { data: createdRows, error: insertError } = await supabase
+        .from('lesson_sessions')
+        .insert(newSessions)
+        .select('id');
+      if (insertError) throw insertError;
+
+      const enrolledIds = students.map((student) => student.student_id).filter(Boolean);
+      if (enrolledIds.length && createdRows?.length) {
+        const events = newSessions.flatMap((session) =>
+          enrolledIds.map((userId) => ({
+            user_id: userId,
+            title: `حصة: ${session.title}`,
+            event_type: 'lesson',
+            starts_at: session.starts_at,
+            ends_at: session.ends_at,
+            link: '/student/calendar',
+          }))
+        );
+        const { error: calendarError } = await supabase.from('calendar_events').insert(events);
+        if (calendarError) toast.push('warning', 'تم إنشاء سجلات الحصص، لكن تعذرت مزامنة بعض المواعيد مع تقويم الطلاب.');
+      }
+
+      toast.push('success', `تم إنشاء ${createdRows?.length || newSessions.length} سجل حصة للأربع أسابيع القادمة.`);
+      await load();
+    } catch (e: any) {
+      toast.push('error', e?.message || 'تعذر إنشاء سجلات الحصص.');
+    } finally {
+      setGeneratingSessions(false);
+    }
+  };
+
+  const sessionCounts = (sessionId: string) => {
+    const byStudent = new Map<string, string>();
+    sessionAttendanceSummary
+      .filter((row) => row.session_id === sessionId && row.student_id)
+      .forEach((row) => {
+        if (!byStudent.has(row.student_id)) byStudent.set(row.student_id, row.status);
+      });
+    const values = Array.from(byStudent.values());
+    return {
+      total: students.length,
+      present: values.filter((value) => value === 'present').length,
+      late: values.filter((value) => value === 'late').length,
+      absent: values.filter((value) => value === 'absent').length,
+      recorded: byStudent.size,
+      unrecorded: Math.max(0, students.length - byStudent.size),
+    };
+  };
 
   const upcoming = useMemo(() => {
     const nowIso = new Date().toISOString();
@@ -208,6 +457,7 @@ export const GroupDashboardPage: React.FC<{ groupId: string; onNavigate?: (path:
     { key: 'payment_status', header: 'الدفع', render: r => <StatusBadge status={r.fee_exempt ? 'exempt' : r.payment_status === 'paid' ? 'paid' : 'overdue'} size="sm" label={r.fee_exempt ? 'معفو' : undefined} /> },
     { key: 'actions', header: 'إجراءات', render: r => (
       <div className="flex items-center gap-1.5">
+        {onNavigate && <button onClick={() => onNavigate(`/teacher/students/${r.student_id}`)} className="px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 text-[10px] font-black flex items-center gap-1 cursor-pointer transition-colors" title="فتح ملف الطالب"><UserRound className="w-3 h-3" /> الملف</button>}
         <button onClick={() => setStudentOptions({
           enrollmentId: r.id,
           studentId: r.student_id,
@@ -295,6 +545,7 @@ export const GroupDashboardPage: React.FC<{ groupId: string; onNavigate?: (path:
         tabs={[
           { key: 'overview', label: 'نظرة عامة' },
           { key: 'students', label: 'الطلاب', count: students.length },
+          { key: 'lessons', label: 'سجل الحصص', count: sessions.length },
           { key: 'schedule', label: 'الحصص والمواعيد' },
           { key: 'exams', label: 'الامتحانات', count: exams.length },
           { key: 'history', label: 'سجل المواعيد', count: history.length },
@@ -390,6 +641,7 @@ export const GroupDashboardPage: React.FC<{ groupId: string; onNavigate?: (path:
                 <div className="flex items-center justify-between"><span className="text-xs font-black text-slate-800">{r.student_name}</span><StatusBadge status={r.fee_exempt ? 'exempt' : r.payment_status === 'paid' ? 'paid' : 'overdue'} size="sm" label={r.fee_exempt ? 'معفو' : undefined} /></div>
                 <div className="flex items-center justify-between text-[11px]"><span className="text-slate-400 font-bold">الحضور</span><span className="font-black">{Math.round(Number(r.attendance_rate || 0))}%</span></div>
                 <div className="flex gap-1.5 pt-1">
+                  {onNavigate && <button onClick={() => onNavigate(`/teacher/students/${r.student_id}`)} className="flex-1 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-black cursor-pointer">ملف الطالب</button>}
                   <button onClick={() => setStudentOptions({ enrollmentId: r.id, studentId: r.student_id, studentName: r.student_name, grade: r.grade, groupId, groupName: group.name, groupSlots: slots, attendanceMode: r.attendance_mode || 'fixed', customScheduleSlots: r.custom_schedule_slots || [], feeExempt: r.fee_exempt === true, feeExemptReason: r.fee_exempt_reason, feeExemptUntil: r.fee_exempt_until })} className="flex-1 py-1.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 text-[10px] font-black cursor-pointer">خيارات</button>
                   <button onClick={() => setTransferStudent(r)} className="flex-1 py-1.5 rounded-lg bg-violet-50 border border-violet-200 text-violet-700 text-[10px] font-black cursor-pointer">نقل</button>
                   <button onClick={() => setRemoveStudent(r)} className="flex-1 py-1.5 rounded-lg bg-red-50 border border-red-200 text-red-600 text-[10px] font-black cursor-pointer">إزالة</button>
@@ -400,10 +652,52 @@ export const GroupDashboardPage: React.FC<{ groupId: string; onNavigate?: (path:
         </div>
       )}
 
+      {/* ============ سجل الحصص لكل تاريخ وموعد ============ */}
+      {tab === 'lessons' && (
+        <div className="space-y-3">
+          <Card title="سجل حصص المجموعة" actions={<Btn size="sm" variant="primary" onClick={() => void generateRecurringSessions()} disabled={generatingSessions}>{generatingSessions ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CalendarClock className="w-3.5 h-3.5" />} تجهيز الأسابيع الأربعة القادمة</Btn>}>
+            <p className="text-[11px] font-bold text-slate-500 mb-3">كل حصة لها سجل مستقل بالتاريخ واليوم والساعة، ومنه تفتح كشف الطلاب وتعدّل الحالات وتراجع من لم يسجل حضوره.</p>
+            {sessions.length === 0 ? (
+              <EmptyState title="لا توجد سجلات حصص بعد" description="جهّز سجلات الأسابيع الأربعة القادمة من المواعيد الأسبوعية للمجموعة، أو أضف حصة بتاريخ محدد." icon={<ClipboardList className="w-6 h-6" />} />
+            ) : (
+              <div className="space-y-2.5">
+                {[...sessions].sort((a, b) => b.starts_at.localeCompare(a.starts_at)).map((session) => {
+                  const counts = sessionCounts(session.id);
+                  return (
+                    <div key={session.id} className="p-3.5 rounded-2xl border border-slate-200 bg-white hover:border-blue-200 transition-colors space-y-2">
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-black text-slate-800">{session.title}</span>
+                            <StatusBadge status={session.status} size="sm" />
+                          </div>
+                          <div className="text-[11px] font-bold text-slate-500 mt-1">
+                            {new Date(session.starts_at).toLocaleDateString('ar-EG', { weekday: 'long', timeZone: 'Africa/Cairo' })} · {fmtDate(session.session_date)} · {fmtDateTime(session.starts_at)} إلى {fmtDateTime(session.ends_at)}
+                          </div>
+                          {session.location && <div className="text-[10px] text-slate-400 mt-1">{session.location}</div>}
+                        </div>
+                        <Btn size="sm" variant="primary" onClick={() => void openSessionRecord(session)}><ClipboardList className="w-3.5 h-3.5" /> فتح سجل الحصة</Btn>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                        <div className="rounded-xl bg-slate-50 p-2"><div className="text-[9px] text-slate-400 font-bold">طلاب المجموعة</div><div className="text-sm font-black">{counts.total}</div></div>
+                        <div className="rounded-xl bg-emerald-50 p-2"><div className="text-[9px] text-emerald-700 font-bold">حاضر</div><div className="text-sm font-black text-emerald-700">{counts.present}</div></div>
+                        <div className="rounded-xl bg-amber-50 p-2"><div className="text-[9px] text-amber-700 font-bold">متأخر</div><div className="text-sm font-black text-amber-700">{counts.late}</div></div>
+                        <div className="rounded-xl bg-rose-50 p-2"><div className="text-[9px] text-rose-700 font-bold">غائب</div><div className="text-sm font-black text-rose-700">{counts.absent}</div></div>
+                        <div className="rounded-xl bg-blue-50 p-2"><div className="text-[9px] text-blue-700 font-bold">لم يسجل</div><div className="text-sm font-black text-blue-700">{counts.unrecorded}</div></div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
+
       {/* ============ الحصص والمواعيد ============ */}
       {tab === 'schedule' && (
         <div className="space-y-4">
-          <Card title="المواعيد الأسبوعية — تغيير الميعاد بفحص توافق الطلاب">
+          <Card title="المواعيد الأسبوعية — تغيير الميعاد بفحص توافق الطلاب" actions={<Btn size="sm" variant="primary" onClick={() => void generateRecurringSessions()} disabled={generatingSessions}>{generatingSessions ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CalendarClock className="w-3.5 h-3.5" />} إنشاء سجلات 4 أسابيع</Btn>}>
             {slots.length === 0 ? (
               <EmptyState title="لا مواعيد أسبوعية محفوظة" description="أضف مواعيد المجموعة من تعديل بيانات المجموعة." icon={<Clock className="w-6 h-6" />} />
             ) : (
@@ -443,6 +737,7 @@ export const GroupDashboardPage: React.FC<{ groupId: string; onNavigate?: (path:
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <StatusBadge status={s.status} size="sm" />
+                      <button onClick={() => void openSessionRecord(s)} className="px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 text-[10px] font-black cursor-pointer transition-colors">سجل الحصة</button>
                       <button onClick={() => setCancelSession(s)} className="px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 text-[10px] font-black cursor-pointer transition-colors">إلغاء</button>
                     </div>
                   </div>
@@ -460,7 +755,10 @@ export const GroupDashboardPage: React.FC<{ groupId: string; onNavigate?: (path:
                       <span className="text-xs font-black text-slate-700">{s.title}</span>
                       <span className="text-[11px] font-bold text-slate-400 ms-2">{fmtDate(s.session_date)}</span>
                     </div>
-                    <StatusBadge status={s.status} size="sm" />
+                    <div className="flex items-center gap-2 shrink-0">
+                      <StatusBadge status={s.status} size="sm" />
+                      <button onClick={() => void openSessionRecord(s)} className="px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 text-[10px] font-black cursor-pointer transition-colors">سجل الحصة</button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -522,6 +820,79 @@ export const GroupDashboardPage: React.FC<{ groupId: string; onNavigate?: (path:
             </div>
           )}
         </Card>
+      )}
+
+      {/* ===== سجل الحصة وكشف الطلاب ===== */}
+      {selectedSession && (
+        <Modal
+          isOpen
+          onClose={() => { setSelectedSession(null); setNoteTarget(null); setSessionError(''); }}
+          maxWidth="2xl"
+          title={`سجل الحصة — ${selectedSession.title}`}
+          icon={<ClipboardList className="w-5 h-5" />}
+        >
+          <div className="space-y-4" dir="rtl">
+            <div className="rounded-2xl bg-blue-50 border border-blue-100 p-3 text-xs">
+              <div className="font-black text-blue-950">{fmtDate(selectedSession.session_date)} · {fmtDateTime(selectedSession.starts_at)} إلى {fmtDateTime(selectedSession.ends_at)}</div>
+              <div className="text-[11px] text-blue-800 mt-1">إجمالي الطلاب المسجلين بالمجموعة: {students.length} · كل تغيير حضور يُحفظ في السجل ويشغّل قواعد إشعار ولي الأمر المعتمدة.</div>
+            </div>
+            {sessionError && <ErrorBlock message={sessionError} onRetry={() => void openSessionRecord(selectedSession)} />}
+            {sessionLoading ? (
+              <LoadingBlock label="جاري تحميل سجل الطلاب..." rows={4} />
+            ) : (
+              <div className="space-y-2">
+                {students.length === 0 ? <EmptyState title="لا يوجد طلاب نشطون في المجموعة" /> : students.map((student) => {
+                  const entry = sessionAttendance.find((row) => row.student_id === student.student_id);
+                  const busy = sessionBusyStudent === student.student_id;
+                  const statusLabel = entry?.status === 'present' ? 'حاضر' : entry?.status === 'late' ? 'متأخر' : entry?.status === 'absent' ? 'غائب' : 'لم يسجل';
+                  return (
+                    <div key={student.id} className="rounded-2xl border border-slate-200 p-3 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="text-xs font-black text-slate-800">{student.student_name}</div>
+                          <div className="text-[10px] text-slate-500 mt-1">{statusLabel}{entry?.time ? ` · ${String(entry.time).slice(0, 5)}` : ''}{entry?.attendance_method === 'qr' ? ' · مسح QR' : entry ? ' · تسجيل يدوي/تلقائي' : ''}</div>
+                        </div>
+                        <div className="flex gap-1 flex-wrap justify-end">
+                          {onNavigate && <Btn size="sm" variant="ghost" onClick={() => onNavigate(`/teacher/students/${student.student_id}`)}><UserRound className="w-3.5 h-3.5" /> ملف</Btn>}
+                          <Btn size="sm" variant="secondary" onClick={() => { setNoteTarget(student); setBehaviorNote({ category: 'behavior', severity: 'info', note: '' }); }}><NotebookPen className="w-3.5 h-3.5" /> تقييم</Btn>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        <button disabled={busy} onClick={() => void markSessionAttendance(student, 'present')} className="rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 py-2 text-[10px] font-black text-emerald-800">{busy ? 'جارٍ الحفظ...' : 'حاضر'}</button>
+                        <button disabled={busy} onClick={() => void markSessionAttendance(student, 'late')} className="rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 disabled:opacity-50 py-2 text-[10px] font-black text-amber-800">متأخر</button>
+                        <button disabled={busy} onClick={() => void markSessionAttendance(student, 'absent')} className="rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 disabled:opacity-50 py-2 text-[10px] font-black text-rose-800">غائب</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {noteTarget && (
+              <div className="rounded-2xl border border-violet-200 bg-violet-50/60 p-4 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-xs font-black text-violet-950">تقييم الطالب: {noteTarget.student_name}</div>
+                  <button onClick={() => setNoteTarget(null)} className="text-[10px] font-bold text-slate-500">إغلاق</button>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label className="block">
+                    <span className="block text-[10px] font-black text-slate-600 mb-1">نوع الملاحظة</span>
+                    <select value={behaviorNote.category} onChange={(e) => setBehaviorNote((v) => ({ ...v, category: e.target.value }))} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold">
+                      <option value="behavior">سلوك</option><option value="academic">أكاديمي</option><option value="participation">مشاركة</option><option value="homework">واجبات</option><option value="attendance">التزام بالحضور</option>
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="block text-[10px] font-black text-slate-600 mb-1">التقييم</span>
+                    <select value={behaviorNote.severity} onChange={(e) => setBehaviorNote((v) => ({ ...v, severity: e.target.value }))} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold">
+                      <option value="positive">إيجابي ⭐</option><option value="info">معلومة</option><option value="warning">يحتاج متابعة</option><option value="critical">مهم / عاجل</option>
+                    </select>
+                  </label>
+                </div>
+                <textarea value={behaviorNote.note} onChange={(e) => setBehaviorNote((v) => ({ ...v, note: e.target.value }))} rows={3} placeholder="اكتب ملاحظتك عن سلوك الطالب أو مشاركته أو مستواه..." className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs leading-6" />
+                <div className="flex justify-end"><Btn size="sm" variant="primary" onClick={() => void saveBehaviorNote()} disabled={savingNote || !behaviorNote.note.trim()}>{savingNote ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />} حفظ التقييم في ملف الطالب</Btn></div>
+              </div>
+            )}
+          </div>
+        </Modal>
       )}
 
       {/* ===== المودالات ===== */}
