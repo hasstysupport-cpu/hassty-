@@ -40,9 +40,10 @@ export default async function handler(req, res) {
 
   let stage = 'claim';
   try {
-    // Keep the claim call within this route's configured 60s budget without retrying
-    // an ambiguous, state-changing claim response.
-    const claimed = await rpc('claim_parent_whatsapp_job', {}, 15000);
+    // The queue is durable; allow transient network/database latency while staying
+    // inside the route's configured 60s budget. Do not retry an ambiguous claim,
+    // because it changes job state before returning its response.
+    const claimed = await rpc('claim_parent_whatsapp_job', {}, 30000);
     const job = Array.isArray(claimed) ? claimed[0] : claimed;
     if (!job || !job.id) return jsonOk(res, { processed: false });
 
