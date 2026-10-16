@@ -51,6 +51,7 @@ interface AttendanceItem {
   scanned_via_qr?: boolean;
   attendance_method?: string;
   created_at?: string;
+  checked_in_at?: string | null;
 }
 
 interface Props {
@@ -105,7 +106,7 @@ export const GroupSessionLedger: React.FC<Props> = ({ groupId, teacherId, sessio
     try {
       const { data, error } = await supabase
         .from('attendance_records')
-        .select('id,group_id,tutor_id,student_id,student_name,qr_code,session_id,date,time,status,notes,scanned_via_qr,attendance_method,created_at')
+        .select('id,group_id,tutor_id,student_id,student_name,qr_code,session_id,date,time,status,notes,scanned_via_qr,attendance_method,created_at,checked_in_at')
         .eq('group_id', groupId)
         .gte('date', dates[0])
         .lte('date', dates[dates.length - 1])
@@ -143,7 +144,15 @@ export const GroupSessionLedger: React.FC<Props> = ({ groupId, teacherId, sessio
       ? attendanceRows.filter((row) => !row.session_id && row.date === session.session_date)
       : [];
     const ids = new Set(direct.map((row) => row.id));
-    return [...direct, ...legacy.filter((row) => !ids.has(row.id))];
+    const combined = [...direct, ...legacy.filter((row) => !ids.has(row.id))];
+    // بعض عمليات المسح القديمة قد تكون كررت التسجيل؛ نظهر أحدث سجل لكل طالب في كشف الحصة.
+    const unique = new Map<string, AttendanceItem>();
+    combined.forEach((row) => {
+      const key = row.student_id || `name:${row.student_name}`;
+      const current = unique.get(key);
+      if (!current || String(row.created_at || row.time || '') >= String(current.created_at || current.time || '')) unique.set(key, row);
+    });
+    return [...unique.values()];
   }, [attendanceRows, sessions]);
 
   const selectedSession = sessions.find((item) => item.id === selectedSessionId) || null;
@@ -199,6 +208,7 @@ export const GroupSessionLedger: React.FC<Props> = ({ groupId, teacherId, sessio
         status,
         scanned_via_qr: existing?.scanned_via_qr ?? false,
         attendance_method: existing?.attendance_method || 'manual',
+        checked_in_at: status === 'absent' ? null : (existing?.checked_in_at || nowIso),
         updated_at: nowIso,
       };
 
@@ -211,7 +221,6 @@ export const GroupSessionLedger: React.FC<Props> = ({ groupId, teacherId, sessio
       } else {
         const { data, error } = await supabase.from('attendance_records').insert({
           ...payload,
-          checked_in_at: status === 'absent' ? null : nowIso,
         }).select('id,group_id,tutor_id,student_id,student_name,qr_code,session_id,date,time,status,notes,scanned_via_qr,attendance_method,created_at').single();
         if (error) throw error;
         saved = data as AttendanceItem;
@@ -412,6 +421,33 @@ export const GroupSessionLedger: React.FC<Props> = ({ groupId, teacherId, sessio
                                   <button type="button" disabled={busy || session.status === 'cancelled'} onClick={() => void markStudent(session, student, 'late')} className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[10px] font-black text-amber-700 disabled:opacity-50">متأخر</button>
                                   <button type="button" disabled={busy || session.status === 'cancelled'} onClick={() => void markStudent(session, student, 'absent')} className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-black text-red-700 disabled:opacity-50"><UserX className="me-1 inline h-3 w-3" />غائب</button>
                                   <button type="button" onClick={() => { setNoteStudent(student); setNoteText(''); setNoteCategory('behavior'); setNoteSeverity('info'); }} className="rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-[10px] font-black text-violet-700"><MessageSquareText className="me-1 inline h-3 w-3" />تقييم</button>
+                                  {busy && <Loader2 className="h-4 w-4 animate-spin text-blue-600" />}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {records.filter((row) => row.student_id && !students.some((student) => student.student_id === row.student_id)).map((row) => {
+                          const formerStudent: GroupStudent = { id: row.id, student_id: row.student_id as string, student_name: row.student_name, qr_code: row.qr_code };
+                          const key = `${session.id}:${formerStudent.student_id}`;
+                          const busy = busyKey === key;
+                          return (
+                            <div key={`historical-${row.id}`} className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-3">
+                              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                <div className="flex min-w-0 items-center gap-2.5">
+                                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-200 text-slate-600"><UserRound className="h-4 w-4" /></div>
+                                  <div className="min-w-0">
+                                    <div className="truncate text-xs font-black text-slate-800">{row.student_name}</div>
+                                    <div className="mt-1 text-[10px] font-bold text-slate-500">قيد سابق أو طالب غير نشط — السجل التاريخي محفوظ</div>
+                                  </div>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <StatusBadge status={row.status} size="sm" />
+                                  {onNavigate && <button type="button" onClick={() => onNavigate(`/teacher/students/${encodeURIComponent(formerStudent.student_id)}`)} className="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[10px] font-black text-blue-700"><UserRound className="me-1 inline h-3 w-3" />ملف الطالب</button>}
+                                  <button type="button" disabled={busy || session.status === 'cancelled'} onClick={() => void markStudent(session, formerStudent, 'present')} className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[10px] font-black text-emerald-700 disabled:opacity-50">حاضر</button>
+                                  <button type="button" disabled={busy || session.status === 'cancelled'} onClick={() => void markStudent(session, formerStudent, 'late')} className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[10px] font-black text-amber-700 disabled:opacity-50">متأخر</button>
+                                  <button type="button" disabled={busy || session.status === 'cancelled'} onClick={() => void markStudent(session, formerStudent, 'absent')} className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-black text-red-700 disabled:opacity-50">غائب</button>
+                                  <button type="button" onClick={() => { setNoteStudent(formerStudent); setNoteText(''); setNoteCategory('behavior'); setNoteSeverity('info'); }} className="rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-[10px] font-black text-violet-700"><MessageSquareText className="me-1 inline h-3 w-3" />تقييم</button>
                                   {busy && <Loader2 className="h-4 w-4 animate-spin text-blue-600" />}
                                 </div>
                               </div>
