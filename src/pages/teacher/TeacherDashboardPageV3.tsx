@@ -5,9 +5,9 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Activity, ArrowLeft, Award, BellRing, CalendarDays, CheckCircle2, Clock3,
-  CreditCard, GraduationCap, Layers3, MessageCircle, RefreshCw, ScanLine,
-  ShieldAlert, Sparkles, Users, UserRoundCheck, Wallet, XCircle, Send,
+  Activity, ArrowLeft, Award, CalendarDays, CheckCircle2, Clock3,
+  GraduationCap, Layers3, MessageCircle, RefreshCw, ScanLine,
+  ShieldAlert, Users, UserRoundCheck, Wallet, XCircle, Send,
 } from 'lucide-react';
 import { useAuth } from '../../lib/AuthContext';
 import { supabase } from '../../lib/supabase';
