@@ -27,6 +27,7 @@ import { formatTimeArabic } from '../../lib/scheduleSync';
 import type { StudentGroup, GroupScheduleSlot } from '../../types';
 import { ChangeSlotModal, TransferStudentModal, AddSessionModal, AddExamModal, SlotRow } from '../../components/teacher/GroupScheduleControls';
 import { StudentOptionsModal, StudentOptionsData } from '../../components/teacher/StudentOptionsModal';
+import { GroupSessionLedger } from '../../components/teacher/GroupSessionLedger';
 import { exportToExcel, exportToPdf } from '../../utils/exportData';
 
 const DAY_ORDER = ['Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
@@ -45,7 +46,7 @@ interface ExamRow { id: string; title: string; exam_date: string; starts_at?: st
 interface HistoryRow { id: string; old_schedule?: string; new_schedule?: string; reason?: string; sessions_updated?: number; created_at: string; }
 interface AttendanceRow { id: string; student_name: string; status: string; date: string; time?: string; }
 
-type TabKey = 'overview' | 'students' | 'schedule' | 'exams' | 'history';
+type TabKey = 'overview' | 'students' | 'schedule' | 'ledger' | 'exams' | 'history';
 
 export const GroupDashboardPage: React.FC<{ groupId: string; onNavigate?: (path: string) => void }> = ({ groupId, onNavigate }) => {
   const { user } = useAuth();
@@ -208,6 +209,9 @@ export const GroupDashboardPage: React.FC<{ groupId: string; onNavigate?: (path:
     { key: 'payment_status', header: 'الدفع', render: r => <StatusBadge status={r.fee_exempt ? 'exempt' : r.payment_status === 'paid' ? 'paid' : 'overdue'} size="sm" label={r.fee_exempt ? 'معفو' : undefined} /> },
     { key: 'actions', header: 'إجراءات', render: r => (
       <div className="flex items-center gap-1.5">
+        {onNavigate && <button onClick={() => onNavigate(`/teacher/students/${encodeURIComponent(r.student_id)}`)} className="px-2.5 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 text-[10px] font-black flex items-center gap-1 cursor-pointer transition-colors" title="فتح ملف الطالب وسجل الحضور والامتحانات والملاحظات">
+          <FileText className="w-3 h-3" /> ملف الطالب
+        </button>}
         <button onClick={() => setStudentOptions({
           enrollmentId: r.id,
           studentId: r.student_id,
@@ -276,6 +280,7 @@ export const GroupDashboardPage: React.FC<{ groupId: string; onNavigate?: (path:
         description={[group.subject, group.grade, group.location].filter(Boolean).join(' · ')}
         badge="لوحة المجموعة"
         actions={<>
+          <Btn variant="secondary" size="sm" onClick={() => setTab('ledger')}><CalendarClock className="w-3.5 h-3.5" /> دفتر الحصص</Btn>
           {onNavigate && <Btn variant="secondary" size="sm" onClick={() => onNavigate('/teacher/groups')}><ArrowRight className="w-3.5 h-3.5" /> كل المجموعات</Btn>}
           <Btn variant="ghost" size="sm" onClick={() => { setLoading(true); void load(); }} title="تحديث"><RefreshCw className="w-3.5 h-3.5" /></Btn>
         </>}
@@ -286,7 +291,7 @@ export const GroupDashboardPage: React.FC<{ groupId: string; onNavigate?: (path:
         <StatCard label="الطلاب المسجلون" value={group.currentStudents} hint={`من ${group.maxCapacity} مقعد`} tone="blue" icon={<Users className="w-3.5 h-3.5" />} />
         <StatCard label="نسبة الحضور (30 يوم)" value={monthRate === null ? '—' : `${monthRate}%`} hint="حاضر + متأخر" tone="emerald" icon={<TrendingUp className="w-3.5 h-3.5" />} />
         <StatCard label="الحصة القادمة" value={nextSession ? fmtDate(nextSession.session_date) : 'لا يوجد'} hint={nextSession ? `${fmtDateTime(nextSession.starts_at)}` : 'أضف حصة من تبويب الحصص'} tone="violet" icon={<CalendarClock className="w-3.5 h-3.5" />} />
-        <StatCard label="الامتحانات" value={exams.length} hint={exams[0]?.title || 'لا امتحانات بعد'} tone="amber" icon={<GraduationCap className="w-3.5 h-3.5" />} />
+        <StatCard label="الحصص المسجلة" value={sessions.length} hint="التاريخ والساعة وسجل حضور كل حصة" tone="amber" icon={<History className="w-3.5 h-3.5" />} />
       </div>
 
       <Tabs
@@ -296,6 +301,7 @@ export const GroupDashboardPage: React.FC<{ groupId: string; onNavigate?: (path:
           { key: 'overview', label: 'نظرة عامة' },
           { key: 'students', label: 'الطلاب', count: students.length },
           { key: 'schedule', label: 'الحصص والمواعيد' },
+          { key: 'ledger', label: 'سجل الحصص', count: sessions.length },
           { key: 'exams', label: 'الامتحانات', count: exams.length },
           { key: 'history', label: 'سجل المواعيد', count: history.length },
         ]}
@@ -390,6 +396,7 @@ export const GroupDashboardPage: React.FC<{ groupId: string; onNavigate?: (path:
                 <div className="flex items-center justify-between"><span className="text-xs font-black text-slate-800">{r.student_name}</span><StatusBadge status={r.fee_exempt ? 'exempt' : r.payment_status === 'paid' ? 'paid' : 'overdue'} size="sm" label={r.fee_exempt ? 'معفو' : undefined} /></div>
                 <div className="flex items-center justify-between text-[11px]"><span className="text-slate-400 font-bold">الحضور</span><span className="font-black">{Math.round(Number(r.attendance_rate || 0))}%</span></div>
                 <div className="flex gap-1.5 pt-1">
+                  {onNavigate && <button onClick={() => onNavigate(`/teacher/students/${encodeURIComponent(r.student_id)}`)} className="flex-1 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-700 text-[10px] font-black cursor-pointer">ملف الطالب</button>}
                   <button onClick={() => setStudentOptions({ enrollmentId: r.id, studentId: r.student_id, studentName: r.student_name, grade: r.grade, groupId, groupName: group.name, groupSlots: slots, attendanceMode: r.attendance_mode || 'fixed', customScheduleSlots: r.custom_schedule_slots || [], feeExempt: r.fee_exempt === true, feeExemptReason: r.fee_exempt_reason, feeExemptUntil: r.fee_exempt_until })} className="flex-1 py-1.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 text-[10px] font-black cursor-pointer">خيارات</button>
                   <button onClick={() => setTransferStudent(r)} className="flex-1 py-1.5 rounded-lg bg-violet-50 border border-violet-200 text-violet-700 text-[10px] font-black cursor-pointer">نقل</button>
                   <button onClick={() => setRemoveStudent(r)} className="flex-1 py-1.5 rounded-lg bg-red-50 border border-red-200 text-red-600 text-[10px] font-black cursor-pointer">إزالة</button>
@@ -467,6 +474,18 @@ export const GroupDashboardPage: React.FC<{ groupId: string; onNavigate?: (path:
             </Card>
           )}
         </div>
+      )}
+
+      {/* ============ دفتر الحصص وسجلات الحضور ============ */}
+      {tab === 'ledger' && (
+        <GroupSessionLedger
+          groupId={groupId}
+          teacherId={teacherId}
+          sessions={sessions}
+          students={students}
+          onNavigate={onNavigate}
+          onRefresh={() => { setLoading(true); void load(); }}
+        />
       )}
 
       {/* ============ الامتحانات ============ */}
