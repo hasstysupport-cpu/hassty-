@@ -217,6 +217,7 @@ export async function collectStudentMonth(input: CollectMonthInput): Promise<Col
     invoiceNumber = (existingPaid as any).invoice_number || invoiceNumber;
     const notified = await notifyParentPayment({
       studentId: input.student.id,
+      teacherUserId: input.teacherId,
       groupId,
       studentName,
       groupName,
@@ -261,6 +262,7 @@ export async function collectStudentMonth(input: CollectMonthInput): Promise<Col
   // 5) إشعار ولي الأمر (واتساب + push + جرس)
   const notified = await notifyParentPayment({
     studentId: input.student.id,
+    teacherUserId: input.teacherId,
     groupId,
     studentName,
     groupName,

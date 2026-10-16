@@ -11,6 +11,7 @@ import express from 'express';
 import path from 'path';
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
+import type { Transporter } from 'nodemailer';
 import { createServer as createViteServer } from 'vite';
 
 const app = express();
@@ -29,9 +30,9 @@ const SMTP_PASS = rawPass.replace(/\s+/g, '');
 const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
 const SMTP_PORT = parseInt(process.env.SMTP_PORT || '465', 10);
 
-let mailTransporter: nodemailer.Transporter | null = null;
+let mailTransporter: Transporter | null = null;
 
-function getMailTransporter(): nodemailer.Transporter {
+function getMailTransporter(): Transporter {
   if (!mailTransporter) {
     mailTransporter = nodemailer.createTransport({
       host: SMTP_HOST,

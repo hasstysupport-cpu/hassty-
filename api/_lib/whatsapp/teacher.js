@@ -110,8 +110,8 @@ async function requireTeacher(req) {
   return { code: 403, message: 'هذا الحساب ليس حساب مدرس صالحًا لاستخدام واتساب المدرس.' };
 }
 
-/* هل المتصل معلمًا (أيًا كان لديه ربط أو لا)؟ — يُستخدم لتوجيه status دائمًا
-   لمسار المعلم بدل إهدار طلبات Green API كل 4 ثوانٍ على معلم بلا ربط */
+/* Detect teacher callers before selecting status/send handlers.
+   Teachers always use the per-teacher Evolution path, even before linking. */
 export async function teacherCaller(req) {
   try {
     const access = await internalOrUser(req);
@@ -380,10 +380,9 @@ async function tryFetchPhone(name, teacherId, row) {
 /* ============================================================
    getConnectedTeacherInstance — لإشعارات النظام من رقم المدرس
    ------------------------------------------------------------
-   إشعارات ولي الأمر (حضور/غياب/مدفوعات/إزالة من مجموعة ...)
-   تُرسل من رقم المدرس الشخصي متى كان مربوطًا ومتصلًا، بدل
-   إهدار الباقة المجانية لـ Green API. تُعاد null (ويكمل المرسل
-   على Green) إذا لم يكن هناك مثيل متصل.
+   Parent notifications use only the responsible teacher's connected
+   Evolution instance. This helper returns null if there is no connected
+   instance; callers must fail closed, with no legacy-provider fallback.
    ============================================================ */
 export async function getConnectedTeacherInstance(teacherId) {
   try {
