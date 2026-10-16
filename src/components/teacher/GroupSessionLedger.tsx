@@ -4,11 +4,12 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  CalendarDays, Clock3, Users, CheckCircle2, CircleAlert, RefreshCw,
+  CalendarDays, Clock3, CheckCircle2, RefreshCw,
   ChevronDown, ChevronUp, ClipboardList, Search, UserRound, MessageSquareText,
   UserCheck, UserX, Loader2,
 } from 'lucide-react';
-import { Btn, Card, EmptyState, ErrorBlock, Modal, StatusBadge, fmtDate, fmtDateTime, useToast } from '../../components/common/ui';
+import { Btn, Card, EmptyState, ErrorBlock, StatusBadge, fmtDate, fmtDateTime, useToast } from '../../components/common/ui';
+import { Modal } from '../../components/common/Modal';
 import { supabase } from '../../lib/supabase';
 
 type AttendanceStatus = 'present' | 'late' | 'absent';
@@ -378,12 +379,12 @@ export const GroupSessionLedger: React.FC<Props> = ({ groupId, teacherId, sessio
                 {opened && (
                   <div className="mt-4 border-t border-slate-100 pt-4">
                     <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                      {[
+                      {([
                         ['حاضر', presentCount, 'bg-emerald-50 text-emerald-700'],
                         ['متأخر', lateCount, 'bg-amber-50 text-amber-700'],
                         ['غائب', absentCount, 'bg-red-50 text-red-700'],
                         ['لم يُسجّل', unmarkedCount, 'bg-slate-100 text-slate-700'],
-                      ].map(([label, value, cls]) => <div key={String(label)} className={`rounded-xl p-3 ${cls}`}><div className="text-[10px] font-bold">{label}</div><div className="mt-1 text-xl font-black">{value}</div></div>)}
+                      ] as [string, number, string][]).map(([label, value, cls]) => <div key={label} className={`rounded-xl p-3 ${cls}`}><div className="text-[10px] font-bold">{label}</div><div className="mt-1 text-xl font-black">{value}</div></div>)}
                     </div>
                     {session.status === 'cancelled' && <div className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-bold text-red-800">الحصة ملغاة. يمكنك مراجعة سجلاتها السابقة، لكن تسجيل حالات جديدة متاح للحصص الفعالة فقط.</div>}
                     <div className="mb-2 text-xs font-black text-slate-700">كشف الطلاب — كل تغيير يُحفظ في قاعدة البيانات</div>
