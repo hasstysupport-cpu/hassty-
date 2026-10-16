@@ -54,13 +54,24 @@ interface AttendanceItem {
   checked_in_at?: string | null;
 }
 
+interface ScheduleSlotRow {
+  id?: string;
+  day: string;
+  dayArabic?: string;
+  startTime: string;
+  endTime: string;
+}
+
 interface Props {
   groupId: string;
   teacherId: string;
   sessions: SessionItem[];
   students: GroupStudent[];
+  scheduleSlots: ScheduleSlotRow[];
+  subject?: string;
+  location?: string;
   onNavigate?: (path: string) => void;
-  onRefresh?: () => void;
+  onRefresh?: () => void | Promise<void>;
 }
 
 const statusText: Record<AttendanceStatus, string> = {
@@ -80,8 +91,28 @@ const weekdayAr = (value: string) => {
   const date = new Date(`${value}T12:00:00`);
   return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('ar-EG', { weekday: 'long' });
 };
+const DAY_NUMBER: Record<string, number> = {
+  Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6,
+  'الأحد': 0, 'الإثنين': 1, 'الاثنين': 1, 'الثلاثاء': 2, 'الأربعاء': 3, 'الخميس': 4, 'الجمعة': 5, 'السبت': 6,
+};
+const toDateKey = (date: Date) => {
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+};
+const normaliseClock = (value: string) => {
+  const match = String(value || '').match(/^(\\d{1,2}):(\\d{2})/);
+  return match ? `${match[1].padStart(2, '0')}:${match[2]}` : '';
+};
+const rawClock = (value: string) => {
+  const match = String(value || '').match(/[T ](\\d{2}:\\d{2})/);
+  return match?.[1] || '';
+};
+const localClockFromInstant = (value: string) => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+};
 
-export const GroupSessionLedger: React.FC<Props> = ({ groupId, teacherId, sessions, students, onNavigate, onRefresh }) => {
+export const GroupSessionLedger: React.FC<Props> = ({ groupId, teacherId, sessions, students, scheduleSlots, subject, location, onNavigate, onRefresh }) => {
   const toast = useToast();
   const [filter, setFilter] = useState<LedgerFilter>('all');
   const [search, setSearch] = useState('');
@@ -95,6 +126,8 @@ export const GroupSessionLedger: React.FC<Props> = ({ groupId, teacherId, sessio
   const [noteSeverity, setNoteSeverity] = useState('info');
   const [noteText, setNoteText] = useState('');
   const [savingNote, setSavingNote] = useState(false);
+  const [showGenerateConfirm, setShowGenerateConfirm] = useState(false);
+  const [generatingSessions, setGeneratingSessions] = useState(false);
 
   const loadAttendanceRows = useCallback(async () => {
     if (!supabase || !groupId || sessions.length === 0) {
@@ -285,6 +318,112 @@ export const GroupSessionLedger: React.FC<Props> = ({ groupId, teacherId, sessio
     }
   };
 
+  const generateNextEightWeeks = async () => {
+    if (!supabase || !teacherId || !groupId) {
+      toast.push('error', 'تعذر الاتصال بقاعدة البيانات أو التحقق من حساب المدرس.');
+      return;
+    }
+    if (!scheduleSlots.length) {
+      toast.push('error', 'المجموعة لا تحتوي على مواعيد أسبوعية محفوظة. أضف مواعيدها أولًا.');
+      return;
+    }
+
+    setGeneratingSessions(true);
+    try {
+      const now = new Date();
+      const pending: Array<Record<string, unknown>> = [];
+      const plannedKeys = new Set<string>();
+      let validSlots = 0;
+
+      for (let offset = 0; offset < 56; offset += 1) {
+        const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
+        const dateKey = toDateKey(day);
+        const daySlots = scheduleSlots.filter((slot) => DAY_NUMBER[slot.day] === day.getDay());
+        if (!daySlots.length) continue;
+
+        const dayStartTimes = new Set(daySlots.map((slot) => normaliseClock(slot.startTime)).filter(Boolean));
+        const existingStartTimes = new Set<string>();
+        sessions.filter((session) => session.session_date === dateKey).forEach((session) => {
+          // السجلات التي أنشأها هذا المولّد تحفظ الوقت المحلي بصيغة ISO؛ للمواعيد اليدوية القديمة نفضّل النص الأصلي لتفادي التكرار.
+          const preferred = String(session.title || '').startsWith('حصة أسبوعية —')
+            ? localClockFromInstant(session.starts_at)
+            : rawClock(session.starts_at) || localClockFromInstant(session.starts_at);
+          const fallback = preferred === rawClock(session.starts_at)
+            ? localClockFromInstant(session.starts_at)
+            : rawClock(session.starts_at);
+          if (dayStartTimes.has(preferred)) existingStartTimes.add(preferred);
+          else if (dayStartTimes.has(fallback)) existingStartTimes.add(fallback);
+        });
+
+        for (const slot of daySlots) {
+          const startText = normaliseClock(slot.startTime);
+          const endText = normaliseClock(slot.endTime);
+          if (!startText || !endText) continue;
+          const [startHour, startMinute] = startText.split(':').map(Number);
+          const [endHour, endMinute] = endText.split(':').map(Number);
+          if (![startHour, startMinute, endHour, endMinute].every(Number.isFinite)) continue;
+          const starts = new Date(day.getFullYear(), day.getMonth(), day.getDate(), startHour, startMinute, 0, 0);
+          const ends = new Date(day.getFullYear(), day.getMonth(), day.getDate(), endHour, endMinute, 0, 0);
+          if (ends <= starts) continue;
+          validSlots += 1;
+          if (starts <= now || existingStartTimes.has(startText)) continue;
+          const key = `${dateKey}|${startText}`;
+          if (plannedKeys.has(key)) continue;
+          plannedKeys.add(key);
+          pending.push({
+            tutor_id: teacherId,
+            group_id: groupId,
+            title: `حصة أسبوعية — ${weekdayAr(dateKey)}`,
+            subject: subject || null,
+            session_date: dateKey,
+            starts_at: starts.toISOString(),
+            ends_at: ends.toISOString(),
+            location: location || null,
+            status: 'scheduled',
+          });
+        }
+      }
+
+      if (!validSlots) {
+        toast.push('error', 'تعذر قراءة أوقات المواعيد الأسبوعية. راجع يوم ووقت بداية ونهاية كل موعد.');
+        return;
+      }
+      if (!pending.length) {
+        toast.push('success', 'كل مواعيد الأسابيع الثمانية القادمة مسجّلة بالفعل أو أن موعد اليوم انتهى؛ لم نضف أي سجل مكرر.');
+        setShowGenerateConfirm(false);
+        return;
+      }
+
+      const { data: inserted, error } = await supabase.from('lesson_sessions').insert(pending).select('id,title,session_date,starts_at,ends_at,location,status');
+      if (error) throw error;
+
+      // مزامنة اختيارية مع تقويم الطلاب — لا تحذف أو تعدّل أي سجلات سابقة.
+      const events = (inserted || []).flatMap((session: any) => students.map((student) => ({
+        user_id: student.student_id,
+        title: session.title,
+        event_type: 'lesson',
+        starts_at: session.starts_at,
+        ends_at: session.ends_at,
+        link: '/student/calendar',
+      })));
+      let calendarWarning = false;
+      if (events.length) {
+        const { error: calendarError } = await supabase.from('calendar_events').insert(events);
+        calendarWarning = !!calendarError;
+      }
+
+      toast.push(calendarWarning ? 'warning' : 'success',
+        `تم إنشاء ${inserted?.length || 0} سجل حصة جديد. ${calendarWarning ? 'سجلات الحصص محفوظة، لكن تعذرت مزامنة بعضها مع تقويم الطلاب.' : 'وتمت مزامنتها مع تقويم الطلاب.'}`
+      );
+      setShowGenerateConfirm(false);
+      await onRefresh?.();
+    } catch (e: any) {
+      toast.push('error', e?.message || 'تعذر إنشاء الحصص الأسبوعية.');
+    } finally {
+      setGeneratingSessions(false);
+    }
+  };
+
   const openSession = (session: SessionItem) => {
     setSelectedSessionId((current) => current === session.id ? null : session.id);
   };
@@ -319,9 +458,14 @@ export const GroupSessionLedger: React.FC<Props> = ({ groupId, teacherId, sessio
             <h3 className="font-black text-[#1E3A8A]">دفتر الحصص</h3>
             <p className="mt-1 text-xs leading-6 text-slate-600">كل حصة بتاريخها وموعدها وعدد طلاب المجموعة وسجل حضور كل طالب. افتح الحصة لتصحيح الحضور أو إضافة تقييم يُحفَظ في ملف الطالب.</p>
           </div>
-          <Btn variant="secondary" size="sm" onClick={() => { void loadAttendanceRows(); onRefresh?.(); }}>
-            <RefreshCw className={`h-3.5 w-3.5 ${loadingRecords ? 'animate-spin' : ''}`} /> تحديث السجلات
-          </Btn>
+          <div className="flex flex-wrap items-center gap-2">
+            <Btn size="sm" disabled={!scheduleSlots.length || generatingSessions} onClick={() => setShowGenerateConfirm(true)}>
+              {generatingSessions ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CalendarDays className="h-3.5 w-3.5" />} تجهيز 8 أسابيع
+            </Btn>
+            <Btn variant="secondary" size="sm" onClick={() => { void loadAttendanceRows(); void onRefresh?.(); }}>
+              <RefreshCw className={`h-3.5 w-3.5 ${loadingRecords ? 'animate-spin' : ''}`} /> تحديث السجلات
+            </Btn>
+          </div>
         </div>
       </div>
 
@@ -468,6 +612,24 @@ export const GroupSessionLedger: React.FC<Props> = ({ groupId, teacherId, sessio
             );
           })}
         </div>
+      )}
+
+      {showGenerateConfirm && (
+        <Modal isOpen onClose={() => { if (!generatingSessions) setShowGenerateConfirm(false); }} maxWidth="lg" title="تجهيز سجلات الحصص الأسبوعية" icon={<CalendarDays className="h-5 w-5" />}>
+          <div className="space-y-4" dir="rtl">
+            <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-xs leading-6 text-blue-900">
+              سيُنشئ النظام سجلات فعلية لكل موعد أسبوعي خلال الـ 8 أسابيع القادمة، بتاريخ ووقت مستقلين، ويضيفها لتقويم الطلاب. أي حصة موجودة بالفعل أو ملغاة ستظل كما هي ولن تتكرر، والحصص السابقة لن تتغير.
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><div className="text-[11px] font-bold text-slate-500">مواعيد أسبوعية</div><div className="mt-1 text-xl font-black text-slate-900">{scheduleSlots.length}</div></div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><div className="text-[11px] font-bold text-slate-500">مدة التجهيز</div><div className="mt-1 text-xl font-black text-slate-900">56 يومًا</div></div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Btn variant="secondary" size="sm" disabled={generatingSessions} onClick={() => setShowGenerateConfirm(false)}>إلغاء</Btn>
+              <Btn size="sm" disabled={generatingSessions} onClick={() => void generateNextEightWeeks()}>{generatingSessions ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CalendarDays className="h-3.5 w-3.5" />} تأكيد وتجهيز الحصص</Btn>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {noteStudent && (
