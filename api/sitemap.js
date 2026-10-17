@@ -16,6 +16,8 @@
    - في حال فشل الاستعلام يعود بخريطة المسارات الثابتة فقط
    ============================================================ */
 import { SUPABASE_URL, SERVICE_KEY, SITE_URL } from './_lib/config.js';
+import examsLabAccess from './_lib/exams-lab/access.js';
+import examsLabApp from './_lib/exams-lab/app.js';
 
 const STATIC_ROUTES = [
   { path: '/', priority: '1.0', freq: 'daily' },
@@ -68,6 +70,10 @@ async function fetchVerifiedTutorIds() {
 }
 
 export default async function handler(req, res) {
+  const requestUrl = new URL(req.url || '/', 'https://hassty.site');
+  const examsLabAction = requestUrl.searchParams.get('examsLab');
+  if (examsLabAction === 'access') return examsLabAccess(req, res);
+  if (examsLabAction === 'app') return examsLabApp(req, res);
   const today = new Date().toISOString().slice(0, 10);
   let tutorUrls = [];
   try { tutorUrls = await fetchVerifiedTutorIds(); } catch { tutorUrls = []; }
