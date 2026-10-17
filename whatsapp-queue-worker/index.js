@@ -7,7 +7,10 @@
 const apiBaseUrl = String(process.env.HASSTY_API_BASE_URL || 'https://hassty.site').replace(/\/$/, '');
 const secret = String(process.env.WHATSAPP_QUEUE_WORKER_SECRET || '');
 const pollMs = Math.max(3000, Number(process.env.WHATSAPP_QUEUE_POLL_MS || 5000));
-const requestTimeoutMs = Math.max(15000, Number(process.env.WHATSAPP_QUEUE_REQUEST_TIMEOUT_MS || 55000));
+const configuredRequestTimeoutMs = Number(process.env.WHATSAPP_QUEUE_REQUEST_TIMEOUT_MS || 50000);
+const requestTimeoutMs = Number.isFinite(configuredRequestTimeoutMs)
+  ? Math.min(52000, Math.max(15000, configuredRequestTimeoutMs))
+  : 50000;
 const maxConcurrency = Math.min(10, Math.max(1, Number(process.env.WHATSAPP_QUEUE_CONCURRENCY || 5)));
 
 if (!secret) {
