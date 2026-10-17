@@ -11,7 +11,7 @@ function isAuthorized(req) {
   return Boolean(QUEUE_WORKER_SECRET && supplied && supplied === QUEUE_WORKER_SECRET);
 }
 
-async function rpc(name, body, timeoutMs = 10000) {
+async function rpc(name, body, timeoutMs = 8000) {
   if (!SERVICE_KEY) throw new Error('Supabase service key is not configured.');
   const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
     method: 'POST',
@@ -19,16 +19,26 @@ async function rpc(name, body, timeoutMs = 10000) {
       apikey: SERVICE_KEY,
       Authorization: `Bearer ${SERVICE_KEY}`,
       'Content-Type': 'application/json',
+      'Accept': 'application/json',
     },
     body: JSON.stringify(body || {}),
     signal: AbortSignal.timeout(timeoutMs),
   });
   const raw = await response.text();
+  const contentType = response.headers.get('content-type') || 'unknown';
   let data = null;
-  try { data = raw ? JSON.parse(raw) : null; } catch { data = { message: raw.slice(0, 300) }; }
+  let parsed = false;
+  if (raw.trim()) {
+    try { data = JSON.parse(raw); parsed = true; } catch { /* report HTTP/content type below */ }
+  }
+
   if (!response.ok) {
-    const message = data?.message || data?.error || `Supabase RPC ${name} failed (HTTP ${response.status})`;
-    throw new Error(message);
+    const detail = parsed && data && typeof data === 'object' ? (data.message || data.error) : null;
+    const suffix = detail ? `: ${String(detail).slice(0, 200)}` : '';
+    throw new Error(`Supabase RPC ${name} failed (HTTP ${response.status}, content-type=${contentType})${suffix}`);
+  }
+  if (raw.trim() && !parsed) {
+    throw new Error(`Supabase RPC ${name} returned non-JSON body (HTTP ${response.status}, content-type=${contentType}).`);
   }
   return data;
 }
@@ -43,7 +53,7 @@ export default async function handler(req, res) {
     // The queue is durable; allow transient network/database latency while staying
     // inside the route's configured 60s budget. Do not retry an ambiguous claim,
     // because it changes job state before returning its response.
-    const claimed = await rpc('claim_parent_whatsapp_job', {}, 30000);
+    const claimed = await rpc('claim_parent_whatsapp_job', {}, 15000);
     const job = Array.isArray(claimed) ? claimed[0] : claimed;
     if (!job || !job.id) return jsonOk(res, { processed: false });
 
@@ -62,7 +72,7 @@ export default async function handler(req, res) {
           'x-whatsapp-internal-secret': QUEUE_WORKER_SECRET,
         },
         body: JSON.stringify(job.payload),
-        signal: AbortSignal.timeout(30000),
+        signal: AbortSignal.timeout(22000),
       });
       const raw = await response.text();
       let result = null;
